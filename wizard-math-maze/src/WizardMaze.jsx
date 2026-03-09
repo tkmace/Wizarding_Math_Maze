@@ -51,7 +51,6 @@ function genQ(ops,dk){
   return{disp,ans,emoji,op,curPts:pts,wrongs:0}
 }
 
-// BFS to find shortest path from start to end, returns array of [r,c] or null
 function bfsPath(grid){
   const H=grid.length,W=grid[0].length
   const queue=[[1,1,[]]],visited=new Set(['1,1'])
@@ -81,29 +80,17 @@ function genMaze(ops,dk){
   let ex=Math.floor(R*C*.35),at=0
   while(ex>0&&at<600){const r=1+Math.floor(Math.random()*(H-2)),c=1+Math.floor(Math.random()*(W-2));if(g[r][c]===WALL){const h=r%2===1&&c%2===0&&g[r][c-1]===PATH&&g[r][c+1]===PATH,v=r%2===0&&c%2===1&&g[r-1][c]===PATH&&g[r+1][c]===PATH;if(h||v){g[r][c]=PATH;ex--}}at++}
   g[1][1]=START;g[H-2][W-2]=END
-
-  // Place random doors (6-9) away from start/end
   const pc=[];for(let r=0;r<H;r++)for(let c=0;c<W;c++)if(g[r][c]===PATH&&!(r<=2&&c<=2)&&!(r>=H-3&&c>=W-3))pc.push([r,c])
   pc.sort(()=>Math.random()-.5);const nd=6+Math.floor(Math.random()*4),dq={}
   for(const[r,c]of pc.slice(0,nd)){g[r][c]=DOOR;dq[`${r},${c}`]=genQ(ops,dk)}
-
-  // ── Guarantee at least 3 doors on the shortest path to the exit ──
   const path=bfsPath(g)
   if(path){
-    // path cells that are currently plain PATH (not START/END/already DOOR)
     const pathPlain=path.filter(([r,c])=>g[r][c]===PATH)
     const doorsOnPath=path.filter(([r,c])=>g[r][c]===DOOR).length
-    let needed=Math.max(0, 3-doorsOnPath)
-    // shuffle pathPlain and convert until we have 3 doors on path
+    let needed=Math.max(0,3-doorsOnPath)
     pathPlain.sort(()=>Math.random()-.5)
-    for(const[r,c]of pathPlain){
-      if(needed<=0)break
-      g[r][c]=DOOR
-      dq[`${r},${c}`]=genQ(ops,dk)
-      needed--
-    }
+    for(const[r,c]of pathPlain){if(needed<=0)break;g[r][c]=DOOR;dq[`${r},${c}`]=genQ(ops,dk);needed--}
   }
-
   return{grid:g,dq}
 }
 
@@ -146,7 +133,6 @@ const CSS=`
 `
 
 export default function WizardMaze(){
-  // ── Player / auth ──────────────────────────────────────────
   const [screen,setScreen]=useState('login')
   const [nameInput,setNameInput]=useState('')
   const [passcodeInput,setPasscodeInput]=useState('')
@@ -156,8 +142,6 @@ export default function WizardMaze(){
   const [loginError,setLoginError]=useState('')
   const [isReturning,setIsReturning]=useState(false)
   const [loginShake,setLoginShake]=useState(false)
-
-  // ── Game ───────────────────────────────────────────────────
   const [gameScreen,setGameScreen]=useState('start')
   const [ops,setOps]=useState(new Set(['addition']))
   const [diff,setDiff]=useState('apprentice')
@@ -192,7 +176,6 @@ export default function WizardMaze(){
 
   const triggerShake=()=>{setLoginShake(true);setTimeout(()=>setLoginShake(false),600)}
 
-  // ── Login ──────────────────────────────────────────────────
   const handleLogin=async()=>{
     const name=nameInput.trim()
     const pc=passcodeInput.trim()
@@ -202,32 +185,22 @@ export default function WizardMaze(){
     try{
       const{data:existing,error:fetchErr}=await supabase.from('players').select('*').eq('name',name).maybeSingle()
       if(fetchErr)throw fetchErr
-
       if(existing){
-        // Returning player — check passcode
-        if(existing.passcode!==pc){
-          setLoginError('Wrong passcode! Try again. 🔒')
-          triggerShake();setLoginLoading(false);return
-        }
+        if(existing.passcode!==pc){setLoginError('Wrong passcode! Try again. 🔒');triggerShake();setLoginLoading(false);return}
         setPlayerId(existing.id);setPlayerName(existing.name)
         setTotal(existing.total_points||0);setSkinId(existing.equipped_skin||'apprentice')
         setIsReturning(true)
       } else {
-        // New player — create with chosen passcode
-        const{data:newP,error:insertErr}=await supabase
-          .from('players').insert({name,total_points:0,equipped_skin:'apprentice',passcode:pc}).select().single()
+        const{data:newP,error:insertErr}=await supabase.from('players').insert({name,total_points:0,equipped_skin:'apprentice',passcode:pc}).select().single()
         if(insertErr)throw insertErr
         setPlayerId(newP.id);setPlayerName(newP.name)
         setTotal(0);setSkinId('apprentice');setIsReturning(false)
       }
       setScreen('game')
-    } catch(e){
-      console.error(e);setLoginError('Something went wrong — try again!')
-      triggerShake()
-    } finally{setLoginLoading(false)}
+    } catch(e){console.error(e);setLoginError('Something went wrong — try again!');triggerShake()}
+    finally{setLoginLoading(false)}
   }
 
-  // ── Save progress ──────────────────────────────────────────
   const saveProgress=useCallback(async(newTotal,newSkinId)=>{
     if(!playerId)return
     await supabase.from('players').update({total_points:newTotal,equipped_skin:newSkinId}).eq('id',playerId)
@@ -288,69 +261,36 @@ export default function WizardMaze(){
 
   if(!maze&&gameScreen==='game')return null
   const{grid=[],dq={}}=maze||{},rows=grid.length,cols=grid[0]?.length||0,C=cell
+  // start/finish label positions in px
+  const startLabelLeft=(1*(C+2))+C/2
+  const endLabelLeft=((cols-2)*(C+2))+C/2
 
   return(
     <div style={{minHeight:'100vh',background:'#080820',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',fontFamily:"'Nunito',sans-serif",position:'relative',overflow:'hidden',padding:10}}>
       <style>{CSS}</style>
       {STARS.map(s=><div key={s.id} className="star" style={{left:`${s.x}%`,top:`${s.y}%`,width:s.sz,height:s.sz,'--dr':`${s.dr}s`,'--dl':`${s.dl}s`}}/>)}
 
-      {/* ════════ LOGIN ════════ */}
+      {/* ════ LOGIN ════ */}
       {screen==='login'&&(
         <div className="appear" style={{textAlign:'center',zIndex:10,maxWidth:420,width:'100%',padding:'0 16px'}}>
           <div style={{fontSize:72,marginBottom:8}} className="wf">🧙‍♂️</div>
           <h1 style={{fontFamily:"'Cinzel',serif",fontSize:'clamp(22px,5vw,34px)',fontWeight:900,color:'#f9ca74',letterSpacing:2,textShadow:'0 0 20px #f9ca74aa',marginBottom:6}}>Wizard Math Maze</h1>
           <p style={{color:'#c8a4ff',fontSize:14,marginBottom:24,fontFamily:"'Cinzel',serif",letterSpacing:1}}>Who dares enter the realm?</p>
-
           <div className={loginShake?'shake':''} style={{background:'#0e0e35',border:`2px solid ${loginError?'#ff5555':'#252558'}`,borderRadius:20,padding:'28px 24px',transition:'border-color .2s'}}>
-            {/* Wizard Name */}
             <label style={{display:'block',color:'#c8a4ff',fontFamily:"'Cinzel',serif",fontSize:10,letterSpacing:2,marginBottom:7,textAlign:'left'}}>WIZARD NAME</label>
-            <input
-              ref={nameRef}
-              type="text"
-              value={nameInput}
-              onChange={e=>setNameInput(e.target.value)}
-              onKeyDown={e=>e.key==='Tab'&&(e.preventDefault(),passcodeRef.current?.focus())}
-              maxLength={20}
-              placeholder="e.g. Lily, Max, Zara..."
-              style={{width:'100%',padding:'11px 15px',fontSize:17,fontWeight:800,background:'#0a0a2c',border:'2px solid #35358a',borderRadius:11,color:'#fff',marginBottom:14,outline:'none',fontFamily:"'Nunito',sans-serif"}}
-            />
-
-            {/* Passcode */}
-            <label style={{display:'block',color:'#c8a4ff',fontFamily:"'Cinzel',serif",fontSize:10,letterSpacing:2,marginBottom:7,textAlign:'left'}}>
-              SECRET PASSCODE <span style={{color:'#404070',fontSize:9,letterSpacing:1}}>(4–6 numbers)</span>
-            </label>
-            <input
-              ref={passcodeRef}
-              type="password"
-              inputMode="numeric"
-              value={passcodeInput}
-              onChange={e=>setPasscodeInput(e.target.value.replace(/\D/g,'').slice(0,6))}
-              onKeyDown={e=>e.key==='Enter'&&!loginLoading&&handleLogin()}
-              maxLength={6}
-              placeholder="••••"
-              style={{width:'100%',padding:'11px 15px',fontSize:22,fontWeight:800,background:'#0a0a2c',border:'2px solid #35358a',borderRadius:11,color:'#fff',textAlign:'center',marginBottom:14,outline:'none',fontFamily:"'Nunito',sans-serif",letterSpacing:6}}
-            />
-
+            <input ref={nameRef} type="text" value={nameInput} onChange={e=>setNameInput(e.target.value)} onKeyDown={e=>e.key==='Tab'&&(e.preventDefault(),passcodeRef.current?.focus())} maxLength={20} placeholder="e.g. Lily, Max, Zara..." style={{width:'100%',padding:'11px 15px',fontSize:17,fontWeight:800,background:'#0a0a2c',border:'2px solid #35358a',borderRadius:11,color:'#fff',marginBottom:14,outline:'none',fontFamily:"'Nunito',sans-serif"}}/>
+            <label style={{display:'block',color:'#c8a4ff',fontFamily:"'Cinzel',serif",fontSize:10,letterSpacing:2,marginBottom:7,textAlign:'left'}}>SECRET PASSCODE <span style={{color:'#404070',fontSize:9,letterSpacing:1}}>(4–6 numbers)</span></label>
+            <input ref={passcodeRef} type="password" inputMode="numeric" pattern="[0-9]*" value={passcodeInput} onChange={e=>setPasscodeInput(e.target.value.replace(/\D/g,'').slice(0,6))} onKeyDown={e=>e.key==='Enter'&&!loginLoading&&handleLogin()} maxLength={6} placeholder="••••" style={{width:'100%',padding:'11px 15px',fontSize:22,fontWeight:800,background:'#0a0a2c',border:'2px solid #35358a',borderRadius:11,color:'#fff',textAlign:'center',marginBottom:14,outline:'none',fontFamily:"'Nunito',sans-serif",letterSpacing:6}}/>
             {loginError&&<div style={{color:'#ff5555',fontSize:12,marginBottom:12,fontWeight:700,textAlign:'center'}}>{loginError}</div>}
-
-            <button
-              className="bh"
-              onClick={handleLogin}
-              disabled={loginLoading}
-              style={{width:'100%',padding:'13px',borderRadius:13,border:'none',background:loginLoading?'#252548':'linear-gradient(135deg,#f9ca74,#f0932b)',color:'#180a00',fontFamily:"'Cinzel',serif",fontWeight:900,fontSize:16,cursor:loginLoading?'not-allowed':'pointer',boxShadow:loginLoading?'none':'0 0 24px #f9ca7468',display:'flex',alignItems:'center',justifyContent:'center',gap:8}}
-            >
+            <button className="bh" onClick={handleLogin} disabled={loginLoading} style={{width:'100%',padding:'13px',borderRadius:13,border:'none',background:loginLoading?'#252548':'linear-gradient(135deg,#f9ca74,#f0932b)',color:'#180a00',fontFamily:"'Cinzel',serif",fontWeight:900,fontSize:16,cursor:loginLoading?'not-allowed':'pointer',boxShadow:loginLoading?'none':'0 0 24px #f9ca7468',display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
               {loginLoading?<><span className="spinner">✨</span>Entering realm...</>:'Enter the Realm! 🗺️'}
             </button>
-
-            <p style={{color:'#2a2a50',fontSize:10,marginTop:14,lineHeight:1.7,textAlign:'center'}}>
-              New wizard? Choose a name + passcode to create your account.<br/>
-              Returning wizard? Use your same name + passcode to load your progress.
-            </p>
+            <p style={{color:'#2a2a50',fontSize:10,marginTop:14,lineHeight:1.7,textAlign:'center'}}>New wizard? Choose a name + passcode to create your account.<br/>Returning wizard? Use your same name + passcode to load your progress.</p>
           </div>
         </div>
       )}
 
-      {/* ════════ START / SETTINGS ════════ */}
+      {/* ════ START ════ */}
       {screen==='game'&&gameScreen==='start'&&(
         <div className="appear" style={{textAlign:'center',zIndex:10,maxWidth:600,width:'100%'}}>
           <div style={{marginBottom:10}}>
@@ -361,7 +301,6 @@ export default function WizardMaze(){
           </div>
           <div style={{fontSize:64,marginBottom:4}} className="wf">{sk.emoji}</div>
           <h1 style={{fontFamily:"'Cinzel',serif",fontSize:'clamp(20px,5vw,34px)',fontWeight:900,color:'#f9ca74',letterSpacing:2,textShadow:'0 0 20px #f9ca74aa',marginBottom:4}}>Wizard Math Maze</h1>
-
           <div style={{background:'#0e0e35',border:'1px solid #252558',borderRadius:14,padding:'10px 15px',margin:'8px auto 11px',display:'inline-flex',alignItems:'center',gap:11,maxWidth:400,width:'100%'}}>
             <span style={{fontSize:22}}>{sk.wand}</span>
             <div style={{flex:1,textAlign:'left'}}>
@@ -371,21 +310,18 @@ export default function WizardMaze(){
             </div>
             <button className="bh" onClick={()=>{setShopNew(false);setShop(true)}} style={{background:'#1a1a50',border:'1px solid #4040a0',borderRadius:9,padding:'5px 8px',color:'#c8a4ff',cursor:'pointer',fontSize:10,fontFamily:"'Cinzel',serif",fontWeight:700,whiteSpace:'nowrap'}}>👗 Wardrobe</button>
           </div>
-
           <div style={{marginBottom:12}}>
             <div style={{color:'#c8a4ff',fontFamily:"'Cinzel',serif",fontSize:10,marginBottom:6,letterSpacing:2}}>CHOOSE YOUR SPELLS</div>
             <div style={{display:'flex',gap:6,flexWrap:'wrap',justifyContent:'center'}}>
               {OPS.map(({key,label,icon,color})=>{const on=ops.has(key);return(<button key={key} className="bh" onClick={()=>toggleOp(key)} style={{padding:'7px 11px',borderRadius:10,cursor:'pointer',border:`2px solid ${on?color:'#1e1e50'}`,background:on?`${color}18`:'#0c0c2e',color:on?color:'#3a3a70',fontFamily:"'Nunito',sans-serif",fontWeight:800,fontSize:12,transition:'all .2s',display:'flex',alignItems:'center',gap:5}}><span style={{width:14,height:14,borderRadius:3,border:`2px solid ${on?color:'#30306a'}`,background:on?color:'transparent',display:'inline-flex',alignItems:'center',justifyContent:'center',fontSize:9,color:'#0c0c2e',fontWeight:900,flexShrink:0}}>{on?'✓':''}</span><span>{icon}</span>{label}</button>)})}
             </div>
           </div>
-
           <div style={{marginBottom:18}}>
             <div style={{color:'#c8a4ff',fontFamily:"'Cinzel',serif",fontSize:10,marginBottom:6,letterSpacing:2}}>DIFFICULTY</div>
             <div style={{display:'flex',gap:5,flexWrap:'wrap',justifyContent:'center'}}>
               {DIFFS.map(({key,label,icon,color,desc})=>(<button key={key} className="bh" onClick={()=>setDiff(key)} style={{padding:'6px 9px',borderRadius:10,border:`2px solid ${diff===key?color:'#1e1e50'}`,background:diff===key?`${color}18`:'#0c0c2e',color:diff===key?color:'#3a3a70',cursor:'pointer',fontFamily:"'Nunito',sans-serif",fontWeight:800,fontSize:11,transition:'all .2s',textAlign:'center',minWidth:68}}><div style={{fontSize:13}}>{icon}</div><div>{label}</div><div style={{fontSize:8,opacity:.6,marginTop:1}}>{desc}</div></button>))}
             </div>
           </div>
-
           <div style={{display:'flex',gap:9,justifyContent:'center',flexWrap:'wrap'}}>
             <button className="bh" onClick={startGame} style={{padding:'12px 36px',borderRadius:14,border:'none',background:'linear-gradient(135deg,#f9ca74,#f0932b)',color:'#180a00',fontFamily:"'Cinzel',serif",fontWeight:900,fontSize:16,cursor:'pointer',letterSpacing:1,boxShadow:'0 0 30px #f9ca7478'}}>Begin the Quest! 🗺️</button>
             <button className="bh" onClick={()=>{setScreen('login');setNameInput('');setPasscodeInput('')}} style={{padding:'12px 16px',borderRadius:14,border:'1px solid #252550',background:'#0c0c2a',color:'#404080',fontFamily:"'Cinzel',serif",fontWeight:700,fontSize:13,cursor:'pointer'}}>Switch Wizard</button>
@@ -393,9 +329,10 @@ export default function WizardMaze(){
         </div>
       )}
 
-      {/* ════════ GAME ════════ */}
+      {/* ════ GAME ════ */}
       {screen==='game'&&gameScreen==='game'&&maze&&(
         <div style={{zIndex:10,display:'flex',flexDirection:'column',alignItems:'center',gap:7}}>
+          {/* HUD */}
           <div style={{background:'#0d0d30',border:'1px solid #20204a',borderRadius:11,padding:'6px 12px',display:'flex',alignItems:'center',gap:10,width:'100%',maxWidth:580}}>
             <div style={{fontSize:18}} className="wf">{sk.emoji}</div>
             <div style={{flex:1,minWidth:0}}>
@@ -409,14 +346,29 @@ export default function WizardMaze(){
             <button className="bh" onClick={()=>setGameScreen('start')} style={{background:'#0c0c2a',border:'1px solid #1e1e50',borderRadius:8,padding:'4px 9px',color:'#404080',cursor:'pointer',fontSize:10}}>← Menu</button>
           </div>
 
+          {/* Maze + START/FINISH labels */}
           <div style={{position:'relative'}}>
             {sparkle&&<Sparkle onDone={()=>setSparkle(false)}/>}
             {popup&&<div key={popup.k} style={{position:'absolute',top:'-8px',left:'50%',transform:'translateX(-50%)',color:'#f9ca74',fontFamily:"'Cinzel',serif",fontWeight:900,fontSize:18,zIndex:60,pointerEvents:'none',whiteSpace:'nowrap',animation:'sup .3s ease-out, fout 1.5s .2s forwards',textShadow:'0 0 12px #f9ca74'}}>+{popup.v} ⭐</div>}
+
+            {/* START label — top-left above the maze */}
+            <div style={{position:'absolute',top:-18,left:7+(1*(C+2)),transform:'translateX(-50%) translateX('+(C/2)+'px)',fontFamily:"'Cinzel',serif",fontSize:9,fontWeight:900,color:'#7ee8a2',letterSpacing:1,textShadow:'0 0 8px #7ee8a2',whiteSpace:'nowrap',pointerEvents:'none',zIndex:10}}>▼ START</div>
+
+            {/* FINISH label — bottom-right below the maze */}
+            <div style={{position:'absolute',bottom:-18,right:7+((cols-1-(cols-2))*(C+2)),transform:'translateX(50%) translateX(-'+(C/2)+'px)',fontFamily:"'Cinzel',serif",fontSize:9,fontWeight:900,color:'#c8a4ff',letterSpacing:1,textShadow:'0 0 8px #c8a4ff',whiteSpace:'nowrap',pointerEvents:'none',zIndex:10}}>FINISH ▲</div>
+
             <div style={{display:'grid',gridTemplateColumns:`repeat(${cols},${C}px)`,gridTemplateRows:`repeat(${rows},${C}px)`,gap:2,padding:7,background:'#080820',borderRadius:12,border:'2px solid #1a1a45',boxShadow:'0 0 40px #08082840'}}>
               {grid.map((row,ri)=>row.map((cv,ci)=>{
                 const ip=pos.row===ri&&pos.col===ci,dqv=cv===DOOR?dq[`${ri},${ci}`]:null,dw=dqv&&dqv.wrongs>0
                 return(<div key={`${ri}-${ci}`} style={{width:C,height:C,borderRadius:4,background:cv===WALL?'linear-gradient(135deg,#0b0b25,#10102c)':'linear-gradient(135deg,#14144a,#18184e)',border:cv===WALL?'1px solid #0d0d26':'1px solid #20204c',display:'flex',alignItems:'center',justifyContent:'center',position:'relative'}}>
-                  {cv===DOOR&&dqv&&<div className={dw?'dw':'dp'} style={{width:C-5,height:C-5,borderRadius:5,background:dw?'linear-gradient(135deg,#2a1000,#3a1800)':'linear-gradient(135deg,#261500,#351e00)',border:`2px solid ${dw?'#ff8855':'#f9ca74'}`,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:1}}><span style={{fontSize:C>42?14:10}}>🔐</span><span style={{fontSize:C>42?8:6,fontWeight:900,color:dw?'#ff8855':'#f9ca74',fontFamily:"'Cinzel',serif",lineHeight:1}}>+{dqv.curPts}p</span>{dw&&<span style={{fontSize:6,color:'#ff8855',lineHeight:1}}>{'⚠️'.repeat(Math.min(dqv.wrongs,3))}</span>}</div>}
+                  {cv===DOOR&&dqv&&(
+                    <div className={dw?'dw':'dp'} style={{width:C-5,height:C-5,borderRadius:5,background:dw?'linear-gradient(135deg,#2a1000,#3a1800)':'linear-gradient(135deg,#261500,#351e00)',border:`2px solid ${dw?'#ff8855':'#f9ca74'}`,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:1}}>
+                      <span style={{fontSize:C>42?15:11}}>🔐</span>
+                      {/* ── Brighter, larger point label on doors ── */}
+                      <span style={{fontSize:C>42?9:7,fontWeight:900,color:dw?'#ffaa77':'#ffe080',fontFamily:"'Cinzel',serif",lineHeight:1,textShadow:`0 0 6px ${dw?'#ff8855':'#f9ca74'}`}}>+{dqv.curPts}p</span>
+                      {dw&&<span style={{fontSize:7,color:'#ffaa77',lineHeight:1}}>{'⚠️'.repeat(Math.min(dqv.wrongs,3))}</span>}
+                    </div>
+                  )}
                   {cv===END&&!ip&&<div style={{width:C-7,height:C-7,borderRadius:'50%',background:'radial-gradient(circle,#f9ca7438,#6a0dad38)',border:'2px solid #c8a4ff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:C>42?20:14,boxShadow:'0 0 18px #c8a4ffaa'}}>🏆</div>}
                   {ip&&<div className="wf" style={{fontSize:C>42?26:20,zIndex:2,filter:'drop-shadow(0 0 8px #c8a4ff)'}}>{sk.emoji}</div>}
                 </div>)
@@ -424,12 +376,13 @@ export default function WizardMaze(){
             </div>
           </div>
 
+          {/* D-pad */}
           {(()=>{const bsz=Math.max(44,Math.min(56,cell+8)),bs={width:bsz,height:bsz,fontSize:19,background:'#0e0e30',border:'2px solid #20205a',borderRadius:10,cursor:'pointer',touchAction:'manipulation'};return(<div style={{display:'grid',gridTemplateColumns:`${bsz}px ${bsz}px ${bsz}px`,gridTemplateRows:`${bsz}px ${bsz}px`,gap:6}}><button className="bh" onClick={()=>move(-1,0)} style={{...bs,gridColumn:2,gridRow:1}}>⬆️</button><button className="bh" onClick={()=>move(0,-1)} style={{...bs,gridColumn:1,gridRow:2}}>⬅️</button><button className="bh" onClick={()=>move(1,0)} style={{...bs,gridColumn:2,gridRow:2}}>⬇️</button><button className="bh" onClick={()=>move(0,1)} style={{...bs,gridColumn:3,gridRow:2}}>➡️</button></div>)})()}
           <p style={{color:'#252548',fontSize:9}}>Arrow keys or buttons • Walk into 🔐 to cast a spell</p>
         </div>
       )}
 
-      {/* ════════ MATH POPUP ════════ */}
+      {/* ════ MATH POPUP ════ */}
       {showMath&&q&&(
         <div style={{position:'fixed',inset:0,background:'#00000092',display:'flex',alignItems:'center',justifyContent:'center',zIndex:200,backdropFilter:'blur(5px)'}}>
           <div className={`appear${wrong?' shake':''}`} style={{background:'linear-gradient(160deg,#0f1048,#171858)',border:`2px solid ${q.wrongs>0?'#ff8855':'#f9ca74'}`,borderRadius:22,padding:'clamp(16px,4vw,32px) clamp(16px,5vw,40px)',textAlign:'center',boxShadow:'0 0 70px #f9ca7438',minWidth:270,maxWidth:'90vw',width:'min(370px,90vw)'}}>
@@ -439,18 +392,30 @@ export default function WizardMaze(){
               {q.wrongs>0&&<span>⚠️</span>}<span>Solve it →</span><span style={{fontSize:16}}>+{q.curPts}</span><span>⭐</span>{q.wrongs>0&&<span style={{fontSize:9,opacity:.8}}>({q.wrongs} wrong)</span>}
             </div>
             {q.wrongs>0&&q.curPts>5&&<div style={{fontSize:9,color:'#ff885588',marginBottom:6}}>Wrong again → +{Math.max(5,Math.round(q.curPts*.5/5)*5)} ⭐</div>}
-            <div style={{fontSize:'clamp(24px,7vw,44px)',fontWeight:900,color:q.wrongs>0?'#ff8855':'#f9ca74',fontFamily:"'Cinzel',serif",marginBottom:12}}>{q.disp} = ?</div>
-            <input ref={iref} type="number" value={ans} onChange={e=>setAns(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')submit();if(e.key==='Escape')setShowMath(false)}} style={{width:'100%',padding:'10px 13px',fontSize:24,fontWeight:800,background:'#0a0a2c',border:`2px solid ${wrong?'#ff5555':'#35358a'}`,borderRadius:11,color:wrong?'#ff5555':'#fff',textAlign:'center',marginBottom:10,outline:'none',fontFamily:"'Nunito',sans-serif"}} placeholder="?"/>
-            {wrong&&<div style={{color:'#ff5555',fontWeight:700,marginBottom:8,fontSize:12}}>🚫 Try again! Points halved!</div>}
+            {/* ── Brighter equation text ── */}
+            <div style={{fontSize:'clamp(26px,7vw,46px)',fontWeight:900,color:q.wrongs>0?'#ffaa77':'#ffe580',fontFamily:"'Cinzel',serif",marginBottom:12,textShadow:`0 0 24px ${q.wrongs>0?'#ff8855':'#f9ca74'}`}}>{q.disp} = ?</div>
+            {/* ── inputMode numeric forces number pad on mobile ── */}
+            <input
+              ref={iref}
+              type="number"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={ans}
+              onChange={e=>setAns(e.target.value)}
+              onKeyDown={e=>{if(e.key==='Enter')submit();if(e.key==='Escape')setShowMath(false)}}
+              style={{width:'100%',padding:'12px 13px',fontSize:28,fontWeight:900,background:'#0a0a2c',border:`2px solid ${wrong?'#ff5555':'#4a4ab0'}`,borderRadius:11,color:wrong?'#ff6655':'#ffffff',textAlign:'center',marginBottom:10,outline:'none',fontFamily:"'Nunito',sans-serif",textShadow:wrong?'none':'0 0 10px #9090ff44'}}
+              placeholder="?"
+            />
+            {wrong&&<div style={{color:'#ff6655',fontWeight:700,marginBottom:8,fontSize:12}}>🚫 Try again! Points halved!</div>}
             <div style={{display:'flex',gap:8,justifyContent:'center'}}>
               <button className="bh" onClick={submit} style={{padding:'10px 20px',borderRadius:11,border:'none',background:'linear-gradient(135deg,#f9ca74,#f0932b)',color:'#180a00',fontFamily:"'Cinzel',serif",fontWeight:900,fontSize:13,cursor:'pointer',boxShadow:'0 0 20px #f9ca7458'}}>Cast Spell! ✨</button>
-              <button className="bh" onClick={()=>setShowMath(false)} style={{padding:'10px 12px',borderRadius:11,border:'1px solid #35358a',background:'#0a0a2c',color:'#505098',fontFamily:"'Nunito',sans-serif",fontWeight:700,fontSize:12,cursor:'pointer'}}>Back</button>
+              <button className="bh" onClick={()=>setShowMath(false)} style={{padding:'10px 12px',borderRadius:11,border:'1px solid #35358a',background:'#0a0a2c',color:'#8080c0',fontFamily:"'Nunito',sans-serif",fontWeight:700,fontSize:12,cursor:'pointer'}}>Back</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ════════ WARDROBE ════════ */}
+      {/* ════ WARDROBE ════ */}
       {shop&&(
         <div style={{position:'fixed',inset:0,background:'#000000b8',display:'flex',alignItems:'center',justifyContent:'center',zIndex:400,backdropFilter:'blur(8px)',padding:14}}>
           <div style={{background:'linear-gradient(160deg,#100d3a,#1a1260)',border:'2px solid #c8a4ff',borderRadius:22,padding:'22px 18px',maxWidth:480,width:'100%',boxShadow:'0 0 80px #c8a4ff44',maxHeight:'90vh',overflowY:'auto'}}>
@@ -474,7 +439,7 @@ export default function WizardMaze(){
         </div>
       )}
 
-      {/* ════════ WIN ════════ */}
+      {/* ════ WIN ════ */}
       {screen==='game'&&gameScreen==='win'&&(
         <div className="victory" style={{textAlign:'center',zIndex:10,maxWidth:480,padding:'0 14px'}}>
           <div style={{fontSize:64,marginBottom:7}}>🏆</div>
