@@ -191,6 +191,7 @@ function renderFrame(canvas, minimap, grid, dq, playerRow, playerCol, facing, px
   ctx.fillRect(0, H / 2, W, H)
 
   // ── Cast rays & draw walls ──
+  let doorHandleData = null  // tracked during loop, drawn after
   for (let x = 0; x < W; x++) {
     const rayAngle = angle - FOV / 2 + (x / W) * FOV
     const { dist, side, hitCell, mapX, mapY, wallX } = castRay(grid, px, py, rayAngle)
@@ -204,17 +205,37 @@ function renderFrame(canvas, minimap, grid, dq, playerRow, playerCol, facing, px
     let r, g, b
 
     if (hitCell === DOOR) {
-      // ── Magical door: arched top + frame posts + animated portal ──
-      const archFactor = Math.max(0, 1 - Math.abs(wallX - 0.5) * 3.2)
-      wallTop = Math.max(0, wallTop - wallH * 0.22 * archFactor)
+      // ── Magical door: arched top + frame posts + animated portal + handle ──
+      // Arch: raised center with a wider, taller semicircle shape
+      const archFactor = Math.max(0, 1 - Math.pow(Math.abs(wallX - 0.5) * 2.1, 1.6))
+      wallTop = Math.max(0, wallTop - wallH * 0.42 * archFactor)
 
-      const isFrame = wallX < 0.10 || wallX > 0.90
-      if (isFrame) {
-        // Gold stone frame pillars
+      // Track the door-handle candidate column (wallX ≈ 0.74, right-of-center)
+      const handleProx = Math.max(0, 1 - Math.abs(wallX - 0.74) * 24)
+      if (handleProx > 0.4 && (!doorHandleData || handleProx > doorHandleData.prox)) {
+        doorHandleData = {
+          x, prox: handleProx,
+          y: wallTop + (wallBottom - wallTop) * 0.56,
+          r: Math.max(2.5, wallH * 0.052),
+        }
+      }
+
+      const isFrame    = wallX < 0.10 || wallX > 0.90
+      const isArchRim  = archFactor > 0.04 && archFactor < 0.20  // gold border along arch curve
+      const isKeystone = archFactor > 0.86                        // gold cap at very top
+
+      if (isFrame || isKeystone) {
+        // Gold stone frame pillars + arch keystone
         const br = Math.min(1.3, Math.max(0.3, 1.7 - dist / 8)) * (side === 1 ? 0.75 : 1.0)
         r = Math.round(Math.min(255, 255 * br))
         g = Math.round(Math.min(255, 195 * br))
         b = Math.round(Math.min(255,  42 * br))
+      } else if (isArchRim) {
+        // Warm amber arch border
+        const br = Math.min(1.1, Math.max(0.25, 1.5 - dist / 9)) * (side === 1 ? 0.75 : 1.0)
+        r = Math.round(Math.min(255, 220 * br))
+        g = Math.round(Math.min(255, 145 * br))
+        b = Math.round(Math.min(255,  18 * br))
       } else {
         // Animated portal: swirling purple/teal
         const t = now / 900
@@ -265,6 +286,20 @@ function renderFrame(canvas, minimap, grid, dq, playerRow, playerCol, facing, px
       ctx.fillRect(x, wallTop,     1, 1)
       ctx.fillRect(x, wallBottom - 1, 1, 1)
     }
+  }
+
+  // ── Door handle overlay (gold knob drawn after ray loop) ──
+  if (doorHandleData) {
+    const { x: hx, y: hy, r: hr } = doorHandleData
+    ctx.save()
+    ctx.shadowColor = 'rgba(255,210,0,0.8)'
+    ctx.shadowBlur = 5
+    ctx.fillStyle = 'rgba(255,218,60,0.92)'
+    ctx.beginPath(); ctx.arc(hx, hy, hr, 0, Math.PI * 2); ctx.fill()
+    ctx.strokeStyle = 'rgba(140,90,0,0.75)'
+    ctx.lineWidth = 1
+    ctx.stroke()
+    ctx.restore()
   }
 
   // ── Door glow + prompt when door is directly ahead ──
@@ -870,7 +905,7 @@ export default function WizardMaze() {
           </div>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
             <button className="bh" onClick={startGame} style={{ padding: '10px 18px', borderRadius: 13, border: 'none', background: 'linear-gradient(135deg,#f9ca74,#f0932b)', color: '#180a00', fontFamily: "'Cinzel',serif", fontWeight: 900, fontSize: 13, cursor: 'pointer', boxShadow: '0 0 20px #f9ca7458' }}>Play Again! 🗺️</button>
-            <button className="bh" onClick={() => setGameScreen('start')} style={{ padding: '10px 18px', borderRadius: 13, border: '2px solid #c8a4ff', background: '#0e0e35', color: '#c8a4ff', fontFamily: "'Cinzel',serif", fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>Settings</button>
+            <button className="bh" onClick={() => setGameScreen('start')} style={{ padding: '10px 18px', borderRadius: 13, border: '2px solid #c8a4ff', background: '#0e0e35', color: '#c8a4ff', fontFamily: "'Cinzel',serif", fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>🏰 Return to Castle</button>
             <button className="bh" onClick={() => { setShopNew(!!pendingSkin); setShop(true) }} style={{ padding: '10px 18px', borderRadius: 13, border: `2px solid ${pendingSkin ? '#f9ca74' : '#7ee8a2'}`, background: '#0e0e35', color: pendingSkin ? '#f9ca74' : '#7ee8a2', fontFamily: "'Cinzel',serif", fontWeight: 700, fontSize: 13, cursor: 'pointer', boxShadow: pendingSkin ? '0 0 16px #f9ca7444' : 'none' }}>{pendingSkin ? '✨ New Wizard!' : '👗 Wardrobe'}</button>
             <button className="bh" onClick={() => { setScreen('login'); setNameInput(''); setPasscodeInput('') }} style={{ padding: '10px 18px', borderRadius: 13, border: '1px solid #252550', background: '#0c0c2a', color: '#404080', fontFamily: "'Cinzel',serif", fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>Switch Wizard</button>
           </div>
