@@ -142,7 +142,7 @@ function genMaze(ops, dk) {
 }
 
 // ─── DDA Raycasting (returns wallX texture coord) ─────────────────────────────
-const FOV = Math.PI / 3  // 60°
+const FOV = Math.PI / 2.3  // ~78° — wider angle gives a "pulled back" perspective
 
 function castRay(grid, px, py, angle) {
   const H = grid.length, W = grid[0].length
@@ -195,7 +195,7 @@ function renderFrame(canvas, minimap, grid, dq, playerRow, playerCol, facing, px
   for (let x = 0; x < W; x++) {
     const rayAngle = angle - FOV / 2 + (x / W) * FOV
     const { dist, side, hitCell, mapX, mapY, wallX } = castRay(grid, px, py, rayAngle)
-    const wallH  = Math.min(H * 5, H / dist)
+    const wallH  = Math.min(H * 3, H / (dist + 0.72))  // +offset keeps close walls from filling the whole screen
     let wallTop    = Math.max(0, (H - wallH) / 2)
     let wallBottom = Math.min(H, (H + wallH) / 2)
 
@@ -360,18 +360,21 @@ function renderFrame(canvas, minimap, grid, dq, playerRow, playerCol, facing, px
   ctx.beginPath(); ctx.moveTo(cx - 7, cy); ctx.lineTo(cx + 7, cy); ctx.stroke()
   ctx.beginPath(); ctx.moveTo(cx, cy - 7); ctx.lineTo(cx, cy + 7); ctx.stroke()
 
-  // ── Wizard sprite (bottom center, bobs when moving) ──
+  // ── Wizard sprite — "looking at back of head" view ──
+  // Drawn larger and pushed down so only the hat + upper ~55% peeks above the canvas edge,
+  // like you're walking behind the wizard and looking over their head.
   const isMoving = Math.hypot(px - (playerCol + 0.5), py - (playerRow + 0.5)) > 0.025
-  const bobY = isMoving ? Math.sin(now / 95) * 4 : 0
-  const wzSz = Math.max(16, Math.round(W * 0.105))
+  const bobY = isMoving ? Math.sin(now / 90) * 5 : 0
+  const wzSz = Math.max(28, Math.round(W * 0.17))  // bigger sprite
+  const wzY  = H + Math.round(wzSz * 0.44) + bobY  // pushed down — canvas clips the bottom half
   ctx.save()
-  ctx.shadowColor = 'rgba(180,140,255,0.65)'
-  ctx.shadowBlur = 16
-  ctx.globalAlpha = 0.90
+  ctx.shadowColor = 'rgba(180,140,255,0.70)'
+  ctx.shadowBlur = 20
+  ctx.globalAlpha = 0.92
   ctx.font = `${wzSz}px serif`
   ctx.textAlign = 'center'
   ctx.textBaseline = 'bottom'
-  ctx.fillText(skinEmoji, W / 2, H - 1 + bobY)
+  ctx.fillText(skinEmoji, W / 2, wzY)
   ctx.restore()
 
   // ── Minimap ──
