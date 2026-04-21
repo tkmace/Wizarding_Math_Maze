@@ -176,19 +176,23 @@ function renderFrame(canvas, minimap, grid, dq, playerRow, playerCol, facing, px
   const W = canvas.width, H = canvas.height
   const now = performance.now()
 
+  // ── Horizon shifted up slightly — looking slightly downward ──
+  // horizonY < H/2 means you see more floor, less ceiling — helps spatial understanding
+  const horizonY = Math.round(H * 0.38)
+
   // ── Starfield ceiling ──
-  const ceilGrad = ctx.createLinearGradient(0, 0, 0, H / 2)
+  const ceilGrad = ctx.createLinearGradient(0, 0, 0, horizonY)
   ceilGrad.addColorStop(0, '#01011a')
   ceilGrad.addColorStop(1, '#0d0d3a')
   ctx.fillStyle = ceilGrad
-  ctx.fillRect(0, 0, W, H / 2)
+  ctx.fillRect(0, 0, W, horizonY)
 
   // ── Dark stone floor ──
-  const floorGrad = ctx.createLinearGradient(0, H / 2, 0, H)
+  const floorGrad = ctx.createLinearGradient(0, horizonY, 0, H)
   floorGrad.addColorStop(0, '#080814')
   floorGrad.addColorStop(1, '#030308')
   ctx.fillStyle = floorGrad
-  ctx.fillRect(0, H / 2, W, H)
+  ctx.fillRect(0, horizonY, W, H)
 
   // ── Cast rays & draw walls ──
   let doorHandleData = null  // tracked during loop, drawn after
@@ -196,8 +200,8 @@ function renderFrame(canvas, minimap, grid, dq, playerRow, playerCol, facing, px
     const rayAngle = angle - FOV / 2 + (x / W) * FOV
     const { dist, side, hitCell, mapX, mapY, wallX } = castRay(grid, px, py, rayAngle)
     const wallH  = Math.min(H * 3, H / (dist + 0.72))  // +offset keeps close walls from filling the whole screen
-    let wallTop    = Math.max(0, (H - wallH) / 2)
-    let wallBottom = Math.min(H, (H + wallH) / 2)
+    let wallTop    = Math.max(0, horizonY - wallH / 2)
+    let wallBottom = Math.min(H, horizonY + wallH / 2)
 
     // Brightness: noticeably brighter than v2, with distance falloff
     const baseBr = Math.min(1, Math.max(0.08, 1.55 - dist / 10.5)) * (side === 1 ? 0.68 : 1.0)
@@ -286,6 +290,14 @@ function renderFrame(canvas, minimap, grid, dq, playerRow, playerCol, facing, px
       ctx.fillRect(x, wallTop,     1, 1)
       ctx.fillRect(x, wallBottom - 1, 1, 1)
     }
+
+    // Colored wall-section cap — unique hue per cell helps depth/spatial reading
+    if ((hitCell === WALL || hitCell === DOOR) && wallBottom > wallTop + 2) {
+      const cellHue = ((mapX * 47 + mapY * 83) * 137) % 360
+      const capAlpha = Math.min(0.55, baseBr * 0.62)
+      ctx.fillStyle = `hsla(${cellHue},55%,62%,${capAlpha})`
+      ctx.fillRect(x, wallTop, 1, Math.min(3, wallBottom - wallTop))
+    }
   }
 
   // ── Door handle overlay (gold knob drawn after ray loop) ──
@@ -360,22 +372,81 @@ function renderFrame(canvas, minimap, grid, dq, playerRow, playerCol, facing, px
   ctx.beginPath(); ctx.moveTo(cx - 7, cy); ctx.lineTo(cx + 7, cy); ctx.stroke()
   ctx.beginPath(); ctx.moveTo(cx, cy - 7); ctx.lineTo(cx, cy + 7); ctx.stroke()
 
-  // ── Wizard sprite — "looking at back of head" view ──
-  // Drawn larger and pushed down so only the hat + upper ~55% peeks above the canvas edge,
-  // like you're walking behind the wizard and looking over their head.
-  const isMoving = Math.hypot(px - (playerCol + 0.5), py - (playerRow + 0.5)) > 0.025
-  const bobY = isMoving ? Math.sin(now / 90) * 5 : 0
-  const wzSz = Math.max(28, Math.round(W * 0.17))  // bigger sprite
-  const wzY  = H + Math.round(wzSz * 0.44) + bobY  // pushed down — canvas clips the bottom half
-  ctx.save()
-  ctx.shadowColor = 'rgba(180,140,255,0.70)'
-  ctx.shadowBlur = 20
-  ctx.globalAlpha = 0.92
-  ctx.font = `${wzSz}px serif`
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'bottom'
-  ctx.fillText(skinEmoji, W / 2, wzY)
-  ctx.restore()
+  // ── Wizard sprite — canvas-drawn "from behind" figure ──
+  // Pointed hat + robe in the current skin's color, rooted at bottom center.
+  // The canvas edge clips the lower robe, so you see the character from behind
+  // looking into the maze — like classic third-person dungeon games.
+  {
+    const skinObj = ALL_SKINS.find(s => s.emoji === skinEmoji) || ALL_SKINS[0]
+    const sc = skinObj.color  // hex e.g. '#7ee8a2'
+    const isMoving = Math.hypot(px - (playerCol + 0.5), py - (playerRow + 0.5)) > 0.025
+    const bobY = isMoving ? Math.sin(now / 90) * 4 : 0
+
+    const sc_x = W / 2
+    const sc_base = H + 14 + bobY      // robe bottom (below canvas, clipped)
+    const sc_k  = W / 480              // scale factor relative to 480px design width
+
+    const robeH   = Math.round(72 * sc_k)
+    const robeTopW = Math.round(32 * sc_k)   // robe width at shoulders
+    const robeBotW = Math.round(52 * sc_k)   // robe width at hem
+    const brimW   = Math.round(38 * sc_k)    // hat brim half-width
+    const brimH   = Math.round(7  * sc_k)
+    const hatBW   = Math.round(22 * sc_k)    // hat cone base half-width
+    const hatH    = Math.round(58 * sc_k)
+
+    const robeTop = sc_base - robeH           // y where shoulders are
+    const hatBase = robeTop + Math.round(4 * sc_k)
+    const hatTip  = hatBase - hatH
+
+    ctx.save()
+    ctx.shadowColor = 'rgba(160,120,255,0.55)'
+    ctx.shadowBlur = 12
+
+    // Robe body
+    ctx.beginPath()
+    ctx.moveTo(sc_x - robeTopW, robeTop)
+    ctx.lineTo(sc_x + robeTopW, robeTop)
+    ctx.lineTo(sc_x + robeBotW, sc_base)
+    ctx.lineTo(sc_x - robeBotW, sc_base)
+    ctx.closePath()
+    ctx.fillStyle = sc + 'bb'
+    ctx.fill()
+
+    // Robe centre highlight
+    ctx.beginPath()
+    ctx.moveTo(sc_x - robeTopW * 0.3, robeTop)
+    ctx.lineTo(sc_x + robeTopW * 0.3, robeTop)
+    ctx.lineTo(sc_x + robeBotW * 0.3, sc_base)
+    ctx.lineTo(sc_x - robeBotW * 0.3, sc_base)
+    ctx.closePath()
+    ctx.fillStyle = sc + '44'
+    ctx.fill()
+
+    // Hat brim
+    ctx.beginPath()
+    ctx.ellipse(sc_x, hatBase, brimW, brimH, 0, 0, Math.PI * 2)
+    ctx.fillStyle = sc + 'dd'
+    ctx.fill()
+
+    // Hat cone
+    ctx.beginPath()
+    ctx.moveTo(sc_x, hatTip)
+    ctx.lineTo(sc_x - hatBW, hatBase)
+    ctx.lineTo(sc_x + hatBW, hatBase)
+    ctx.closePath()
+    ctx.fillStyle = sc
+    ctx.fill()
+
+    // Tiny star on hat tip
+    ctx.shadowBlur = 8
+    ctx.shadowColor = 'rgba(255,255,180,0.9)'
+    ctx.font = `${Math.round(13 * sc_k)}px serif`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText('✦', sc_x, hatTip + Math.round(8 * sc_k))
+
+    ctx.restore()
+  }
 
   // ── Minimap ──
   if (minimap) {
@@ -766,7 +837,7 @@ export default function WizardMaze() {
               : <div style={{ background: 'linear-gradient(90deg,#7ee8a218,#c8a4ff18)', border: '1px solid #7ee8a244', borderRadius: 14, padding: '9px 20px', display: 'inline-block' }}><span style={{ color: '#7ee8a2', fontFamily: "'Cinzel',serif", fontSize: 13 }}>Welcome, new wizard </span><span style={{ color: '#f9ca74', fontFamily: "'Cinzel',serif", fontSize: 13, fontWeight: 900 }}>{playerName}</span><span style={{ color: '#7ee8a2', fontFamily: "'Cinzel',serif", fontSize: 13 }}> 🌟</span></div>
             }
           </div>
-          <div style={{ fontSize: 64, marginBottom: 4 }} className="wf">{sk.emoji}</div>
+          <div style={{ fontSize: 128, marginBottom: 4 }} className="wf">{sk.emoji}</div>
           <h1 style={{ fontFamily: "'Cinzel',serif", fontSize: 'clamp(20px,5vw,34px)', fontWeight: 900, color: '#f9ca74', letterSpacing: 2, textShadow: '0 0 20px #f9ca74aa', marginBottom: 4 }}>Wizard Math Maze</h1>
           {/* Progress bar */}
           <div style={{ background: '#0e0e35', border: '1px solid #252558', borderRadius: 14, padding: '10px 15px', margin: '8px auto 11px', display: 'inline-flex', alignItems: 'center', gap: 11, maxWidth: 400, width: '100%' }}>
