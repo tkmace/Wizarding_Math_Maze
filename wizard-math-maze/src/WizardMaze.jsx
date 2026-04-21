@@ -64,11 +64,9 @@ function genQ(ops, dk) {
 // ─── Min-door Dijkstra ── guarantees ≥3 doors on every possible path ──────────
 function findMinDoorPath(grid) {
   const H = grid.length, W = grid[0].length
-  // dist[r][c] = min doors needed to reach (r,c) from START
   const dist = Array.from({ length: H }, () => Array(W).fill(Infinity))
   const prev = Array.from({ length: H }, () => Array(W).fill(null))
   dist[1][1] = 0
-  // Simple priority queue: [doorCount, row, col]
   const pq = [[0, 1, 1]]
   let endR = -1, endC = -1
   for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) if (grid[r][c] === END) { endR = r; endC = c }
@@ -88,7 +86,6 @@ function findMinDoorPath(grid) {
     }
   }
   const minCount = dist[endR]?.[endC] ?? 0
-  // Reconstruct path to find PATH cells to convert to doors
   const pathCells = []
   let r = endR, c = endC
   while (prev[r][c]) {
@@ -99,7 +96,7 @@ function findMinDoorPath(grid) {
   return { minCount, pathCells }
 }
 
-// ─── Maze generator (with fixed door logic) ──────────────────────────────────
+// ─── Maze generator ───────────────────────────────────────────────────────────
 function genMaze(ops, dk) {
   const R = 6, C = 6, H = R * 2 + 1, W = C * 2 + 1
   const g = Array.from({ length: H }, () => Array(W).fill(WALL))
@@ -114,7 +111,6 @@ function genMaze(ops, dk) {
     }
   }
   carve(0, 0)
-  // Add extra passages (loops) to create alternate routes
   let ex = Math.floor(R * C * .35), at = 0
   while (ex > 0 && at < 600) {
     const r = 1 + Math.floor(Math.random() * (H - 2)), c = 1 + Math.floor(Math.random() * (W - 2))
@@ -126,19 +122,16 @@ function genMaze(ops, dk) {
     at++
   }
   g[1][1] = START; g[H - 2][W - 2] = END
-  // Place initial random doors (away from start and end)
   const pc = []
   for (let r = 0; r < H; r++) for (let c = 0; c < W; c++)
     if (g[r][c] === PATH && !(r <= 2 && c <= 2) && !(r >= H - 3 && c >= W - 3)) pc.push([r, c])
   pc.sort(() => Math.random() - .5)
   const dq = {}
   for (const [r, c] of pc.slice(0, 6 + Math.floor(Math.random() * 4))) { g[r][c] = DOOR; dq[`${r},${c}`] = genQ(ops, dk) }
-  // ── FIX: ensure every path through the maze requires ≥ 3 doors ──
   let attempts = 0
   while (attempts < 50) {
     const { minCount, pathCells } = findMinDoorPath(g)
     if (minCount >= 3) break
-    // Add a door to a random PATH cell on the cheapest route
     const candidates = pathCells.filter(([r, c]) => !(r <= 2 && c <= 2) && !(r >= H - 3 && c >= W - 3))
     if (candidates.length === 0) break
     const [r, c] = candidates[Math.floor(Math.random() * candidates.length)]
@@ -148,7 +141,7 @@ function genMaze(ops, dk) {
   return { grid: g, dq }
 }
 
-// ─── DDA Raycasting ───────────────────────────────────────────────────────────
+// ─── DDA Raycasting (returns wallX texture coord) ─────────────────────────────
 const FOV = Math.PI / 3  // 60°
 
 function castRay(grid, px, py, angle) {
@@ -169,90 +162,126 @@ function castRay(grid, px, py, angle) {
     if (hitCell === WALL || hitCell === DOOR || hitCell === END) break
   }
   const perpDist = side === 0 ? (sideDistX - deltaDistX) : (sideDistY - deltaDistY)
-  return { dist: Math.max(0.05, perpDist), side, hitCell, mapX, mapY }
+  // Texture coord: where on the wall face the ray hit (0–1)
+  const wallHit = side === 0 ? py + perpDist * dy : px + perpDist * dx
+  const wallX = wallHit - Math.floor(wallHit)
+  return { dist: Math.max(0.05, perpDist), side, hitCell, mapX, mapY, wallX }
 }
 
 // ─── Frame renderer ───────────────────────────────────────────────────────────
-function renderFrame(canvas, minimap, grid, dq, playerRow, playerCol, facing) {
+// px/py/angle are the *animated* (smoothly interpolated) camera values
+function renderFrame(canvas, minimap, grid, dq, playerRow, playerCol, facing, px, py, angle, skinEmoji) {
   if (!canvas || !grid) return
   const ctx = canvas.getContext('2d')
   const W = canvas.width, H = canvas.height
+  const now = performance.now()
 
-  // World position = center of current cell
-  const px = playerCol + 0.5
-  const py = playerRow + 0.5
-  const angle = FACING_ANGLES[facing]
-
-  // ── Ceiling: deep purple-starfield gradient ──
+  // ── Starfield ceiling ──
   const ceilGrad = ctx.createLinearGradient(0, 0, 0, H / 2)
-  ceilGrad.addColorStop(0, '#02021a')
-  ceilGrad.addColorStop(1, '#0c0c38')
+  ceilGrad.addColorStop(0, '#01011a')
+  ceilGrad.addColorStop(1, '#0d0d3a')
   ctx.fillStyle = ceilGrad
   ctx.fillRect(0, 0, W, H / 2)
 
-  // ── Floor: dark stone ──
+  // ── Dark stone floor ──
   const floorGrad = ctx.createLinearGradient(0, H / 2, 0, H)
-  floorGrad.addColorStop(0, '#0a0a18')
-  floorGrad.addColorStop(1, '#040410')
+  floorGrad.addColorStop(0, '#080814')
+  floorGrad.addColorStop(1, '#030308')
   ctx.fillStyle = floorGrad
   ctx.fillRect(0, H / 2, W, H)
 
-  // ── Cast rays ──
+  // ── Cast rays & draw walls ──
   for (let x = 0; x < W; x++) {
     const rayAngle = angle - FOV / 2 + (x / W) * FOV
-    const { dist, side, hitCell } = castRay(grid, px, py, rayAngle)
-    const wallH = Math.min(H * 5, H / dist)
-    const wallTop = Math.max(0, (H - wallH) / 2)
-    const wallBottom = Math.min(H, (H + wallH) / 2)
+    const { dist, side, hitCell, mapX, mapY, wallX } = castRay(grid, px, py, rayAngle)
+    const wallH  = Math.min(H * 5, H / dist)
+    let wallTop    = Math.max(0, (H - wallH) / 2)
+    let wallBottom = Math.min(H, (H + wallH) / 2)
 
-    // Brightness falloff with distance; N/S walls slightly darker for depth
-    const baseBr = Math.min(1, Math.max(0.05, 1 - dist / 13)) * (side === 1 ? 0.68 : 1.0)
+    // Brightness: noticeably brighter than v2, with distance falloff
+    const baseBr = Math.min(1, Math.max(0.08, 1.55 - dist / 10.5)) * (side === 1 ? 0.68 : 1.0)
 
     let r, g, b
+
     if (hitCell === DOOR) {
-      // Golden magical door
-      const br = Math.min(1, Math.max(0.2, 1 - dist / 9)) * (side === 1 ? 0.75 : 1.0)
-      r = Math.round(249 * br); g = Math.round(185 * br); b = Math.round(50 * br)
+      // ── Magical door: arched top + frame posts + animated portal ──
+      const archFactor = Math.max(0, 1 - Math.abs(wallX - 0.5) * 3.2)
+      wallTop = Math.max(0, wallTop - wallH * 0.22 * archFactor)
+
+      const isFrame = wallX < 0.10 || wallX > 0.90
+      if (isFrame) {
+        // Gold stone frame pillars
+        const br = Math.min(1.3, Math.max(0.3, 1.7 - dist / 8)) * (side === 1 ? 0.75 : 1.0)
+        r = Math.round(Math.min(255, 255 * br))
+        g = Math.round(Math.min(255, 195 * br))
+        b = Math.round(Math.min(255,  42 * br))
+      } else {
+        // Animated portal: swirling purple/teal
+        const t = now / 900
+        const s1 = Math.sin(wallX * 11 + t) * 0.45
+        const s2 = Math.cos(wallX * 6.5 - t * 0.85) * 0.35
+        const swirl = (s1 + s2 + 0.9) / 1.8  // 0–1
+        const br = Math.min(1, Math.max(0.28, 1.6 - dist / 9)) * (side === 1 ? 0.75 : 1.0)
+        // Tiny star flecks inside portal
+        const starSeed = ((Math.floor(wallX * 28) * 4127 + Math.floor(t * 2.5)) ^ 0xB3C5) & 0xFF
+        if (starSeed < 12) {
+          // Bright star pixel
+          r = g = b = Math.round(210 * br)
+        } else {
+          r = Math.round(Math.min(255, (70 + swirl * 120) * br))
+          g = Math.round(Math.min(255, (20 + swirl * 80)  * br))
+          b = Math.round(Math.min(255, (215 + swirl * 40) * br))
+        }
+      }
     } else if (hitCell === END) {
-      // Purple portal / exit
-      const br = Math.min(1, Math.max(0.2, 1 - dist / 9)) * (side === 1 ? 0.75 : 1.0)
-      r = Math.round(180 * br); g = Math.round(90 * br); b = Math.round(255 * br)
+      // ── Exit portal: pulsing purple ──
+      const t = now / 620
+      const pulse = Math.sin(wallX * 7.5 + t) * 0.12 + 0.88
+      const br = Math.min(1, Math.max(0.2, 1.6 - dist / 9)) * (side === 1 ? 0.75 : 1.0) * pulse
+      r = Math.round(185 * br); g = Math.round(88 * br); b = Math.round(255 * br)
     } else {
-      // Castle stone: deep indigo-purple
-      r = Math.round(55 * baseBr); g = Math.round(38 * baseBr); b = Math.round(125 * baseBr)
+      // ── Castle stone: brighter + stone texture variation + torch glow ──
+      const stoneVar = Math.sin(wallX * 17.3) * 0.055 + Math.sin(wallX * 6.1) * 0.030
+      const adjBr = baseBr * (1.0 + stoneVar)
+
+      // Torches: ~25% of wall cells have a torch glow near their center
+      const cellHash = ((mapX * 7919 + mapY * 6271) ^ (mapX * 3301)) & 0xFFFF
+      const hasTorch = cellHash % 4 === 0
+      const torchProx = hasTorch ? Math.max(0, 1 - Math.abs(wallX - 0.5) * 5.5) : 0
+      const torchGlow = torchProx * torchProx * Math.min(1.3, 1.5 / Math.max(0.5, dist))
+
+      r = Math.round(Math.min(255, 72  * adjBr + torchGlow * 195))
+      g = Math.round(Math.min(255, 50  * adjBr + torchGlow *  88))
+      b = Math.round(Math.min(255, 160 * adjBr + torchGlow *   8))
     }
 
     ctx.fillStyle = `rgb(${r},${g},${b})`
     ctx.fillRect(x, wallTop, 1, wallBottom - wallTop)
 
-    // Thin bright mortar line at top/bottom of wall strips (stone block effect)
+    // Stone mortar lines at top/bottom of close walls
     if (hitCell === WALL && dist < 6) {
-      const mortarBr = baseBr * 0.35
-      ctx.fillStyle = `rgba(120,100,200,${mortarBr * 0.6})`
-      ctx.fillRect(x, wallTop, 1, 1)
+      const mortarAlpha = baseBr * 0.28
+      ctx.fillStyle = `rgba(135,112,210,${mortarAlpha})`
+      ctx.fillRect(x, wallTop,     1, 1)
       ctx.fillRect(x, wallBottom - 1, 1, 1)
     }
   }
 
-  // ── Door glow overlay when door is directly ahead and close ──
+  // ── Door glow + prompt when door is directly ahead ──
   const fwdR = playerRow + FACING_DELTA[facing][0]
   const fwdC = playerCol + FACING_DELTA[facing][1]
   if (grid[fwdR]?.[fwdC] === DOOR) {
     const doorData = dq[`${fwdR},${fwdC}`]
-    // Vertical golden border on edges of screen
-    const grd = ctx.createLinearGradient(0, 0, W / 5, 0)
-    grd.addColorStop(0, 'rgba(249,202,116,0.25)')
-    grd.addColorStop(1, 'rgba(249,202,116,0)')
+    const grd  = ctx.createLinearGradient(0, 0, W / 5, 0)
+    grd.addColorStop(0, 'rgba(249,202,116,0.20)'); grd.addColorStop(1, 'rgba(249,202,116,0)')
     ctx.fillStyle = grd; ctx.fillRect(0, 0, W / 5, H)
     const grd2 = ctx.createLinearGradient(W, 0, W * 4 / 5, 0)
-    grd2.addColorStop(0, 'rgba(249,202,116,0.25)')
-    grd2.addColorStop(1, 'rgba(249,202,116,0)')
+    grd2.addColorStop(0, 'rgba(249,202,116,0.20)'); grd2.addColorStop(1, 'rgba(249,202,116,0)')
     ctx.fillStyle = grd2; ctx.fillRect(W * 4 / 5, 0, W / 5, H)
-    // Door prompt text
     ctx.textAlign = 'center'
     ctx.font = `bold ${Math.round(W * 0.038)}px 'Cinzel', serif`
     ctx.fillStyle = 'rgba(249,202,116,0.92)'
-    ctx.fillText('🔐  Press ⬆️ to unlock', W / 2, H - 22)
+    ctx.fillText('🔐  Press ▲ to unlock', W / 2, H - 22)
     if (doorData) {
       ctx.font = `bold ${Math.round(W * 0.030)}px 'Nunito', sans-serif`
       ctx.fillStyle = 'rgba(249,202,116,0.65)'
@@ -260,7 +289,7 @@ function renderFrame(canvas, minimap, grid, dq, playerRow, playerCol, facing) {
     }
   }
 
-  // ── END portal glow when ahead ──
+  // ── Exit portal text ──
   if (grid[fwdR]?.[fwdC] === END) {
     ctx.textAlign = 'center'
     ctx.font = `bold ${Math.round(W * 0.04)}px 'Cinzel', serif`
@@ -268,12 +297,47 @@ function renderFrame(canvas, minimap, grid, dq, playerRow, playerCol, facing) {
     ctx.fillText('🏆  The exit lies ahead!', W / 2, H - 18)
   }
 
+  // ── Movement hint overlays (subtle, always visible) ──
+  const hSz = Math.max(11, Math.round(W * 0.065))
+  const drawHint = (symbol, hx, hy) => {
+    const pad = hSz * 0.62
+    ctx.save()
+    ctx.globalAlpha = 0.22
+    ctx.fillStyle = '#02022a'
+    ctx.fillRect(hx - pad, hy - pad, pad * 2, pad * 2)
+    ctx.globalAlpha = 0.42
+    ctx.fillStyle = '#b8b8f0'
+    ctx.font = `bold ${hSz}px sans-serif`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(symbol, hx, hy)
+    ctx.restore()
+  }
+  drawHint('▲', W / 2,              Math.round(H * 0.08))  // forward
+  drawHint('▼', W / 2,              Math.round(H * 0.82))  // backward
+  drawHint('↺', Math.round(W * 0.055), H / 2)              // turn left
+  drawHint('↻', Math.round(W * 0.945), H / 2)              // turn right
+
   // ── Crosshair ──
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)'
+  ctx.lineWidth = 1.2
   const cx = W / 2, cy = H / 2
-  ctx.strokeStyle = 'rgba(255,255,255,0.35)'
-  ctx.lineWidth = 1.5
-  ctx.beginPath(); ctx.moveTo(cx - 8, cy); ctx.lineTo(cx + 8, cy); ctx.stroke()
-  ctx.beginPath(); ctx.moveTo(cx, cy - 8); ctx.lineTo(cx, cy + 8); ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(cx - 7, cy); ctx.lineTo(cx + 7, cy); ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(cx, cy - 7); ctx.lineTo(cx, cy + 7); ctx.stroke()
+
+  // ── Wizard sprite (bottom center, bobs when moving) ──
+  const isMoving = Math.hypot(px - (playerCol + 0.5), py - (playerRow + 0.5)) > 0.025
+  const bobY = isMoving ? Math.sin(now / 95) * 4 : 0
+  const wzSz = Math.max(16, Math.round(W * 0.105))
+  ctx.save()
+  ctx.shadowColor = 'rgba(180,140,255,0.65)'
+  ctx.shadowBlur = 16
+  ctx.globalAlpha = 0.90
+  ctx.font = `${wzSz}px serif`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'bottom'
+  ctx.fillText(skinEmoji, W / 2, H - 1 + bobY)
+  ctx.restore()
 
   // ── Minimap ──
   if (minimap) {
@@ -281,15 +345,12 @@ function renderFrame(canvas, minimap, grid, dq, playerRow, playerCol, facing) {
     const rows = grid.length, cols = grid[0].length
     const cs = Math.floor(minimap.width / cols)
     mCtx.clearRect(0, 0, minimap.width, minimap.height)
-    // Semi-transparent background
-    mCtx.fillStyle = 'rgba(5,5,20,0.82)'
+    mCtx.fillStyle = 'rgba(4,4,18,0.84)'
     mCtx.fillRect(0, 0, minimap.width, minimap.height)
-    // Cells
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
-        const cell = grid[r][c]
-        const key = `${r},${c}`
-        if      (cell === WALL)  mCtx.fillStyle = '#0e0e2c'
+        const cell = grid[r][c], key = `${r},${c}`
+        if      (cell === WALL)  mCtx.fillStyle = '#0d0d2a'
         else if (cell === DOOR)  mCtx.fillStyle = dq[key]?.wrongs > 0 ? '#ff6633' : '#f9ca74'
         else if (cell === END)   mCtx.fillStyle = '#c8a4ff'
         else if (cell === START) mCtx.fillStyle = '#7ee8a244'
@@ -300,16 +361,15 @@ function renderFrame(canvas, minimap, grid, dq, playerRow, playerCol, facing) {
     // Player dot
     const mmx = (playerCol + 0.5) * cs, mmy = (playerRow + 0.5) * cs
     mCtx.fillStyle = '#ffffff'
-    mCtx.beginPath(); mCtx.arc(mmx, mmy, cs * 0.75, 0, Math.PI * 2); mCtx.fill()
-    // Direction arrow
+    mCtx.beginPath(); mCtx.arc(mmx, mmy, cs * 0.8, 0, Math.PI * 2); mCtx.fill()
+    // Facing arrow
     const ang = FACING_ANGLES[facing]
     mCtx.strokeStyle = '#f9ca74'
     mCtx.lineWidth = 1.5
     mCtx.beginPath()
     mCtx.moveTo(mmx, mmy)
-    mCtx.lineTo(mmx + Math.cos(ang) * cs * 2, mmy + Math.sin(ang) * cs * 2)
+    mCtx.lineTo(mmx + Math.cos(ang) * cs * 2.2, mmy + Math.sin(ang) * cs * 2.2)
     mCtx.stroke()
-    // Border
     mCtx.strokeStyle = 'rgba(100,80,200,0.5)'
     mCtx.lineWidth = 1
     mCtx.strokeRect(0, 0, minimap.width, minimap.height)
@@ -379,8 +439,7 @@ export default function WizardMaze() {
   const [maze, setMaze]             = useState(null)
 
   // ── Player position & facing ──────────────────────────────────────────────
-  // facing: 0=East 1=South 2=West 3=North
-  const [pos, setPos]       = useState({ row: 1, col: 1, facing: 0 })
+  const [pos, setPos]   = useState({ row: 1, col: 1, facing: 0 })
 
   // ── Math puzzle ───────────────────────────────────────────────────────────
   const [showMath, setShowMath] = useState(false)
@@ -400,11 +459,18 @@ export default function WizardMaze() {
   const [popup, setPopup]           = useState(null)
 
   // ── Refs ──────────────────────────────────────────────────────────────────
-  const canvasRef  = useRef(null)
-  const minimapRef = useRef(null)
-  const iref       = useRef(null)
-  const nameRef    = useRef(null)
+  const canvasRef   = useRef(null)
+  const minimapRef  = useRef(null)
+  const iref        = useRef(null)
+  const nameRef     = useRef(null)
   const passcodeRef = useRef(null)
+
+  // ── Smooth animation refs (avoid re-renders) ──────────────────────────────
+  const animRef   = useRef({ px: 1.5, py: 1.5, angle: FACING_ANGLES[0] })
+  const targetRef = useRef({ px: 1.5, py: 1.5, angle: FACING_ANGLES[0] })
+  const mazeRef   = useRef(null)
+  const posRef    = useRef({ row: 1, col: 1, facing: 0 })
+  const skRef     = useRef(ALL_SKINS[0])
 
   // ── Canvas dimensions ─────────────────────────────────────────────────────
   const [canvasW, setCanvasW] = useState(480)
@@ -417,10 +483,10 @@ export default function WizardMaze() {
     upd(); window.addEventListener('resize', upd); return () => window.removeEventListener('resize', upd)
   }, [])
 
-  // ── Minimap size (auto from grid) ─────────────────────────────────────────
+  // ── Minimap size: 1.5× bigger than v2 ────────────────────────────────────
   const mmCols   = maze?.grid?.[0]?.length || 13
   const mmRows   = maze?.grid?.length || 13
-  const mmCS     = Math.max(4, Math.floor(90 / Math.max(mmCols, mmRows)))
+  const mmCS     = Math.max(6, Math.floor(120 / Math.max(mmCols, mmRows)))
   const mmWidth  = mmCols * mmCS
   const mmHeight = mmRows * mmCS
 
@@ -433,6 +499,65 @@ export default function WizardMaze() {
     return Math.min(100, Math.round((total - c.threshold) / (n.threshold - c.threshold) * 100))
   }, [total])
   const di = DIFFS.find(d => d.key === diff) || DIFFS[1]
+
+  // ── Sync refs on every render ─────────────────────────────────────────────
+  useEffect(() => { mazeRef.current = maze }, [maze])
+  useEffect(() => { skRef.current = sk }, [sk])
+
+  // ── Sync pos → refs & animation target ───────────────────────────────────
+  useEffect(() => {
+    posRef.current = pos
+    targetRef.current = {
+      px:    pos.col + 0.5,
+      py:    pos.row + 0.5,
+      angle: FACING_ANGLES[pos.facing],
+    }
+  }, [pos])
+
+  // ── Continuous RAF animation loop ─────────────────────────────────────────
+  useEffect(() => {
+    if (gameScreen !== 'game' || !maze) return
+    let lastTime = null
+    let frameId  = null
+
+    const tick = (t) => {
+      if (!lastTime) lastTime = t
+      const dt = Math.min(t - lastTime, 50)   // cap at 50 ms (tab unfocus, etc.)
+      lastTime = t
+
+      const a   = animRef.current
+      const tgt = targetRef.current
+
+      // Exponential lerp — feel snappy but still smooth (~200 ms to settle)
+      const k = 1 - Math.exp(-13 * dt / 1000)
+      a.px += (tgt.px - a.px) * k
+      a.py += (tgt.py - a.py) * k
+
+      // Angle: take shortest arc
+      let da = tgt.angle - a.angle
+      if (da >  Math.PI) da -= 2 * Math.PI
+      if (da < -Math.PI) da += 2 * Math.PI
+      a.angle += da * k
+      if (Math.abs(da) < 0.0008) a.angle = tgt.angle   // snap when settled
+
+      const m = mazeRef.current
+      const p = posRef.current
+      const s = skRef.current
+      if (m && canvasRef.current && s) {
+        renderFrame(
+          canvasRef.current, minimapRef.current,
+          m.grid, m.dq,
+          p.row, p.col, p.facing,
+          a.px, a.py, a.angle,
+          s.emoji
+        )
+      }
+      frameId = requestAnimationFrame(tick)
+    }
+
+    frameId = requestAnimationFrame(tick)
+    return () => { if (frameId) cancelAnimationFrame(frameId) }
+  }, [maze, gameScreen, canvasW, canvasH])   // stable loop; pos changes via refs
 
   // ── Login focus ───────────────────────────────────────────────────────────
   useEffect(() => { if (screen === 'login' && nameRef.current) setTimeout(() => nameRef.current?.focus(), 200) }, [screen])
@@ -474,17 +599,15 @@ export default function WizardMaze() {
   const startGame = () => {
     const m = genMaze(ops, diff)
     setMaze(m)
-    setPos({ row: 1, col: 1, facing: 0 })
+    const sp = { row: 1, col: 1, facing: 0 }
+    setPos(sp)
+    // Teleport animation to start position immediately (no slide-in)
+    animRef.current  = { px: 1.5, py: 1.5, angle: FACING_ANGLES[0] }
+    targetRef.current = { px: 1.5, py: 1.5, angle: FACING_ANGLES[0] }
     setRun(0); setPendingSkin(null); setShowMath(false)
     setGameScreen('game')
   }
   const toggleOp = k => setOps(prev => { const n = new Set(prev); n.has(k) ? n.size > 1 && n.delete(k) : n.add(k); return n })
-
-  // ── Canvas render: fires whenever pos or maze changes ─────────────────────
-  useEffect(() => {
-    if (gameScreen !== 'game' || !maze || !canvasRef.current) return
-    renderFrame(canvasRef.current, minimapRef.current, maze.grid, maze.dq, pos.row, pos.col, pos.facing)
-  }, [pos, maze, gameScreen, canvasW, canvasH])
 
   // ── Move ──────────────────────────────────────────────────────────────────
   const move = useCallback((action) => {
@@ -499,7 +622,7 @@ export default function WizardMaze() {
 
       const [dr, dc] = action === 'forward'
         ? FACING_DELTA[facing]
-        : FACING_DELTA[(facing + 2) % 4] // backward = opposite direction
+        : FACING_DELTA[(facing + 2) % 4]
 
       const nr = row + dr, nc = col + dc
       if (nr < 0 || nr >= grid.length || nc < 0 || nc >= grid[0].length) return prev
@@ -509,15 +632,11 @@ export default function WizardMaze() {
 
       if (cv === DOOR) {
         const qq = dq[`${nr},${nc}`] || genQ(ops, diff)
-        // Trigger door — use setTimeout to avoid state mutation inside setPos
         setTimeout(() => { setQ(qq); setPending({ row: nr, col: nc }); setAns(''); setWrong(false); setShowMath(true) }, 0)
-        return prev // don't move into door yet
+        return prev
       }
 
-      if (cv === END) {
-        setTimeout(() => setGameScreen('win'), 300)
-      }
-
+      if (cv === END) { setTimeout(() => setGameScreen('win'), 300) }
       return { row: nr, col: nc, facing }
     })
   }, [showMath, maze, ops, diff])
@@ -541,7 +660,6 @@ export default function WizardMaze() {
   const submit = () => {
     const n = parseInt(ans, 10)
     if (!isNaN(n) && n === q.ans) {
-      // ✅ Correct
       const ng = maze.grid.map(r => [...r]); ng[pending.row][pending.col] = PATH
       const ndq = { ...maze.dq }; delete ndq[`${pending.row},${pending.col}`]
       const newMaze = { grid: ng, dq: ndq }
@@ -554,11 +672,9 @@ export default function WizardMaze() {
       saveProgress(nt, skinId)
       setShowMath(false); setSparkle(true)
       setPopup({ v: earned, k: Date.now() }); setTimeout(() => setPopup(null), 1500)
-      // Move player into the now-opened cell
       setPos(prev => ({ ...prev, row: pending.row, col: pending.col }))
       if (ng[pending.row][pending.col] === END) setTimeout(() => setGameScreen('win'), 1100)
     } else {
-      // ❌ Wrong
       setWrong(true); setAns('')
       setQ(prev => {
         const nw = prev.wrongs + 1, red = Math.max(5, Math.round(prev.curPts * .5 / 5) * 5)
