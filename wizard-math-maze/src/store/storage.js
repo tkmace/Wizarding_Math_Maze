@@ -1,11 +1,15 @@
-// ─── Local-first profile store ────────────────────────────────────────────────
-// Progress lives in this browser. No backend to wake up, no free-tier project to
-// keep alive, works on a plane. `sync.js` can mirror a profile to a cloud
-// backend later without any of the game code changing.
+import { blankSkill, SENSE } from '../game/math.js'
+import { blankAppearance, randomAppearance } from '../game/appearance.js'
+import { mapLegacySkin, formById, STARTER } from '../game/skins.js'
 
-const KEY = 'wmm.profiles.v3'
+// --- Local-first profile store ------------------------------------------------
+// Progress lives in this browser. No backend to wake up, no free-tier project to
+// keep alive, works on a plane. `sync.js` mirrors a profile to the cloud without
+// any of the game code changing.
+
+const KEY = 'wmm.profiles.v3'      // storage key kept stable across schema bumps
 const LAST = 'wmm.lastPlayer'
-const SCHEMA = 3
+const SCHEMA = 4
 
 /** localStorage can throw (private windows, blocked site data) — never let it break the game. */
 function readAll() {
@@ -30,18 +34,29 @@ export function blankProfile(name, passcode) {
     name: String(name).trim(),
     passcode: String(passcode),
     totalPoints: 0,
-    equippedSkin: 'apprentice',
+    equippedSkin: STARTER,
+    chosen: {},                    // rank -> chosen form id, one pick per rank
+    appearance: randomAppearance(),// face and hair — hers, kept across every form
+    skill: blankSkill(),           // per-operation 0..1, drives Wizard's Sense
     stones: 0,
     plays: 0,
     facts: {},
     stats: { mazesCleared: 0, doorsOpened: 0, correct: 0, wrong: 0, bestStreak: 0, hintsUsed: 0, playMs: 0 },
-    settings: { ops: ['addition'], diff: 'apprentice', showCompass: true, bigKeypad: true },
+    settings: { ops: ['addition'], diff: SENSE, showCompass: true, bigKeypad: true },
     createdAt: Date.now(),
     lastPlayed: Date.now(),
   }
 }
 
-/** Fill in anything a profile from an older schema is missing. */
+/**
+ * Bring a profile from any earlier schema up to the current one.
+ *
+ * The v3 -> v4 step matters: v3 stored one of six skin ids, which have been
+ * replaced by 25 procedurally drawn forms across 8 ranks. A returning player's
+ * old skin is mapped to its nearest new form AND recorded as her chosen form for
+ * that rank, so she keeps wearing something she recognises rather than being
+ * silently demoted to the starter robe.
+ */
 export function migrate(p) {
   const base = blankProfile(p.name || 'Wizard', p.passcode || '0000')
   const out = {
@@ -50,8 +65,23 @@ export function migrate(p) {
     stats: { ...base.stats, ...(p.stats || {}) },
     settings: { ...base.settings, ...(p.settings || {}) },
     facts: p.facts || {},
+    chosen: { ...(p.chosen || {}) },
+    skill: { ...blankSkill(), ...(p.skill || {}) },
+    appearance: { ...blankAppearance(), ...(p.appearance || {}) },
   }
+
   if (!Array.isArray(out.settings.ops) || !out.settings.ops.length) out.settings.ops = ['addition']
+
+  if ((p.v || 0) < 4) {
+    const mapped = mapLegacySkin(p.equippedSkin)
+    out.equippedSkin = mapped
+    const form = formById(mapped)
+    if (form.rank > 0 && !out.chosen[form.rank]) out.chosen[form.rank] = form.id
+  }
+  // Guard against a form id that no longer exists.
+  if (!formById(out.equippedSkin) || formById(out.equippedSkin).id !== out.equippedSkin) {
+    out.equippedSkin = STARTER
+  }
   return out
 }
 
@@ -63,7 +93,8 @@ export function listProfiles() {
     .map(p => ({
       name: p.name,
       totalPoints: p.totalPoints || 0,
-      equippedSkin: p.equippedSkin || 'apprentice',
+      equippedSkin: p.equippedSkin || STARTER,
+      appearance: p.appearance,
       lastPlayed: p.lastPlayed,
       mazesCleared: p.stats?.mazesCleared || 0,
     }))
@@ -106,28 +137,30 @@ export function deleteProfile(name) {
 export function setLastPlayer(name) { try { localStorage.setItem(LAST, name) } catch {} }
 export function getLastPlayer() { try { return localStorage.getItem(LAST) || null } catch { return null } }
 
-// ─── Wizard Scroll: move a profile between devices ────────────────────────────
+// --- Wizard Scroll: move a profile between devices ---------------------------
 // A pasteable code, so progress can hop from the iPad to the laptop with no
 // account system at all.
 export function exportScroll(profile) {
   const slim = {
     n: profile.name, p: profile.passcode, t: profile.totalPoints, s: profile.equippedSkin,
-    st: profile.stones, pl: profile.plays, f: profile.facts, x: profile.stats, g: profile.settings,
+    st: profile.stones, pl: profile.plays, f: profile.facts, x: profile.stats,
+    g: profile.settings, c: profile.chosen, k: profile.skill, ap: profile.appearance,
   }
   const json = JSON.stringify(slim)
-  const b64 = btoa(unescape(encodeURIComponent(json)))
-  return `WMM3-${b64}`
+  return `WMM4-${btoa(unescape(encodeURIComponent(json)))}`
 }
 
 export function importScroll(code) {
   try {
-    const body = String(code).trim().replace(/^WMM3-/, '')
+    const body = String(code).trim().replace(/^WMM\d-/, '')
     const json = decodeURIComponent(escape(atob(body)))
     const s = JSON.parse(json)
     if (!s?.n) return { ok: false, reason: 'unreadable' }
     const p = migrate({
       name: s.n, passcode: s.p, totalPoints: s.t, equippedSkin: s.s,
-      stones: s.st, plays: s.pl, facts: s.f, stats: s.x, settings: s.g,
+      stones: s.st, plays: s.pl, facts: s.f, stats: s.x,
+      settings: s.g, chosen: s.c, skill: s.k, appearance: s.ap,
+      v: s.c ? 4 : 3,
     })
     const all = readAll()
     const existing = all[slug(p.name)]

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { buildHint, diffByKey, opByKey } from '../game/math.js'
+import { buildHint, opByKey } from '../game/math.js'
 import { C, sans, serif, btn } from './theme.js'
 import Keypad from './Keypad.jsx'
 import Hint from './Hint.jsx'
@@ -11,14 +11,16 @@ import Hint from './Hint.jsx'
  *  - a visual hint rather than the answer, free after two misses;
  *  - no dead end — she can always step back and try another corridor.
  */
-export default function MathDoor({ q, diff, stones, bigKeypad, onCorrect, onWrong, onSpendStone, onStepBack }) {
+export default function MathDoor({ q, stones, swiftMs = 0, bigKeypad, onCorrect, onWrong, onSpendStone, onStepBack }) {
   const [ans, setAns] = useState('')
   const [shake, setShake] = useState(false)
   const [showHint, setShowHint] = useState(false)
   const [elapsed, setElapsed] = useState(0)
   const startRef = useRef(performance.now())
   const inputRef = useRef(null)
-  const fastMs = diffByKey(diff).fastMs
+  // The window travels on the question (Wizard's Sense gives each operation its
+  // own), widened by the worn form's Swift perk.
+  const fastMs = (q.fastMs || 6000) + swiftMs
   const hint = useMemo(() => buildHint(q), [q])
   const op = opByKey(q.op)
 
@@ -95,10 +97,10 @@ export default function MathDoor({ q, diff, stones, bigKeypad, onCorrect, onWron
       }}>
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-          <span style={{ fontFamily: serif, fontSize: 10, letterSpacing: 2, color: q.color, fontWeight: 900 }}>
+          <span style={{ fontFamily: serif, fontSize: 14, letterSpacing: 2.5, color: q.color, fontWeight: 900 }}>
             {q.review ? '◆ RUNE OF RETURN' : '◆ SEALED DOOR'}
           </span>
-          <span style={{ fontSize: 11, fontWeight: 900, color: C.gold }}>+{q.curPts} pts</span>
+          <span style={{ fontSize: 13, fontWeight: 900, color: C.gold }}>+{q.curPts} pts</span>
         </div>
 
         {/* Quick-recall bar — a bonus that drains away, never a penalty */}

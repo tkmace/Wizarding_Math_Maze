@@ -1,11 +1,11 @@
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { genMaze, revealFrom, WALL, PATH, DOOR, END, FACING_DELTA, cellKey } from './game/maze.js'
 import { recordAnswer } from './game/curriculum.js'
-import { to5 } from './game/math.js'
-import { getUnlocked } from './game/skins.js'
-import { skinById } from './game/skins.js'
+import { roundPts, SENSE } from './game/math.js'
+import { formById, rankFor, pendingRanks, activePerks, STARTER } from './game/skins.js'
+import { rollEncounter, encounterReward } from './game/encounters.js'
 import { saveProfile } from './store/storage.js'
-import { syncEnabled, push as cloudPush, pull as cloudPull, mergeProfiles } from './store/sync.js'
+import { syncEnabled, push as cloudPush } from './store/sync.js'
 import { CSS, C, sans, serif } from './ui/theme.js'
 import StarField from './ui/StarField.jsx'
 import Login from './ui/Login.jsx'
@@ -16,6 +16,9 @@ import Wardrobe from './ui/Wardrobe.jsx'
 import WinScreen from './ui/WinScreen.jsx'
 import ParentReport from './ui/ParentReport.jsx'
 import ScrollPanel from './ui/ScrollPanel.jsx'
+import SkinChoice from './ui/SkinChoice.jsx'
+import LookPicker from './ui/LookPicker.jsx'
+import Encounter from './ui/Encounter.jsx'
 
 const DISSOLVE_MS = 620
 const blankRun = () => ({ points: 0, doors: 0, answered: 0, correct: 0, fast: 0, startedAt: Date.now() })
@@ -24,7 +27,7 @@ export default function App() {
   const [profile, setProfile] = useState(null)
   const [screen, setScreen] = useState('login')
   const [ops, setOps] = useState(new Set(['addition']))
-  const [diff, setDiff] = useState('apprentice')
+  const [diff, setDiff] = useState(SENSE)
 
   const [maze, setMaze] = useState(null)
   const [pos, setPos] = useState({ row: 1, col: 1, facing: 0 })
@@ -34,29 +37,37 @@ export default function App() {
   const [doorQ, setDoorQ] = useState(null)
   const [doorCell, setDoorCell] = useState(null)
   const [run, setRun] = useState(blankRun)
+  const runRef = useRef(run)
+  runRef.current = run
   const [effects, setEffects] = useState([])
   const [popup, setPopup] = useState(null)
   const [flare, setFlare] = useState(0)
-  const [unlocked, setUnlocked] = useState(null)
-  const [newSkin, setNewSkin] = useState(false)
+  const [newRank, setNewRank] = useState(null)
+  const [encounter, setEncounter] = useState(null)
+  // An encounter is queued with a short delay so the step finishes animating.
+  // Without this flag, a door bumped inside that window opened BOTH overlays.
+  const encPending = useRef(false)
+  const encState = useRef({ count: 0, lastAt: -99 })
+  const steps = useRef(0)
   const mazeSeq = useRef(0)
 
-  // ── Persist: every change to the profile is written straight through to local
-  //    storage, so closing the tab mid-maze never loses points she just earned.
-  //    The cloud copy is NOT written here — that would be one request per
-  //    correct answer. See `syncUp` for when it goes up.
+  const perks = useMemo(() => activePerks(profile), [profile])
+  const pending = useMemo(() => (profile ? pendingRanks(profile) : []), [profile])
+  const gateMet = !maze || run.points >= (maze.pointsRequired || 0)
+
+  // --- Persistence -----------------------------------------------------------
+  // Local storage is written straight through, so closing the tab mid-maze never
+  // loses points she just earned. The cloud copy is NOT written here — that
+  // would be one request per correct answer. See `syncUp`.
   const commit = useCallback(next => {
     setProfile(next)
     saveProfile(next)
     return next
   }, [])
 
-  // Callbacks below fire from timers and event listeners, so they read the
-  // profile through a ref rather than closing over it.
   const profileRef = useRef(null)
   profileRef.current = profile
 
-  /** Mirror the current profile to the cloud. Best-effort, never awaited. */
   const syncUp = useCallback(() => {
     const p = profileRef.current
     if (p && syncEnabled()) cloudPush(p)
@@ -65,12 +76,18 @@ export default function App() {
   const enter = useCallback(p => {
     setProfile(p)
     setOps(new Set(p.settings?.ops?.length ? p.settings.ops : ['addition']))
-    setDiff(p.settings?.diff || 'apprentice')
+    setDiff(p.settings?.diff || SENSE)
     setScreen('hub')
   }, [])
 
-  // Push at the natural resting points — back at the castle, and when the tab
-  // goes away. Between those, local storage has already got everything.
+  useEffect(() => {
+    if (!profile) return
+    const settings = { ...profile.settings, ops: [...ops], diff }
+    if (JSON.stringify(settings) === JSON.stringify(profile.settings)) return
+    commit({ ...profile, settings })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ops, diff])
+
   useEffect(() => {
     if (screen === 'hub') syncUp()
   }, [screen, syncUp])
@@ -85,25 +102,26 @@ export default function App() {
     }
   }, [syncUp])
 
-  // Keep the chosen operations/difficulty on the profile so they survive a reload.
+  // A rank she's reached but not chosen a form for is owed a pick. Collect it
+  // the moment she's back in the castle rather than interrupting a maze.
   useEffect(() => {
-    if (!profile) return
-    const settings = { ...profile.settings, ops: [...ops], diff }
-    if (JSON.stringify(settings) === JSON.stringify(profile.settings)) return
-    commit({ ...profile, settings })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ops, diff])
+    if (screen === 'hub' && pending.length) setScreen('pick')
+  }, [screen, pending.length])
 
-  // ── Start a maze ────────────────────────────────────────────────────────────
+  // --- Start a maze ----------------------------------------------------------
   const startGame = useCallback(() => {
-    const m = genMaze(ops, diff, profile)
+    const m = genMaze(ops, diff, profile, perks)
     m.id = ++mazeSeq.current
     setMaze(m)
     setPos({ row: 1, col: 1, facing: 0 })
     setRun(blankRun())
-    setDoorQ(null); setDoorCell(null); setEffects([]); setUnlocked(null)
+    setDoorQ(null); setDoorCell(null); setEffects([]); setNewRank(null)
+    setEncounter(null)
+    encPending.current = false
+    encState.current = { count: 0, lastAt: -99 }
+    steps.current = 0
     setScreen('game')
-  }, [ops, diff, profile])
+  }, [ops, diff, profile, perks])
 
   const toggleOp = useCallback(k => setOps(prev => {
     const n = new Set(prev)
@@ -111,11 +129,16 @@ export default function App() {
     return n
   }), [])
 
-  // ── Movement ────────────────────────────────────────────────────────────────
+  const say = useCallback((text, ms = 1500) => {
+    setPopup({ text, k: Date.now() })
+    setTimeout(() => setPopup(null), ms)
+  }, [])
+
+  // --- Movement --------------------------------------------------------------
   const act = useCallback(action => {
-    if (doorQ || !maze) return
+    if (doorQ || encounter || encPending.current || !maze) return
     const cur = posRef.current
-    let { row, col, facing } = cur
+    const { row, col, facing } = cur
 
     if (action === 'turnLeft')  { setPos({ row, col, facing: (facing + 3) % 4 }); return }
     if (action === 'turnRight') { setPos({ row, col, facing: (facing + 1) % 4 }); return }
@@ -131,21 +154,38 @@ export default function App() {
       return
     }
 
+    // The exit gate. Finding the way out early shouldn't let her skip the maths,
+    // so the last step is refused until she's banked enough points in this run.
+    if (cell === END) {
+      const needed = (maze.pointsRequired || 0) - runRef.current.points
+      if (needed > 0) {
+        say(`🔒 Sealed — ${needed} more points`, 1800)
+        return
+      }
+    }
+
     setPos({ row: nr, col: nc, facing })
     revealFrom(maze.seen, maze.grid, nr, nc)
 
-    // Rune stone pickup
     const k = cellKey(nr, nc)
     if (maze.stones?.[k]) {
       delete maze.stones[k]
       commit({ ...profile, stones: (profile.stones || 0) + 1 })
-      setPopup({ text: '🔮 +1 Rune Stone', k: Date.now() })
-      setTimeout(() => setPopup(null), 1500)
+      say('🔮 +1 Rune Stone')
     }
 
-    if (cell === END) setTimeout(() => finishMaze(), 280)
+    if (cell === END) { setTimeout(() => finishMaze(), 280); return }
+
+    // Wandering encounters fire on ordinary corridor squares only — never on the
+    // exit, and never stacked on top of a door puzzle.
+    steps.current += 1
+    const enc = rollEncounter(encState.current, steps.current)
+    if (enc) {
+      encPending.current = true
+      setTimeout(() => { encPending.current = false; setEncounter(enc) }, 180)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [doorQ, maze, profile, commit])
+  }, [doorQ, encounter, maze, profile, commit, say])
 
   // The movement pad repeats on hold, so it must not capture `act` from the
   // render where the hold began — the maze can change underneath it.
@@ -153,14 +193,14 @@ export default function App() {
   actRef.current = act
   const onAction = useCallback(a => actRef.current(a), [])
 
-  // ── Finish ──────────────────────────────────────────────────────────────────
+  // --- Finish ----------------------------------------------------------------
   const finishMaze = useCallback(() => {
     setProfile(prev => {
       if (!prev) return prev
       const stats = {
         ...prev.stats,
         mazesCleared: (prev.stats?.mazesCleared || 0) + 1,
-        playMs: (prev.stats?.playMs || 0) + (Date.now() - run.startedAt),
+        playMs: (prev.stats?.playMs || 0) + (Date.now() - runRef.current.startedAt),
       }
       const next = { ...prev, stats }
       saveProfile(next)
@@ -168,25 +208,25 @@ export default function App() {
       return next
     })
     setScreen('win')
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [run.startedAt])
+  }, [])
 
-  // ── Door answered correctly ─────────────────────────────────────────────────
+  // --- Door answered correctly ----------------------------------------------
   const onCorrect = useCallback((ms, usedHint) => {
     const q = doorQ, cell = doorCell
     if (!q || !cell) return
 
-    const rec = recordAnswer({ ...profile, settings: { ...profile.settings, diff } },
-                             { ...q, hinted: usedHint }, true, ms)
-    const earned = q.curPts + rec.bonus
-    const before = getUnlocked(profile.totalPoints).map(s => s.id)
+    const rec = recordAnswer(profile, { ...q, hinted: usedHint }, true, ms, perks.swift)
+    const earned = roundPts((q.curPts + rec.bonus) * perks.fortune)
+
+    const before = rankFor(profile.totalPoints).rank
     const total = profile.totalPoints + earned
-    const justUnlocked = getUnlocked(total).find(s => !before.includes(s.id))
+    const after = rankFor(total).rank
 
     commit({
       ...profile,
       totalPoints: total,
       facts: rec.facts,
+      skill: rec.skill,
       plays: rec.plays,
       stats: {
         ...profile.stats,
@@ -195,7 +235,7 @@ export default function App() {
         hintsUsed: (profile.stats?.hintsUsed || 0) + (usedHint ? 1 : 0),
       },
     })
-    if (justUnlocked) { setUnlocked(justUnlocked.id); setNewSkin(true) }
+    if (after > before) setNewRank(after)
 
     setRun(r => ({
       ...r,
@@ -208,8 +248,7 @@ export default function App() {
 
     setDoorQ(null); setDoorCell(null)
     setFlare(Date.now())
-    setPopup({ text: `+${earned}${rec.fast ? ' ⚡QUICK!' : ''}`, k: Date.now() })
-    setTimeout(() => setPopup(null), 1500)
+    say(`+${earned}${rec.fast ? ' ⚡QUICK!' : ''}`)
 
     // Let the door dissolve on screen before the grid actually opens up.
     const start = performance.now()
@@ -228,37 +267,109 @@ export default function App() {
       setEffects(e => e.filter(x => x.start !== start))
     }, DISSOLVE_MS)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [doorQ, doorCell, profile, diff, commit])
+  }, [doorQ, doorCell, profile, perks, commit, say])
 
-  // ── Door answered wrongly ───────────────────────────────────────────────────
+  // --- Door answered wrongly ------------------------------------------------
   const onWrong = useCallback(() => {
     const cell = doorCell
     if (!cell) return
     setDoorQ(prev => {
       if (!prev) return prev
-      const next = { ...prev, wrongs: prev.wrongs + 1, curPts: to5(prev.curPts * 0.5) }
+      // How much a miss costs is a perk — a forgiving form keeps more of it.
+      const next = { ...prev, wrongs: prev.wrongs + 1, curPts: roundPts(prev.curPts * perks.mercy) }
       setMaze(m => m ? { ...m, dq: { ...m.dq, [cellKey(cell.row, cell.col)]: next } } : m)
       return next
     })
     setProfile(prev => {
       if (!prev) return prev
-      const next = { ...prev, stats: { ...prev.stats, wrong: (prev.stats?.wrong || 0) + 1 } }
+      const rec = recordAnswer(prev, doorQ, false, 0, perks.swift)
+      const next = {
+        ...prev,
+        facts: rec.facts,
+        skill: rec.skill,
+        plays: rec.plays,
+        stats: { ...prev.stats, wrong: (prev.stats?.wrong || 0) + 1 },
+      }
       saveProfile(next)
       return next
     })
     setRun(r => ({ ...r, answered: r.answered + 1 }))
-  }, [doorCell])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doorCell, doorQ, perks])
+
+  /**
+   * An encounter is over. Its answers are real practice, so they go through the
+   * same curriculum path as door answers — the adaptive skill and the fact table
+   * should not care where a question was asked.
+   */
+  const endEncounter = useCallback(({ outcome, earned, answers }) => {
+    encPending.current = false
+    setEncounter(null)
+    if (!profile) return
+
+    let next = profile
+    let fastCount = 0
+    for (const a of answers || []) {
+      const rec = recordAnswer(next, a.q, a.correct, a.ms, perks.swift)
+      if (rec.fast) fastCount += 1
+      next = { ...next, facts: rec.facts, skill: rec.skill, plays: rec.plays }
+    }
+
+    const reward = outcome === 'won' ? encounterReward(earned, perks) : { points: 0, stone: 0 }
+    next = {
+      ...next,
+      totalPoints: next.totalPoints + reward.points,
+      stones: (next.stones || 0) + reward.stone,
+      stats: {
+        ...next.stats,
+        correct: (next.stats?.correct || 0) + (answers || []).filter(a => a.correct).length,
+        wrong: (next.stats?.wrong || 0) + (answers || []).filter(a => !a.correct).length,
+        encountersWon: (next.stats?.encountersWon || 0) + (outcome === 'won' ? 1 : 0),
+      },
+    }
+
+    const before = rankFor(profile.totalPoints).rank
+    const after = rankFor(next.totalPoints).rank
+    commit(next)
+    if (after > before) setNewRank(after)
+
+    if (reward.points > 0) {
+      setRun(r => ({
+        ...r,
+        points: r.points + reward.points,
+        answered: r.answered + (answers || []).length,
+        correct: r.correct + (answers || []).filter(a => a.correct).length,
+        fast: r.fast + fastCount,
+      }))
+      setFlare(Date.now())
+      say(`+${reward.points}${reward.stone ? '  🔮+1' : ''}`, 1700)
+    }
+  }, [profile, perks, commit, say])
 
   const spendStone = useCallback(() => {
     commit({ ...profile, stones: Math.max(0, (profile.stones || 0) - 1) })
   }, [profile, commit])
 
-  const equip = useCallback(id => {
-    commit({ ...profile, equippedSkin: id })
+  const equip = useCallback(id => commit({ ...profile, equippedSkin: id }), [profile, commit])
+
+  const saveLook = useCallback(look => {
+    commit({ ...profile, appearance: look })
+    setScreen('hub')
   }, [profile, commit])
 
-  // ── Shell ───────────────────────────────────────────────────────────────────
-  const skin = profile ? skinById(profile.equippedSkin) : null
+  const choose = useCallback(id => {
+    const rank = pending[0]
+    commit({
+      ...profile,
+      chosen: { ...(profile.chosen || {}), [rank]: id },
+      equippedSkin: id,
+    })
+    setNewRank(null)
+    setScreen('hub')
+  }, [pending, profile, commit])
+
+  // --- Shell -----------------------------------------------------------------
+  const form = profile ? formById(profile.equippedSkin || STARTER) : null
   const doorsLeft = maze ? Object.keys(maze.dq).length : 0
 
   return (
@@ -272,25 +383,30 @@ export default function App() {
 
       {screen === 'login' && <Login onEnter={enter} />}
 
-      {screen === 'hub' && profile && (
+      {screen === 'pick' && profile && pending.length > 0 && (
+        <SkinChoice rank={pending[0]} appearance={profile.appearance} onChoose={choose} />
+      )}
+
+      {screen === 'hub' && profile && !pending.length && (
         <Hub
-          profile={profile} ops={ops} diff={diff} newSkin={newSkin}
+          profile={profile} ops={ops} diff={diff} pendingPicks={pending.length}
           onToggleOp={toggleOp} onSetDiff={setDiff}
           onStart={startGame}
-          onWardrobe={() => { setNewSkin(false); setScreen('wardrobe') }}
+          onWardrobe={() => setScreen('wardrobe')}
           onReport={() => setScreen('report')}
           onScroll={() => setScreen('scroll')}
+          onLook={() => setScreen('look')}
           onLogout={() => { setProfile(null); setScreen('login') }}
         />
       )}
 
       {screen === 'game' && maze && profile && (
         <GameView
-          maze={maze} pos={pos} skin={skin}
+          maze={maze} pos={pos} form={form} appearance={profile.appearance}
           runPoints={run.points} total={profile.totalPoints} stones={profile.stones || 0}
-          doorsLeft={doorsLeft} effects={effects}
+          doorsLeft={doorsLeft} effects={effects} gateMet={gateMet}
           showCompass={profile.settings?.showCompass}
-          paused={!!doorQ}
+          paused={!!doorQ || !!encounter}
           onAction={onAction}
           onExit={() => setScreen('hub')}
         />
@@ -298,8 +414,9 @@ export default function App() {
 
       {screen === 'win' && profile && (
         <WinScreen
-          profile={profile} run={run} unlocked={unlocked}
-          onAgain={startGame} onCastle={() => setScreen('hub')}
+          profile={profile} run={run} newRank={newRank} form={form}
+          onAgain={pending.length ? () => setScreen('pick') : startGame}
+          onCastle={() => setScreen('hub')}
         />
       )}
 
@@ -312,11 +429,23 @@ export default function App() {
       {screen === 'scroll' && profile && (
         <ScrollPanel profile={profile} onClose={() => setScreen('hub')} />
       )}
+      {screen === 'look' && profile && (
+        <LookPicker profile={profile} onSave={saveLook} onClose={() => setScreen('hub')} />
+      )}
 
-      {/* Door puzzle sits over the top of the maze */}
+      {encounter && profile && (
+        <Encounter
+          kind={encounter.kind} creature={encounter.creature}
+          ops={ops} diff={diff} profile={profile} form={form}
+          appearance={profile.appearance}
+          onDone={endEncounter}
+        />
+      )}
+
       {doorQ && profile && (
         <MathDoor
-          q={doorQ} diff={diff} stones={profile.stones || 0}
+          q={doorQ} stones={profile.stones || 0}
+          swiftMs={perks.swift}
           bigKeypad={profile.settings?.bigKeypad}
           onCorrect={onCorrect}
           onWrong={onWrong}
@@ -325,13 +454,12 @@ export default function App() {
         />
       )}
 
-      {/* Transient feedback */}
       {flare > 0 && <div key={flare} className="flare" />}
       {popup && screen === 'game' && (
         <div key={popup.k} className="pop" style={{
-          position: 'fixed', left: '50%', top: '46%', transform: 'translateX(-50%)',
+          position: 'fixed', left: '50%', top: '44%', transform: 'translateX(-50%)',
           zIndex: 70, color: C.goldHi, fontFamily: serif, fontWeight: 900,
-          fontSize: 30, textShadow: `0 0 22px ${C.gold}`, whiteSpace: 'nowrap',
+          fontSize: 28, textShadow: `0 0 22px ${C.gold}`, whiteSpace: 'nowrap',
         }}>{popup.text}</div>
       )}
     </div>

@@ -56,7 +56,7 @@ export const label = (extra = {}) => ({
   display: 'block',
   color: C.dim,
   fontFamily: serif,
-  fontSize: 10,
+  fontSize: 12.5,
   letterSpacing: 2,
   marginBottom: 7,
   ...extra,

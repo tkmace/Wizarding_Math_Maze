@@ -1,8 +1,8 @@
-import { getSkin, skinById } from '../game/skins.js'
+import { rankFor, rankInfo, formsAtRank } from '../game/skins.js'
 import { C, sans, serif, btn, panel } from './theme.js'
 
-export default function WinScreen({ profile, run, onAgain, onCastle, unlocked }) {
-  const rank = getSkin(profile.totalPoints)
+export default function WinScreen({ profile, run, onAgain, onCastle, newRank, form }) {
+  const rank = rankFor(profile.totalPoints)
   const acc = run.answered ? Math.round((run.correct / run.answered) * 100) : 100
 
   return (
@@ -13,15 +13,18 @@ export default function WinScreen({ profile, run, onAgain, onCastle, unlocked })
         letterSpacing: 2, textShadow: `0 0 24px ${C.gold}aa`, margin: '4px 0 16px',
       }}>Maze Conquered!</h2>
 
-      {unlocked && (
+      {newRank != null && (
         <div className="pulseRing" style={{
-          ...panel({ padding: '14px 16px', marginBottom: 12, borderColor: skinById(unlocked).color }),
+          ...panel({ padding: '14px 16px', marginBottom: 12, borderColor: C.gold }),
         }}>
-          <div style={{ fontSize: 40 }}>{skinById(unlocked).emoji}</div>
-          <div style={{ color: skinById(unlocked).color, fontFamily: serif, fontSize: 12, letterSpacing: 2, fontWeight: 900, marginTop: 4 }}>
-            NEW FORM UNLOCKED
+          <div style={{ fontSize: 34 }}>✨</div>
+          <div style={{ color: C.gold, fontFamily: serif, fontSize: 12, letterSpacing: 2, fontWeight: 900, marginTop: 4 }}>
+            RANK {newRank} — {rankInfo(newRank).name.toUpperCase()}
           </div>
-          <div style={{ color: '#fff', fontWeight: 900, fontSize: 18, fontFamily: sans }}>{skinById(unlocked).title}</div>
+          <div style={{ color: '#fff', fontWeight: 900, fontSize: 15, fontFamily: sans, marginTop: 2 }}>
+            {formsAtRank(newRank).length} new forms to choose from
+          </div>
+          <div style={{ color: C.dim, fontSize: 11, marginTop: 4 }}>Pick one — the others seal for good.</div>
         </div>
       )}
 
@@ -36,12 +39,12 @@ export default function WinScreen({ profile, run, onAgain, onCastle, unlocked })
           <Mini label="⚡ QUICK" value={run.fast} color={C.gold} />
         </div>
         <div style={{ color: C.dim, fontSize: 11, marginTop: 14, fontFamily: serif, letterSpacing: 1 }}>
-          {rank.wand} {rank.title} · {profile.totalPoints.toLocaleString()} total
+          {form?.title || rank.name} · {profile.totalPoints.toLocaleString()} total
         </div>
       </div>
 
       <button className="bh" onClick={onAgain} style={btn('gold', { width: '100%', fontSize: 17, minHeight: 56 })}>
-        Another Maze! 🗺️
+        {newRank != null ? 'Choose my new form! ✨' : 'Another Maze! 🗺️'}
       </button>
       <button className="bh" onClick={onCastle} style={btn('ghost', { width: '100%', marginTop: 9, fontSize: 14 })}>
         🏰 Return to Castle

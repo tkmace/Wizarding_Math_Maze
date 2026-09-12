@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { listProfiles, loadProfile, createProfile, importScroll, getLastPlayer, profileExists, saveProfile } from '../store/storage.js'
 import { syncEnabled, pull as cloudPull, mergeProfiles, findLegacy, claimLegacy } from '../store/sync.js'
-import { skinById, getSkin, getUnlocked } from '../game/skins.js'
+import { formById, rankFor, mapLegacySkin } from '../game/skins.js'
+import WizardPreview from './WizardPreview.jsx'
 import { C, sans, serif, btn, panel, label } from './theme.js'
 
 /**
@@ -88,10 +89,15 @@ export default function Login({ onEnter }) {
       return onEnter(made.profile)
     }
 
-    // Restore the old robe too, but only if the points actually unlock it.
-    const wanted = result.claimed.equippedSkin
-    const allowed = getUnlocked(result.profile.totalPoints).some(s => s.id === wanted)
-    const restored = { ...result.profile, equippedSkin: allowed ? wanted : 'apprentice' }
+    // Restore the old robe too. v1's six skins map onto the new form ladder, and
+    // we only honour it if the claimed points actually reach that form's rank —
+    // nobody inherits a rank they haven't earned.
+    const wanted = mapLegacySkin(result.claimed.equippedSkin)
+    const form = formById(wanted)
+    const earned = rankFor(result.profile.totalPoints).rank >= form.rank
+    const restored = earned
+      ? { ...result.profile, equippedSkin: wanted, chosen: { ...(result.profile.chosen || {}), [form.rank]: wanted } }
+      : { ...result.profile, equippedSkin: 'apprentice' }
     saveProfile(restored)
     onEnter(restored)
   }
@@ -129,19 +135,19 @@ export default function Login({ onEnter }) {
             <div style={{ ...label({ textAlign: 'left' }) }}>CHOOSE YOUR WIZARD</div>
             <div className="scroll" style={{ display: 'grid', gap: 8, maxHeight: '42vh', marginBottom: 12 }}>
               {profiles.map(p => {
-                const sk = skinById(p.equippedSkin)
-                const rank = getSkin(p.totalPoints)
+                const sk = formById(p.equippedSkin)
+                const rank = rankFor(p.totalPoints)
                 return (
                   <button key={p.name} className="bh" onClick={() => pick(p)} style={{
                     display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left',
                     padding: '11px 13px', borderRadius: 14, cursor: 'pointer',
                     background: C.panelHi, border: `2px solid ${p.name === lastName ? C.gold + '88' : C.lineHi}`,
                   }}>
-                    <span style={{ fontSize: 30, filter: `drop-shadow(0 0 8px ${sk.color})` }}>{sk.emoji}</span>
+                    <WizardPreview form={sk} appearance={p.appearance} size={46} animate={false} />
                     <span style={{ flex: 1, minWidth: 0 }}>
                       <span style={{ display: 'block', color: '#fff', fontWeight: 900, fontSize: 17, fontFamily: sans, overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</span>
                       <span style={{ display: 'block', color: C.dim, fontSize: 11, fontFamily: serif, letterSpacing: 1 }}>
-                        {rank.title} · {p.totalPoints.toLocaleString()} pts
+                        {rank.name} · {p.totalPoints.toLocaleString()} pts
                       </span>
                     </span>
                     <span style={{ color: C.gold, fontSize: 18 }}>›</span>
@@ -161,7 +167,7 @@ export default function Login({ onEnter }) {
         {/* ── Passcode ── */}
         {mode === 'passcode' && target && (
           <>
-            <div style={{ fontSize: 44, marginBottom: 2 }}>{skinById(target.equippedSkin).emoji}</div>
+            <WizardPreview form={formById(target.equippedSkin)} appearance={target.appearance} size={86} style={{ margin: '0 auto' }} />
             <div style={{ color: '#fff', fontWeight: 900, fontSize: 20, marginBottom: 14, fontFamily: sans }}>{target.name}</div>
             <label style={label({ textAlign: 'left' })}>SECRET PASSCODE</label>
             <input
@@ -219,7 +225,7 @@ export default function Login({ onEnter }) {
         {mode === 'legacy' && legacy && (
           <>
             <div style={{ fontSize: 40, marginBottom: 4 }}>📜</div>
-            <div style={{ fontFamily: serif, fontSize: 11, letterSpacing: 2, color: C.gold, fontWeight: 900, marginBottom: 10 }}>
+            <div style={{ fontFamily: serif, fontSize: 14, letterSpacing: 2, color: C.gold, fontWeight: 900, marginBottom: 10 }}>
               AN OLD SCROLL BEARS YOUR NAME
             </div>
             <div style={{
@@ -232,7 +238,7 @@ export default function Login({ onEnter }) {
                 <span style={{ fontSize: 11, color: C.faint, marginLeft: 5, letterSpacing: 1 }}>PTS</span>
               </div>
               <div style={{ color: C.dim, fontSize: 11, marginTop: 6, fontFamily: serif, letterSpacing: 1 }}>
-                {skinById(legacy.equippedSkin).emoji} {skinById(legacy.equippedSkin).title}
+                {formById(mapLegacySkin(legacy.equippedSkin)).title}
               </div>
             </div>
             <p style={{ color: C.dim, fontSize: 12, lineHeight: 1.7, margin: '0 0 14px' }}>

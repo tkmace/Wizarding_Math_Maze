@@ -37,7 +37,10 @@ export default function ParentReport({ profile, onClose }) {
                 <div key={o.key}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
                     <span style={{ color: o.color }}>{o.icon} {o.label}</span>
-                    <span style={{ color: C.faint }}>{b.right}/{b.attempts} right</span>
+                    <span style={{ color: C.faint }}>
+                      {b.right}/{b.attempts} right
+                      {b.skill != null && <span style={{ color: C.dim, marginLeft: 6 }}>· sense {Math.round(b.skill * 100)}%</span>}
+                    </span>
                   </div>
                   <div style={{ display: 'flex', height: 11, borderRadius: 8, overflow: 'hidden', background: '#0a0a2c', border: `1px solid ${C.line}` }}>
                     <Seg w={b.mastered / tot} c={C.good} />
@@ -89,7 +92,7 @@ export default function ParentReport({ profile, onClose }) {
 const Seg = ({ w, c }) => w > 0 ? <div style={{ width: `${w * 100}%`, background: c }} /> : null
 
 const SubHead = ({ children }) => (
-  <div style={{ fontFamily: serif, fontSize: 9.5, letterSpacing: 2, color: C.dim, fontWeight: 900, margin: '0 0 8px' }}>{children}</div>
+  <div style={{ fontFamily: serif, fontSize: 12.5, letterSpacing: 2, color: C.dim, fontWeight: 900, margin: '0 0 8px' }}>{children}</div>
 )
 
 const chip = c => ({
@@ -101,7 +104,7 @@ const chip = c => ({
 function Stat({ label, value, color }) {
   return (
     <div style={{ background: '#0a0a2c', border: `1.5px solid ${C.line}`, borderRadius: 13, padding: '10px 12px' }}>
-      <div style={{ fontFamily: serif, fontSize: 8.5, letterSpacing: 1.5, color: C.faint }}>{label.toUpperCase()}</div>
+      <div style={{ fontFamily: serif, fontSize: 10.5, letterSpacing: 1.5, color: C.faint }}>{label.toUpperCase()}</div>
       <div style={{ fontWeight: 900, fontSize: 21, color, fontFamily: sans, marginTop: 2 }}>{value}</div>
     </div>
   )

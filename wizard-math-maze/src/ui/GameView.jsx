@@ -1,35 +1,33 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import { renderFrame } from '../engine/renderer.js'
 import { renderMinimap, compassRotation } from '../engine/minimap.js'
-import { FACING_ANGLES, guideBearing, DOOR, cellKey } from '../game/maze.js'
+import { FACING_ANGLES, guideBearing, openings, isOpen, DOOR, END, WALL, cellKey } from '../game/maze.js'
 import { C, sans, serif } from './theme.js'
 import Controls from './Controls.jsx'
 
 const MAX_PIXEL_W = 960     // ray count cap — one ray per pixel column
 
 export default function GameView({
-  maze, pos, skin, runPoints, total, stones, doorsLeft, effects,
-  showCompass, paused, onAction, onExit,
+  maze, pos, form, appearance, runPoints, total, stones, doorsLeft, effects,
+  showCompass, paused, gateMet, onAction, onExit,
 }) {
   const wrapRef = useRef(null)
   const canvasRef = useRef(null)
   const miniRef = useRef(null)
   const animRef = useRef({ px: pos.col + 0.5, py: pos.row + 0.5, angle: FACING_ANGLES[pos.facing] })
   const targetRef = useRef({ ...animRef.current })
-  const [size, setSize] = useState({ w: 480, h: 270 })
+  const [size, setSize] = useState({ w: 480, h: 320 })
 
   // Everything the render loop needs, refreshed every render so the loop never
   // closes over stale state.
   const sceneRef = useRef(null)
-  sceneRef.current = { maze, pos, skin, effects, paused }
+  sceneRef.current = { maze, pos, form, appearance, effects, paused, gateMet }
 
   // ── Responsive canvas ───────────────────────────────────────────────────────
   useEffect(() => {
     const measure = () => {
       const el = wrapRef.current
       const availW = Math.min(el?.clientWidth || 480, 900)
-      // Portrait screens get a taller, squarer viewport; wide screens stay
-      // cinematic. Either way it's capped so the D-pad is always reachable.
       const ratio = window.innerWidth < 620 ? 0.92 : 0.56
       const h = Math.min(availW * ratio, window.innerHeight * 0.54)
       setSize({ w: Math.floor(availW), h: Math.floor(Math.max(190, h)) })
@@ -43,7 +41,6 @@ export default function GameView({
     }
   }, [])
 
-  // ── Follow the discrete grid position smoothly ──────────────────────────────
   useEffect(() => {
     targetRef.current = { px: pos.col + 0.5, py: pos.row + 0.5, angle: FACING_ANGLES[pos.facing] }
   }, [pos.row, pos.col, pos.facing])
@@ -86,7 +83,9 @@ export default function GameView({
           px: a.px, py: a.py, angle: a.angle,
           playerRow: s.pos.row, playerCol: s.pos.col, facing: s.pos.facing,
           doorAhead: aheadDoor(s.maze.grid, s.pos),
-          time: t, skin: s.skin, moving, effects: s.effects,
+          time: t, form: s.form, appearance: s.appearance, moving, effects: s.effects,
+          gateMet: s.gateMet,
+          lean: Math.max(-1, Math.min(1, da * 1.6)),
         })
         const mctx = miniRef.current?.getContext('2d')
         if (mctx) renderMinimap(mctx, {
@@ -124,31 +123,57 @@ export default function GameView({
     const t = e.changedTouches[0]
     const dx = t.clientX - touch.current.x
     const dy = t.clientY - touch.current.y
-    const dist = Math.hypot(dx, dy)
-    if (dist < 26) { onAction('forward'); return }          // a tap means "go"
+    if (Math.hypot(dx, dy) < 26) { onAction('forward'); return }   // a tap means "go"
     if (Math.abs(dx) > Math.abs(dy)) onAction(dx > 0 ? 'turnRight' : 'turnLeft')
     else onAction(dy > 0 ? 'backward' : 'forward')
     touch.current = null
   }, [onAction, paused])
 
-  // ── Compass ─────────────────────────────────────────────────────────────────
+  // ── Compass and side signposts ──────────────────────────────────────────────
   const guide = useMemo(
     () => maze ? guideBearing(maze.grid, pos.row, pos.col) : null,
     [maze, pos.row, pos.col])
   const rel = guide ? compassRotation(guide.angle, pos.facing) : null
 
+  const side = useMemo(
+    () => maze ? openings(maze.grid, pos.row, pos.col, pos.facing) : null,
+    [maze, pos.row, pos.col, pos.facing])
+
   const doorAhead = maze ? aheadDoor(maze.grid, pos) : null
   const aheadQ = doorAhead ? maze.dq?.[cellKey(doorAhead.row, doorAhead.col)] : null
+
+  const need = maze ? Math.max(0, (maze.pointsRequired || 0) - runPoints) : 0
+  const gatePct = maze?.pointsRequired ? Math.min(1, runPoints / maze.pointsRequired) : 1
 
   return (
     <div style={{ width: '100%', maxWidth: 900, zIndex: 10 }}>
       {/* HUD */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 7, padding: '0 2px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, padding: '0 2px' }}>
         <Chip label="RUN" value={runPoints} color={C.gold} />
         <Chip label="TOTAL" value={total} color={C.dim} />
         <Chip label="🚪" value={doorsLeft} color={C.teal} />
         <Chip label="🔮" value={stones} color={C.teal} />
       </div>
+
+      {/* Exit gate progress */}
+      {maze?.pointsRequired > 0 && (
+        <div style={{ marginBottom: 7, padding: '0 2px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9.5, fontWeight: 900, letterSpacing: 1, marginBottom: 3 }}>
+            <span style={{ fontFamily: serif, color: gateMet ? C.good : C.gold }}>
+              {gateMet ? '★ EXIT UNSEALED' : `🔒 EXIT SEALED — ${need} MORE`}
+            </span>
+            <span style={{ color: C.faint }}>{runPoints}/{maze.pointsRequired}</span>
+          </div>
+          <div style={{ height: 7, background: '#0a0a2c', borderRadius: 7, overflow: 'hidden', border: `1px solid ${C.line}` }}>
+            <div style={{
+              height: '100%', width: `${gatePct * 100}%`, borderRadius: 7,
+              background: gateMet ? `linear-gradient(90deg,${C.good},#8affd4)` : `linear-gradient(90deg,${C.amber},${C.gold})`,
+              boxShadow: `0 0 10px ${gateMet ? C.good : C.gold}88`,
+              transition: 'width .45s ease-out',
+            }} />
+          </div>
+        </div>
+      )}
 
       {/* Viewport */}
       <div ref={wrapRef} style={{ position: 'relative', width: '100%', borderRadius: 18, overflow: 'hidden', border: `2px solid ${C.line}`, background: '#04030f' }}>
@@ -159,7 +184,6 @@ export default function GameView({
           style={{ display: 'block', width: '100%', height: size.h, touchAction: 'none' }}
         />
 
-        {/* Back to the castle, as an overlay so the HUD row stays on one line */}
         <button className="bh" onClick={onExit} style={{
           position: 'absolute', top: 8, left: 8, zIndex: 2,
           padding: '7px 10px', borderRadius: 10, border: `1.5px solid ${C.lineHi}`,
@@ -168,12 +192,16 @@ export default function GameView({
           WebkitTapHighlightColor: 'transparent',
         }}>🏰</button>
 
+        {/* Side signposts. A first-person view physically cannot show a corridor
+            opening at 90° — the wall is edge-on — so the turns are signposted. */}
+        {side && <SideTab dir="left" cell={side.left} />}
+        {side && <SideTab dir="right" cell={side.right} />}
+
         {/* Minimap */}
         <div style={{ position: 'absolute', top: 8, right: 8, borderRadius: 12, overflow: 'hidden', boxShadow: '0 3px 14px #000a' }}>
           <canvas ref={miniRef} style={{ display: 'block', width: 108, height: 108 }} />
         </div>
 
-        {/* Compass — always know which way the next door is */}
         {showCompass !== false && rel != null && (
           <div style={{
             position: 'absolute', top: 124, right: 8, width: 108,
@@ -192,14 +220,18 @@ export default function GameView({
           </div>
         )}
 
-        {/* Door prompt */}
+        {/* Door prompt — operation and reward only. The numbers stay hidden
+            until the puzzle opens, so there's nothing to pre-solve. */}
         {aheadQ && (
           <div className="pulseRing" style={{
             position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)',
             background: 'rgba(8,6,28,.9)', border: `2px solid ${aheadQ.color}`,
-            borderRadius: 12, padding: '8px 14px', textAlign: 'center', whiteSpace: 'nowrap',
+            borderRadius: 12, padding: '8px 16px', textAlign: 'center', whiteSpace: 'nowrap',
           }}>
-            <div style={{ fontFamily: sans, fontWeight: 900, fontSize: 17, color: '#fff' }}>{aheadQ.disp} = ?</div>
+            <div style={{ fontFamily: sans, fontWeight: 900, fontSize: 17, color: '#fff' }}>
+              <span style={{ color: aheadQ.color, fontSize: 20 }}>{aheadQ.rune}</span>
+              {'  '}SEALED DOOR
+            </div>
             <div style={{ fontFamily: serif, fontSize: 9, letterSpacing: 1.5, color: aheadQ.color, marginTop: 2 }}>
               PRESS ▲ TO UNLOCK · +{aheadQ.curPts}
             </div>
@@ -208,6 +240,34 @@ export default function GameView({
       </div>
 
       <Controls onAction={onAction} disabled={paused} />
+    </div>
+  )
+}
+
+/** A glowing tab on the left or right edge naming what's through that turn. */
+function SideTab({ dir, cell }) {
+  if (!isOpen(cell)) return null
+  const look = cell === DOOR ? { c: C.gold, t: 'DOOR' }
+             : cell === END  ? { c: C.good, t: 'EXIT' }
+             : { c: '#8f8fd0', t: 'PATH' }
+  const left = dir === 'left'
+  return (
+    <div style={{
+      position: 'absolute', top: '50%', [left ? 'left' : 'right']: 0,
+      transform: 'translateY(-50%)',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+      padding: '10px 6px',
+      background: `linear-gradient(${left ? 'to right' : 'to left'}, ${look.c}33, transparent)`,
+      borderLeft: left ? `3px solid ${look.c}` : 'none',
+      borderRight: left ? 'none' : `3px solid ${look.c}`,
+      borderRadius: left ? '0 10px 10px 0' : '10px 0 0 10px',
+      pointerEvents: 'none',
+    }}>
+      <span style={{ color: look.c, fontSize: 19, lineHeight: 1, fontWeight: 900 }}>{left ? '↰' : '↱'}</span>
+      <span style={{
+        color: look.c, fontFamily: serif, fontSize: 8, fontWeight: 900, letterSpacing: 1,
+        writingMode: 'vertical-rl', textOrientation: 'mixed',
+      }}>{look.t}</span>
     </div>
   )
 }

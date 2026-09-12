@@ -1,4 +1,5 @@
 import { nextQuestion } from './curriculum.js'
+import { gateFraction, roundPts } from './math.js'
 
 export const WALL = 0, PATH = 1, DOOR = 2, START = 3, END = 4
 
@@ -56,7 +57,7 @@ export function findMinDoorPath(grid) {
  * Door questions come from the curriculum engine, so a maze quietly weights
  * itself toward the facts this player keeps missing.
  */
-export function genMaze(ops, dk, profile, rooms = 6) {
+export function genMaze(ops, dk, profile, perks = {}, rooms = 6) {
   const R = rooms, C = rooms, H = R * 2 + 1, W = C * 2 + 1
   const g = Array.from({ length: H }, () => Array(W).fill(WALL))
   for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) g[r * 2 + 1][c * 2 + 1] = PATH
@@ -120,14 +121,56 @@ export function genMaze(ops, dk, profile, rooms = 6) {
 
   // Rune stones: scattered pickups, each worth one visual hint at a door.
   const stones = {}
-  const stoneSpots = open.filter(([r, c]) => g[r][c] === PATH).slice(0, 4)
+  const stoneCount = 4 + (perks.stones || 0)
+  const stoneSpots = open.filter(([r, c]) => g[r][c] === PATH).slice(0, stoneCount)
   for (const [r, c] of stoneSpots) stones[key(r, c)] = true
+
+  // "True sight": a few doors show their numbers legibly from a distance
+  // instead of the usual blur. This is the Seer perk made visible.
+  const doorKeys = Object.keys(dq)
+  for (let i = 0; i < Math.min(perks.seer || 0, doorKeys.length); i++) {
+    dq[doorKeys[i]] = { ...dq[doorKeys[i]], clear: true }
+  }
+
+  // The exit gate. Requiring a SHARE of what this maze actually contains means
+  // it's always reachable by construction, however many doors happened to be
+  // placed — a fixed target could strand her in a maze that generated few.
+  const pointsAvailable = doorKeys.reduce((s, k) => s + (dq[k].basePts || 0), 0)
+  const frac = Math.max(0.2, gateFraction(dk, profile, ops) - (perks.gate || 0))
+  const pointsRequired = Math.min(pointsAvailable, roundPts(pointsAvailable * frac))
 
   const seen = Array.from({ length: H }, () => Array(W).fill(false))
   revealFrom(seen, g, 1, 1)
 
-  return { grid: g, dq, stones, seen, doorTotal: Object.keys(dq).length }
+  return {
+    grid: g, dq, stones, seen,
+    doorTotal: doorKeys.length,
+    pointsAvailable, pointsRequired,
+  }
 }
+
+/**
+ * What lies immediately ahead, to the left, to the right and behind — in the
+ * player's own frame of reference.
+ *
+ * A first-person view with any sane field of view simply cannot show a corridor
+ * opening at 90 degrees to your left: the wall face is edge-on, so it's
+ * invisible from the square you're standing on. Rather than distort the whole
+ * projection to fake it, the UI reads this and draws explicit signposts at the
+ * screen edges, so the available turns are always legible.
+ */
+export function openings(grid, row, col, facing) {
+  const rel = [0, 1, 2, 3].map(turn => {
+    const f = (facing + turn) % 4
+    const [dr, dc] = FACING_DELTA[f]
+    const cell = grid[row + dr]?.[col + dc]
+    return cell === undefined ? WALL : cell
+  })
+  // rel[0] ahead, rel[1] right, rel[2] behind, rel[3] left
+  return { ahead: rel[0], right: rel[1], behind: rel[2], left: rel[3] }
+}
+
+export const isOpen = cell => cell === PATH || cell === DOOR || cell === END || cell === START
 
 // ─── Fog of war ───────────────────────────────────────────────────────────────
 /**

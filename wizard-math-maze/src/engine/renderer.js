@@ -1,9 +1,14 @@
 import { castRay, FOV } from './raycaster.js'
 import { WALL, DOOR, END, cellKey } from '../game/maze.js'
+import { drawWizard } from './wizardSprite.js'
 
 // ─── Look & feel ──────────────────────────────────────────────────────────────
 const HORIZON = 0.42        // horizon above centre → more floor, reads as looking slightly down
-const CAM_BACK = 0.72       // camera pulled back, so a wall in your face doesn't fill the screen
+// Vertical scale of a wall one cell tall. Lower than 1 so a wall you're pressed
+// against doesn't overflow the frame — the old trick of adding a constant to the
+// DISTANCE did the same job but bent every straight edge, which is what made the
+// side walls kink where they met the wall ahead.
+const WALL_SCALE = 0.62
 const RAY_STEP = 1
 
 const PAL = {
@@ -48,6 +53,7 @@ export function renderFrame(ctx, s) {
   const W = ctx.canvas.width, H = ctx.canvas.height
   const horizonY = H * HORIZON
   const { grid, dq, px, py, angle, time } = s
+  const fov = s.fov || FOV
 
   drawSky(ctx, W, H, horizonY, time)
 
@@ -55,14 +61,27 @@ export function renderFrame(ctx, s) {
   const zbuf = new Float32Array(Math.ceil(W / RAY_STEP))
   const doors = new Map()
 
+  // Rectilinear (camera-plane) projection: screen x maps to the TANGENT of the
+  // ray angle, not the angle itself.
+  //
+  // Stepping the angle linearly instead is a cylindrical projection, and under it
+  // a straight horizontal edge in the world projects to a curve — so the top of a
+  // side wall bowed, and met the top of the wall ahead at a kink instead of
+  // running into the corner cleanly. Mapping through tan() is what Wolfenstein and
+  // Doom did, and it keeps flat surfaces flat: a wall beside you now draws as a
+  // true trapezoid whose edges continue the lines of the wall in front.
+  const halfPlane = Math.tan(fov / 2)
+
   for (let x = 0; x < W; x += RAY_STEP) {
-    const rayAngle = angle - FOV / 2 + (x / W) * FOV
+    const cameraX = (2 * x) / W - 1
+    const rayAngle = angle + Math.atan(cameraX * halfPlane)
     const hit = castRay(grid, px, py, rayAngle)
-    // Perpendicular distance removes the fish-eye bulge of raw ray length.
+    // Perpendicular distance to the camera plane — this is what makes the
+    // projection linear, and removes the fish-eye bulge of raw ray length.
     const perp = hit.dist * Math.cos(rayAngle - angle)
     zbuf[x / RAY_STEP] = perp
 
-    const wallH = H / (perp + CAM_BACK)
+    const wallH = (H * WALL_SCALE) / perp
     const top = horizonY - wallH * 0.52
     const bot = horizonY + wallH * 0.48
 
@@ -85,7 +104,7 @@ export function renderFrame(ctx, s) {
       continue
     }
 
-    drawWallSlice(ctx, x, top, bot, wallH, hit, perp, time)
+    drawWallSlice(ctx, x, top, bot, wallH, hit, perp, time, H)
   }
 
   // ── Doors ───────────────────────────────────────────────────────────────────
@@ -99,12 +118,12 @@ export function renderFrame(ctx, s) {
   }
 
   // ── Sprites ─────────────────────────────────────────────────────────────────
-  drawStones(ctx, s, W, H, horizonY, zbuf)
-  drawExitGlow(ctx, s, W, H, horizonY, zbuf)
+  drawStones(ctx, s, W, H, horizonY, zbuf, fov)
+  drawExitGlow(ctx, s, W, H, horizonY, zbuf, s.gateMet !== false, fov)
 
   // ── Foreground ──────────────────────────────────────────────────────────────
   drawVignette(ctx, W, H)
-  drawWizard(ctx, W, H, s.skin, s.moving, time)
+  drawPlayerWizard(ctx, W, H, s.form, s.appearance, s.moving, time, s.lean || 0)
   drawCrosshair(ctx, W, H, horizonY)
 }
 
@@ -148,7 +167,7 @@ function drawSky(ctx, W, H, horizonY, time) {
 }
 
 // ─── One wall column ──────────────────────────────────────────────────────────
-function drawWallSlice(ctx, x, top, bot, wallH, hit, perp, time) {
+function drawWallSlice(ctx, x, top, bot, wallH, hit, perp, time, H) {
   const h = hash(hit.mapX, hit.mapY)
   const br = clamp(1.55 - perp / 10.5, 0.14, 1.55) * (hit.side ? 0.78 : 1)
   // Stone grain across the face, so flat walls aren't flat colour.
@@ -160,13 +179,30 @@ function drawWallSlice(ctx, x, top, bot, wallH, hit, perp, time) {
   ctx.fillStyle = `rgb(${r | 0},${g | 0},${b | 0})`
   ctx.fillRect(x, top, RAY_STEP, bot - top)
 
-  // Mortar courses — four horizontal joints, offset per cell so neighbouring
-  // blocks don't line up. This is most of what makes it read as masonry.
+  // Masonry. The course COUNT scales with how tall the wall appears, which
+  // matters a lot: a fixed four joints stretched across a wall you're standing
+  // against turned it into three wide stripes on a flat field. Scaling keeps the
+  // bricks roughly constant in world size, so a near wall shows many courses and
+  // a far one shows few.
+  const courses = Math.round(clamp(wallH / (H * 0.085), 3, 16))
+  const brickH = wallH / courses
+  const bricksAcross = 4
   ctx.fillStyle = PAL.mortar
-  ctx.globalAlpha = clamp(0.55 - perp / 16, 0.04, 0.55)
-  for (let i = 1; i <= 4; i++) {
-    const f = i / 5 + ((h >> (i * 3)) % 7) * 0.006
-    ctx.fillRect(x, top + wallH * f, RAY_STEP, Math.max(1, wallH * 0.012))
+  ctx.globalAlpha = clamp(0.6 - perp / 16, 0.05, 0.6)
+  for (let i = 1; i < courses; i++) {
+    const jitter = ((h >> (i % 8 * 3)) % 5) * 0.0015 * wallH
+    ctx.fillRect(x, top + i * brickH + jitter, RAY_STEP, Math.max(1, brickH * 0.1))
+  }
+  // Vertical joints, offset half a brick on alternating courses so the blocks
+  // interlock rather than forming a grid.
+  for (let i = 0; i < courses; i++) {
+    const off = (i % 2) * 0.5 + ((h >> (i % 6)) % 3) * 0.04
+    const u = (hit.wallX * bricksAcross + off) % 1
+    // A narrow threshold: 5% of a brick's width is ~10px on a wall you're
+    // standing against, which reads as a dark block rather than a mortar line.
+    if (u < 0.018 || u > 0.982) {
+      ctx.fillRect(x, top + i * brickH + brickH * 0.08, RAY_STEP, Math.max(1, brickH * 0.84))
+    }
   }
   ctx.globalAlpha = 1
 
@@ -202,7 +238,7 @@ function drawDoor(ctx, d, W, H, horizonY, time, q, isAhead, fade) {
     const t = span <= RAY_STEP ? 0 : (x - x0) / span
     return d.leftDist + (d.rightDist - d.leftDist) * t
   }
-  const hAt   = x => H / (distAt(x) + CAM_BACK)
+  const hAt   = x => (H * WALL_SCALE) / distAt(x)
   const topAt = x => horizonY - hAt(x) * 0.52
   const botAt = x => horizonY + hAt(x) * 0.48
 
@@ -323,13 +359,45 @@ function drawDoor(ctx, d, W, H, horizonY, time, q, isAhead, fade) {
     ctx.fillText(q.rune, cx, runeY)
     ctx.shadowBlur = 0
 
-    // The problem itself — outlined so it stays legible over the swirl
+    // The numbers, deliberately unreadable.
+    //
+    // Showing the sum on the door let her solve it from down the corridor and
+    // walk through already knowing the answer, which skips the whole point. The
+    // operation rune above stays sharp, so she can still see whether it's a
+    // times door or a plus door and choose her route — only the digits are
+    // withheld until she's standing at the door and the puzzle opens.
+    //
+    // The True Sight perk sets `clear` on a few doors, which is where this
+    // becomes a reward rather than a restriction.
     ctx.font = `900 ${probSize}px Nunito, system-ui, sans-serif`
     ctx.lineWidth = Math.max(2, probSize * 0.16)
     ctx.strokeStyle = '#0b0824'
-    ctx.strokeText(q.disp, cx, probY)
-    ctx.fillStyle = '#ffffff'
-    ctx.fillText(q.disp, cx, probY)
+
+    if (q.clear) {
+      ctx.strokeText(q.disp, cx, probY)
+      ctx.fillStyle = '#ffffff'
+      ctx.fillText(q.disp, cx, probY)
+      ctx.globalAlpha = fade * 0.9
+      ctx.font = `900 ${probSize * 0.4}px Cinzel, Georgia, serif`
+      ctx.fillStyle = PAL.goldHi
+      ctx.fillText('TRUE SIGHT', cx, probY - openH * 0.16)
+      ctx.globalAlpha = fade
+    } else if (typeof ctx.filter === 'string') {
+      ctx.filter = `blur(${Math.max(3, probSize * 0.28)}px)`
+      ctx.fillStyle = '#ffffff'
+      ctx.fillText(q.disp, cx, probY)
+      ctx.filter = 'none'
+    } else {
+      // No filter support: smear several offset copies instead.
+      const r = Math.max(2, probSize * 0.16)
+      ctx.fillStyle = '#ffffff'
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2
+        ctx.globalAlpha = fade * 0.16
+        ctx.fillText(q.disp, cx + Math.cos(a) * r, probY + Math.sin(a) * r)
+      }
+      ctx.globalAlpha = fade
+    }
 
     if (wallHmid > 120) {
       ctx.font = `800 ${probSize * 0.58}px Nunito, system-ui, sans-serif`
@@ -379,29 +447,31 @@ function drawDoor(ctx, d, W, H, horizonY, time, q, isAhead, fade) {
 //  Billboarded sprites
 // ══════════════════════════════════════════════════════════════════════════════
 /** Screen placement for a world point, matching the wall pass's angular projection. */
-function project(s, W, H, horizonY, wx, wy) {
+function project(s, W, H, horizonY, wx, wy, fov = FOV) {
   let delta = Math.atan2(wy - s.py, wx - s.px) - s.angle
   while (delta > Math.PI) delta -= Math.PI * 2
   while (delta < -Math.PI) delta += Math.PI * 2
-  if (Math.abs(delta) > FOV / 2 + 0.3) return null
+  if (Math.abs(delta) > fov / 2 + 0.3) return null
   const raw = Math.hypot(wx - s.px, wy - s.py)
   const perp = raw * Math.cos(delta)
   if (perp < 0.12) return null
+  // Same tangent mapping as the wall pass, so sprites sit where the walls say.
+  const cameraX = Math.tan(delta) / Math.tan(fov / 2)
   return {
-    x: W * (delta + FOV / 2) / FOV,
+    x: (W * (cameraX + 1)) / 2,
     perp,
-    size: H / (perp + CAM_BACK),
+    size: (H * WALL_SCALE) / perp,
   }
 }
 
-function drawStones(ctx, s, W, H, horizonY, zbuf) {
+function drawStones(ctx, s, W, H, horizonY, zbuf, fov) {
   if (!s.stones) return
   const items = Object.keys(s.stones).map(k => {
     const [r, c] = k.split(',').map(Number)
     return { r, c, k }
   })
   for (const it of items) {
-    const p = project(s, W, H, horizonY, it.c + 0.5, it.r + 0.5)
+    const p = project(s, W, H, horizonY, it.c + 0.5, it.r + 0.5, fov)
     if (!p) continue
     const sz = p.size * 0.17
     const bob = Math.sin(s.time / 520 + it.r + it.c) * p.size * 0.03
@@ -441,32 +511,36 @@ function drawStones(ctx, s, W, H, horizonY, zbuf) {
   }
 }
 
-function drawExitGlow(ctx, s, W, H, horizonY, zbuf) {
+function drawExitGlow(ctx, s, W, H, horizonY, zbuf, gateMet, fov) {
   const grid = s.grid
   let er = -1, ec = -1
   for (let r = 0; r < grid.length; r++) for (let c = 0; c < grid[0].length; c++) if (grid[r][c] === END) { er = r; ec = c }
   if (er < 0) return
-  const p = project(s, W, H, horizonY, ec + 0.5, er + 0.5)
+  const p = project(s, W, H, horizonY, ec + 0.5, er + 0.5, fov)
   if (!p) return
   const cols = []
   for (let x = Math.max(0, Math.floor(p.x - p.size * 0.5)); x <= Math.min(W - 1, Math.ceil(p.x + p.size * 0.5)); x += RAY_STEP)
     if (p.perp < (zbuf[Math.floor(x / RAY_STEP)] ?? Infinity)) cols.push(x)
   if (!cols.length) return
 
+  // Sealed exits glow amber and wear a padlock; open ones are green with a star.
+  const tint = gateMet ? '138,255,212' : '249,202,116'
   ctx.save()
   clipColumns(ctx, cols, horizonY - p.size, horizonY + p.size)
   const g = ctx.createRadialGradient(p.x, horizonY + p.size * 0.1, 0, p.x, horizonY + p.size * 0.1, p.size * 0.5)
-  g.addColorStop(0, 'rgba(138,255,212,0.75)')
-  g.addColorStop(0.5, 'rgba(138,255,212,0.22)')
-  g.addColorStop(1, 'rgba(138,255,212,0)')
+  g.addColorStop(0, `rgba(${tint},0.75)`)
+  g.addColorStop(0.5, `rgba(${tint},0.22)`)
+  g.addColorStop(1, `rgba(${tint},0)`)
   ctx.fillStyle = g
   ctx.fillRect(p.x - p.size * 0.5, horizonY - p.size * 0.4, p.size, p.size)
   ctx.textAlign = 'center'
-  ctx.font = `900 ${clamp(p.size * 0.2, 10, 42)}px Nunito, sans-serif`
-  ctx.fillStyle = PAL.exit
-  ctx.globalAlpha = 0.9
-  ctx.fillText('★', p.x, horizonY + p.size * 0.1)
+  ctx.textBaseline = 'middle'
+  ctx.font = `900 ${clamp(p.size * 0.22, 10, 46)}px Nunito, sans-serif`
+  ctx.fillStyle = gateMet ? PAL.exit : PAL.gold
+  ctx.globalAlpha = 0.95
+  ctx.fillText(gateMet ? '★' : '🔒', p.x, horizonY + p.size * 0.1)
   ctx.textAlign = 'left'
+  ctx.textBaseline = 'alphabetic'
   ctx.restore()
 }
 
@@ -479,52 +553,22 @@ function drawVignette(ctx, W, H) {
   ctx.fillRect(0, 0, W, H)
 }
 
-/** The player's wizard, seen from behind at the bottom of the frame. */
-function drawWizard(ctx, W, H, skin, moving, time) {
-  const col = skin?.color || '#a0a0cc'
-  const bob = moving ? Math.sin(time / 130) * H * 0.012 : Math.sin(time / 900) * H * 0.004
-  const cx = W * 0.5
-  const base = H + H * 0.06 + bob
-  const rw = Math.min(W * 0.13, H * 0.22), rh = H * 0.185
-
-  ctx.save()
-  // Robe
-  ctx.beginPath()
-  ctx.moveTo(cx - rw * 0.44, base)
-  ctx.lineTo(cx - rw * 0.19, base - rh)
-  ctx.lineTo(cx + rw * 0.19, base - rh)
-  ctx.lineTo(cx + rw * 0.44, base)
-  ctx.closePath()
-  const rg = ctx.createLinearGradient(cx - rw * 0.44, 0, cx + rw * 0.44, 0)
-  rg.addColorStop(0, '#0d0a24'); rg.addColorStop(0.5, col); rg.addColorStop(1, '#0d0a24')
-  ctx.fillStyle = rg
-  ctx.globalAlpha = 0.95
-  ctx.fill()
-
-  // Pointed hat
-  const hatB = base - rh * 0.92, hatH = rh * 0.70
-  ctx.beginPath()
-  ctx.moveTo(cx - rw * 0.30, hatB)
-  ctx.quadraticCurveTo(cx - rw * 0.05, hatB - hatH * 0.85, cx + rw * 0.02, hatB - hatH)
-  ctx.quadraticCurveTo(cx + rw * 0.14, hatB - hatH * 0.55, cx + rw * 0.30, hatB)
-  ctx.closePath()
-  const hg = ctx.createLinearGradient(cx - rw * 0.3, hatB, cx + rw * 0.3, hatB - hatH)
-  hg.addColorStop(0, '#0b0820'); hg.addColorStop(1, col)
-  ctx.fillStyle = hg
-  ctx.fill()
-  // Brim
-  ctx.beginPath()
-  ctx.ellipse(cx, hatB, rw * 0.34, rh * 0.045, 0, 0, Math.PI * 2)
-  ctx.fillStyle = '#100c2c'
-  ctx.fill()
-  // Star on the tip
-  ctx.globalAlpha = 0.75 + 0.25 * Math.sin(time / 400)
-  ctx.fillStyle = PAL.goldHi
-  ctx.font = `900 ${Math.max(9, rh * 0.14)}px serif`
-  ctx.textAlign = 'center'
-  ctx.fillText('✦', cx + rw * 0.03, hatB - hatH + rh * 0.06)
-  ctx.textAlign = 'left'
-  ctx.restore()
+/**
+ * The player's wizard, walking ahead of the camera.
+ *
+ * Sized and placed so the head sits just below the horizon: the wizard is
+ * unmistakably there and being guided, while the corridor and doors ahead stay
+ * unobstructed. Any larger and she'd be steering a wizard she couldn't see past.
+ */
+function drawPlayerWizard(ctx, W, H, form, appearance, moving, time, lean) {
+  if (!form) return
+  drawWizard(ctx, {
+    x: W / 2,
+    yBase: H * 0.94,
+    h: H * 0.26,
+    form, appearance, t: time, moving, lean,
+    view: 'back',
+  })
 }
 
 function drawCrosshair(ctx, W, H, horizonY) {

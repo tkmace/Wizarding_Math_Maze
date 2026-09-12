@@ -1,10 +1,13 @@
-import { genQ, factKey, parseFactKey, factInDifficulty, opByKey, diffByKey, to5 } from './math.js'
+import {
+  genQ, factKey, parseFactKey, factInDifficulty, opByKey,
+  roundPts, blankSkill, skillOf, SENSE,
+} from './math.js'
 
-// ─── Adaptive practice engine ─────────────────────────────────────────────────
-// A Leitner box system. Every math fact she meets lands in a box; getting it
-// right promotes it and pushes the next review further out, getting it wrong
-// demotes it and brings it back almost immediately. Intervals are counted in
-// *questions answered*, not wall-clock time, so a kid who plays once a fortnight
+// --- Adaptive practice engine -------------------------------------------------
+// A Leitner box system. Every fact she meets lands in a box; getting it right
+// promotes it and pushes the next review further out, getting it wrong demotes
+// it and brings it back almost immediately. Intervals are counted in *questions
+// answered* rather than wall-clock time, so a child who plays once a fortnight
 // still gets a sensible review order instead of a wall of overdue cards.
 const BOX_INTERVAL = [1, 3, 8, 20, 50, 120]
 const MAX_BOX = BOX_INTERVAL.length - 1
@@ -12,16 +15,25 @@ const MAX_BOX = BOX_INTERVAL.length - 1
 /** Share of door questions pulled from the review queue rather than generated fresh. */
 const REVIEW_RATE = 0.45
 
+// How far one answer moves the per-operation skill that drives Wizard's Sense.
+// Rises slowly and falls faster, so the maze backs off quickly when she starts
+// struggling but makes her earn the harder numbers.
+const SKILL_UP_FAST  = 0.045
+const SKILL_UP       = 0.028
+const SKILL_UP_SLOW  = 0.004
+const SKILL_DOWN     = 0.050
+const SKILL_MIN      = 0.02
+
 export const blankFact = () => ({ n: 0, right: 0, wrong: 0, box: 0, due: 0, bestMs: null, lastMs: null, streak: 0 })
 
 /**
- * Choose the next question. Prefers a weak, due fact that fits the chosen
- * operations and difficulty; otherwise generates a fresh one. `recent` is a
- * list of fact keys to avoid so the same problem never appears back-to-back.
+ * Choose the next question. Prefers a weak, due fact that fits the operations
+ * and difficulty in play; otherwise generates a fresh one. `recent` is a list of
+ * fact keys to avoid, so the same problem never appears back-to-back.
  */
 export function nextQuestion(profile, ops, diff, recent = []) {
-  const facts = profile.facts || {}
-  const plays = profile.plays || 0
+  const facts = profile?.facts || {}
+  const plays = profile?.plays || 0
   const opSet = ops instanceof Set ? ops : new Set(ops)
 
   const due = Object.entries(facts)
@@ -30,7 +42,7 @@ export function nextQuestion(profile, ops, diff, recent = []) {
       if (f.due > plays) return false        // not due yet
       if (recent.includes(key)) return false
       const { op, a, b } = parseFactKey(key)
-      return opSet.has(op) && factInDifficulty(op, a, b, diff)
+      return opSet.has(op) && factInDifficulty(op, a, b, diff, profile)
     })
     .sort((x, y) =>
       x[1].box - y[1].box ||
@@ -42,29 +54,30 @@ export function nextQuestion(profile, ops, diff, recent = []) {
     const pool = due.slice(0, 5)
     const [key] = pool[Math.floor(Math.random() * pool.length)]
     const { op, a, b } = parseFactKey(key)
-    const q = genQ(opSet, diff, { op, a, b })
-    return { ...q, review: true }
+    return { ...genQ(opSet, diff, profile, { op, a, b }), review: true }
   }
 
-  // Fresh question, but don't hand back something she just saw.
   for (let i = 0; i < 8; i++) {
-    const q = genQ(opSet, diff)
+    const q = genQ(opSet, diff, profile)
     if (!recent.includes(q.key)) return q
   }
-  return genQ(opSet, diff)
+  return genQ(opSet, diff, profile)
 }
 
 /**
- * Fold one answer into the profile's fact table.
- * Returns { facts, plays, fast, bonus } — `bonus` is extra points for a
- * first-try answer inside the difficulty's quick-recall window.
+ * Fold one answer into the profile's fact table and adaptive skill.
+ *
+ * `swiftBonusMs` comes from the worn form's perk and widens the quick-recall
+ * window. Returns { facts, skill, plays, fast, bonus } — `bonus` is extra
+ * points for a first-try answer inside that window.
  */
-export function recordAnswer(profile, q, correct, ms) {
-  const facts = { ...(profile.facts || {}) }
+export function recordAnswer(profile, q, correct, ms, swiftBonusMs = 0) {
+  const facts = { ...(profile?.facts || {}) }
   const prev = facts[q.key] || blankFact()
-  const plays = (profile.plays || 0) + 1
+  const plays = (profile?.plays || 0) + 1
   const firstTry = q.wrongs === 0 && !q.hinted
-  const fast = correct && firstTry && ms <= diffByKey(profile.settings?.diff || 'apprentice').fastMs
+  const window = (q.fastMs || 6000) + swiftBonusMs
+  const fast = correct && firstTry && ms <= window
 
   let box = prev.box
   if (correct) box = firstTry ? Math.min(MAX_BOX, box + 1) : box
@@ -81,10 +94,22 @@ export function recordAnswer(profile, q, correct, ms) {
     streak: correct ? prev.streak + 1 : 0,
   }
 
-  return { facts, plays, fast, bonus: fast ? to5(q.curPts * 0.25) : 0 }
+  // --- Wizard's Sense ---
+  const skill = { ...blankSkill(), ...(profile?.skill || {}) }
+  const cur = skillOf(profile, q.op)
+  let delta
+  if (!correct)      delta = -SKILL_DOWN
+  else if (fast)     delta = SKILL_UP_FAST
+  else if (firstTry) delta = SKILL_UP
+  else               delta = SKILL_UP_SLOW
+  // Ease off as it approaches the ceiling so the top tier has to be earned.
+  const scaled = delta > 0 ? delta * (1 - cur * 0.55) : delta
+  skill[q.op] = Math.min(1, Math.max(SKILL_MIN, cur + scaled))
+
+  return { facts, skill, plays, fast, bonus: fast ? roundPts(q.curPts * 0.25) : 0 }
 }
 
-// ─── Mastery classification ───────────────────────────────────────────────────
+// --- Mastery classification ---------------------------------------------------
 export function factState(f) {
   if (!f || f.n === 0) return 'new'
   if (f.box >= 4) return 'mastered'
@@ -98,10 +123,10 @@ const STATE_ORDER = ['shaky', 'learning', 'mastered', 'new']
 
 /** Everything the parent report needs, derived from the fact table. */
 export function masteryReport(profile) {
-  const facts = profile.facts || {}
+  const facts = profile?.facts || {}
   const byOp = {}
   for (const o of ['addition', 'subtraction', 'multiplication', 'division'])
-    byOp[o] = { mastered: 0, learning: 0, shaky: 0, attempts: 0, right: 0, wrong: 0 }
+    byOp[o] = { mastered: 0, learning: 0, shaky: 0, attempts: 0, right: 0, wrong: 0, skill: skillOf(profile, o) }
 
   const rows = []
   for (const [key, f] of Object.entries(facts)) {
@@ -112,7 +137,7 @@ export function masteryReport(profile) {
     byOp[op].attempts += f.n
     byOp[op].right += f.right
     byOp[op].wrong += f.wrong
-    rows.push({ key, op, a, b, ...f, state: st, disp: dispOf(op, a, b) })
+    rows.push({ key, op, a, b, ...f, state: st, disp: `${a} ${opByKey(op).rune} ${b}` })
   }
 
   rows.sort((x, y) =>
@@ -121,27 +146,19 @@ export function masteryReport(profile) {
     y.n - x.n)
 
   const timed = rows.filter(r => r.bestMs != null)
+  const all = rows.reduce((s, r) => s + r.n, 0)
   return {
     rows,
     byOp,
     needsWork: rows.filter(r => r.state === 'shaky').slice(0, 12),
     strongest: rows.filter(r => r.state === 'mastered').slice(0, 12),
     totalFacts: rows.length,
-    totalAttempts: rows.reduce((s, r) => s + r.n, 0),
-    accuracy: (() => {
-      const right = rows.reduce((s, r) => s + r.right, 0)
-      const all = rows.reduce((s, r) => s + r.n, 0)
-      return all ? right / all : 0
-    })(),
+    totalAttempts: all,
+    accuracy: all ? rows.reduce((s, r) => s + r.right, 0) / all : 0,
     medianMs: timed.length
       ? timed.map(r => r.bestMs).sort((a, b) => a - b)[Math.floor(timed.length / 2)]
       : null,
   }
 }
 
-function dispOf(op, a, b) {
-  const r = opByKey(op).rune
-  return `${a} ${r} ${b}`
-}
-
-export { factKey }
+export { factKey, SENSE }

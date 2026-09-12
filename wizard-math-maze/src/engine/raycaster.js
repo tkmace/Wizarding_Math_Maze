@@ -1,6 +1,20 @@
 import { WALL, DOOR } from '../game/maze.js'
 
-export const FOV = Math.PI / 2.3            // ~78°, a wide "pulled back" view
+// 110°. Wide enough that a door or corridor immediately to your side is visible
+// from the square you're standing on, which an 84° view cannot show at all.
+//
+// A classic engine couldn't afford this. Wolfenstein 3D and Doom projected onto
+// a flat camera plane, where the edges of a wide view stretch badly, so they sat
+// near 60-90° and solved the problem elsewhere: Doom's levels were open polygons
+// rather than one-cell grid corridors, and it shipped an automap. Grid-based
+// dungeon crawlers (Dungeon Master, Eye of the Beholder, Legend of Grimrock) hit
+// exactly our case and drew the side walls of the current cell as explicit
+// angled panels instead.
+//
+// This renderer steps the ray angle linearly across the screen, which is a
+// cylindrical projection — straight walls bow very slightly, but nothing
+// stretches at the edges, so a wide view stays comfortable.
+export const FOV = 95 * Math.PI / 180
 export const MAX_STEPS = 64
 
 /**
