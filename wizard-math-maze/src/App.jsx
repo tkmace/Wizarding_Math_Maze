@@ -5,7 +5,7 @@ import { to5 } from './game/math.js'
 import { getUnlocked } from './game/skins.js'
 import { skinById } from './game/skins.js'
 import { saveProfile } from './store/storage.js'
-import { syncEnabled, push as cloudPush } from './store/sync.js'
+import { syncEnabled, push as cloudPush, pull as cloudPull, mergeProfiles } from './store/sync.js'
 import { CSS, C, sans, serif } from './ui/theme.js'
 import StarField from './ui/StarField.jsx'
 import Login from './ui/Login.jsx'
@@ -41,13 +41,25 @@ export default function App() {
   const [newSkin, setNewSkin] = useState(false)
   const mazeSeq = useRef(0)
 
-  // ── Persist: every change to the profile is written straight through, so
-  //    closing the tab mid-maze never loses points she already earned.
+  // ── Persist: every change to the profile is written straight through to local
+  //    storage, so closing the tab mid-maze never loses points she just earned.
+  //    The cloud copy is NOT written here — that would be one request per
+  //    correct answer. See `syncUp` for when it goes up.
   const commit = useCallback(next => {
     setProfile(next)
     saveProfile(next)
-    if (syncEnabled()) cloudPush(next)          // best-effort, never awaited
     return next
+  }, [])
+
+  // Callbacks below fire from timers and event listeners, so they read the
+  // profile through a ref rather than closing over it.
+  const profileRef = useRef(null)
+  profileRef.current = profile
+
+  /** Mirror the current profile to the cloud. Best-effort, never awaited. */
+  const syncUp = useCallback(() => {
+    const p = profileRef.current
+    if (p && syncEnabled()) cloudPush(p)
   }, [])
 
   const enter = useCallback(p => {
@@ -56,6 +68,22 @@ export default function App() {
     setDiff(p.settings?.diff || 'apprentice')
     setScreen('hub')
   }, [])
+
+  // Push at the natural resting points — back at the castle, and when the tab
+  // goes away. Between those, local storage has already got everything.
+  useEffect(() => {
+    if (screen === 'hub') syncUp()
+  }, [screen, syncUp])
+
+  useEffect(() => {
+    const onHide = () => { if (document.visibilityState === 'hidden') syncUp() }
+    window.addEventListener('pagehide', syncUp)
+    document.addEventListener('visibilitychange', onHide)
+    return () => {
+      window.removeEventListener('pagehide', syncUp)
+      document.removeEventListener('visibilitychange', onHide)
+    }
+  }, [syncUp])
 
   // Keep the chosen operations/difficulty on the profile so they survive a reload.
   useEffect(() => {

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { listProfiles, loadProfile, createProfile, importScroll, getLastPlayer } from '../store/storage.js'
+import { listProfiles, loadProfile, createProfile, importScroll, getLastPlayer, profileExists, saveProfile } from '../store/storage.js'
+import { syncEnabled, pull as cloudPull, mergeProfiles } from '../store/sync.js'
 import { skinById, getSkin } from '../game/skins.js'
 import { C, sans, serif, btn, panel, label } from './theme.js'
 
@@ -17,6 +18,7 @@ export default function Login({ onEnter }) {
   const [scroll, setScroll] = useState('')
   const [err, setErr] = useState('')
   const [shake, setShake] = useState(false)
+  const [busy, setBusy] = useState(false)
   const codeRef = useRef(null)
 
   const nope = msg => { setErr(msg); setShake(true); setTimeout(() => setShake(false), 450) }
@@ -25,16 +27,40 @@ export default function Login({ onEnter }) {
 
   const pick = p => { setTarget(p); setCode(''); setErr(''); setMode('passcode') }
 
-  const unlock = () => {
+  const unlock = async () => {
     const res = loadProfile(target.name, code)
     if (!res.ok) return nope(res.reason === 'passcode' ? 'Wrong passcode — try again 🔒' : 'That wizard vanished!')
-    onEnter(res.profile)
+    if (!syncEnabled()) return onEnter(res.profile)
+
+    // Fold in anything she did on another device. If the network is down or
+    // there's no cloud copy, the local profile is used unchanged.
+    setBusy(true)
+    const remote = await cloudPull(res.profile.name, code)
+    setBusy(false)
+    const merged = mergeProfiles(res.profile, remote)
+    if (remote) saveProfile(merged)
+    onEnter(merged)
   }
 
-  const make = () => {
+  const make = async () => {
     const n = name.trim()
     if (n.length < 2) return nope('Your name needs at least 2 letters!')
     if (!/^\d{4,6}$/.test(code)) return nope('Passcode must be 4–6 numbers!')
+    if (profileExists(n)) return nope('A wizard already has that name — pick another!')
+
+    // This might not be a new wizard at all — it might be the same wizard on a
+    // new device. The same name and passcode derive the same token, so we look
+    // in the cloud before creating a blank profile over the top of real progress.
+    if (syncEnabled()) {
+      setBusy(true)
+      const remote = await cloudPull(n, code)
+      setBusy(false)
+      if (remote) {
+        saveProfile(remote)
+        return onEnter(remote)
+      }
+    }
+
     const res = createProfile(n, code)
     if (!res.ok) return nope('A wizard already has that name — pick another!')
     onEnter(res.profile)
@@ -110,7 +136,10 @@ export default function Login({ onEnter }) {
               style={inputStyle({ textAlign: 'center', fontSize: 24, letterSpacing: 8 })}
             />
             {err && <Err>{err}</Err>}
-            <button className="bh" onClick={unlock} style={btn('gold', { width: '100%', marginTop: 4 })}>Enter the Realm! 🗺️</button>
+            <button className="bh" onClick={unlock} disabled={busy}
+              style={btn('gold', { width: '100%', marginTop: 4, opacity: busy ? 0.7 : 1 })}>
+              {busy ? <><span className="spinner">✨</span> Finding your magic…</> : 'Enter the Realm! 🗺️'}
+            </button>
             <button className="bh" onClick={() => { setMode('pick'); setErr('') }}
               style={{ marginTop: 10, background: 'none', border: 'none', color: C.faint, fontSize: 12, cursor: 'pointer' }}>← someone else</button>
           </>
@@ -136,7 +165,10 @@ export default function Login({ onEnter }) {
               style={inputStyle({ textAlign: 'center', fontSize: 22, letterSpacing: 8 })}
             />
             {err && <Err>{err}</Err>}
-            <button className="bh" onClick={make} style={btn('gold', { width: '100%', marginTop: 4 })}>Begin the Journey! ✨</button>
+            <button className="bh" onClick={make} disabled={busy}
+              style={btn('gold', { width: '100%', marginTop: 4, opacity: busy ? 0.7 : 1 })}>
+              {busy ? <><span className="spinner">✨</span> Checking the archives…</> : 'Begin the Journey! ✨'}
+            </button>
             {profiles.length > 0 && (
               <button className="bh" onClick={() => { setMode('pick'); setErr('') }}
                 style={{ marginTop: 10, background: 'none', border: 'none', color: C.faint, fontSize: 12, cursor: 'pointer' }}>← back to wizards</button>
