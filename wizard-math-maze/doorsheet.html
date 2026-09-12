@@ -1,0 +1,50 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Doors</title>
+<style>body{margin:0;background:#0b0a22;color:#c8a4ff;font:11px system-ui}
+h3{margin:12px 0 3px 10px;font-size:12px;letter-spacing:1px;color:#f9ca74}
+canvas{display:block;margin:0 0 6px 10px;border:1px solid #2a2a55}</style></head>
+<body><div id="out"></div>
+<script type="module">
+import { renderFrame } from '/src/engine/renderer.js'
+import { WALL, PATH, DOOR, cellKey } from '/src/game/maze.js'
+import { formById } from '/src/game/skins.js'
+import { blankAppearance } from '/src/game/appearance.js'
+
+// A straight corridor running east, with a door in the NORTH wall two cells
+// along — exactly the case Tom is describing: a door you pass on your left.
+const W = 9, Hh = 5
+const grid = Array.from({ length: Hh }, () => Array(W).fill(WALL))
+for (let c = 1; c < W - 1; c++) grid[2][c] = PATH
+grid[1][3] = DOOR            // door on the left as you walk east
+grid[3][6] = DOOR            // door on the right, further along
+grid[2][W - 2] = DOOR        // door straight ahead at the end
+
+const q = (op, disp, rune, color) => ({ op, disp, rune, color, curPts: 20, wrongs: 0 })
+const dq = {
+  [cellKey(1, 3)]: q('addition', '7 + 8', '+', '#7ef0b0'),
+  [cellKey(3, 6)]: q('multiplication', '6 × 7', '×', '#ff8fb0'),
+  [cellKey(2, W - 2)]: q('subtraction', '15 − 6', '−', '#8fd0ff'),
+}
+
+const out = document.getElementById('out')
+function shot(title, px, py, angle) {
+  const h = document.createElement('h3'); h.textContent = title; out.append(h)
+  const cv = document.createElement('canvas')
+  cv.width = 760; cv.height = 400
+  cv.style.width = '380px'; cv.style.height = '200px'
+  out.append(cv)
+  renderFrame(cv.getContext('2d'), {
+    grid, dq, stones: {}, px, py, angle,
+    playerRow: Math.floor(py), playerCol: Math.floor(px), facing: 0,
+    doorAhead: null, time: 3000, form: formById('apprentice'),
+    appearance: blankAppearance(), moving: false, effects: [], gateMet: true, lean: 0,
+  })
+}
+// Walking east down the corridor, the left-hand door coming up beside us.
+shot('far — both side doors ahead', 1.5, 2.5, 0)
+shot('closer', 2.5, 2.5, 0)
+shot('level with the left-hand door', 3.5, 2.5, 0)
+shot('just past it (door behind-left)', 4.2, 2.5, 0)
+shot('approaching the right-hand door', 5.5, 2.5, 0)
+shot('facing the end door head-on', 6.5, 2.5, 0)
+window.__done = true
+</script></body></html>

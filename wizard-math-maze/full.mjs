@@ -74,7 +74,7 @@ await page.click('text=Camille')
 await page.fill('input[type=password]','1234')
 await page.locator('button',{hasText:'Enter the Realm'}).click()
 // The cloud check derives a PBKDF2 token before the hub opens, so give it room.
-await page.waitForSelector('text=/WHAT SHALL WE PRACTISE|Choose the form you will take/',{timeout:20000})
+await page.waitForSelector('text=/WHAT SHALL WE PRACTICE|Choose the form you will take/',{timeout:20000})
 // Points banked in the maze may owe her a form pick, collected before the hub.
 for (let k=0;k<8;k++){
   if (!(await page.locator('text=Choose the form you will take').count())) break

@@ -63,7 +63,7 @@ const page = await open('main', 430, 900)
 await page.fill('input[type=text]', 'Camille')
 await page.fill('input[type=password]', '1234')
 await page.locator('button', { hasText: 'Begin the Journey' }).click()
-await page.waitForSelector('text=WHAT SHALL WE PRACTISE', { timeout: 15000 })
+await page.waitForSelector('text=WHAT SHALL WE PRACTICE', { timeout: 15000 })
 await snap(page, '40-hub-v4')
 const senseDefault = (await prof(page)).diff
 console.log('1. default difficulty:', senseDefault, senseDefault === 'sense' ? 'PASS' : 'FAIL')

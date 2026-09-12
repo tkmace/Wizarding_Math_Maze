@@ -59,7 +59,7 @@ console.log('2. no further picks outstanding:', more?'FAIL (unexpected extra pic
 const st = await page.evaluate(()=>{const p=JSON.parse(localStorage.getItem('wmm.profiles.v3')).camille
   return {chosen:p.chosen, worn:p.equippedSkin, look:p.appearance, v:p.v}})
 console.log('3. after both picks:', JSON.stringify(st))
-console.log('   reached the hub:', await page.locator('text=WHAT SHALL WE PRACTISE').count()>0?'PASS':'FAIL')
+console.log('   reached the hub:', await page.locator('text=WHAT SHALL WE PRACTICE').count()>0?'PASS':'FAIL')
 await page.screenshot({path:`${OUT}/92-hub-after-picks.png`,fullPage:true})
 await page.locator('button',{hasText:'Wardrobe'}).click(); await page.waitForTimeout(900)
 await page.screenshot({path:`${OUT}/93-wardrobe-big-text.png`,fullPage:true})
