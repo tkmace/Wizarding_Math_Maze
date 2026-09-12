@@ -1,0 +1,13 @@
+{
+  "name": "Wizard Math Maze",
+  "short_name": "Math Maze",
+  "description": "A magical first-person maze where every door is a maths fact.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#080820",
+  "theme_color": "#080820",
+  "icons": [
+    { "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23080820'/><text y='.9em' x='5' font-size='80'>🧙‍♂️</text></svg>", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

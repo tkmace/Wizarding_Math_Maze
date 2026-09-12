@@ -1,0 +1,179 @@
+import { useState, useEffect, useRef } from 'react'
+import { listProfiles, loadProfile, createProfile, importScroll, getLastPlayer } from '../store/storage.js'
+import { skinById, getSkin } from '../game/skins.js'
+import { C, sans, serif, btn, panel, label } from './theme.js'
+
+/**
+ * Login is a face-picker first and a form second. A seven-year-old should be
+ * able to get into the game by tapping her own wizard and typing four digits —
+ * no name to spell, no email anywhere.
+ */
+export default function Login({ onEnter }) {
+  const [profiles, setProfiles] = useState(() => listProfiles())
+  const [mode, setMode] = useState(() => listProfiles().length ? 'pick' : 'new')
+  const [target, setTarget] = useState(null)
+  const [name, setName] = useState('')
+  const [code, setCode] = useState('')
+  const [scroll, setScroll] = useState('')
+  const [err, setErr] = useState('')
+  const [shake, setShake] = useState(false)
+  const codeRef = useRef(null)
+
+  const nope = msg => { setErr(msg); setShake(true); setTimeout(() => setShake(false), 450) }
+
+  useEffect(() => { if (mode === 'passcode') setTimeout(() => codeRef.current?.focus(), 120) }, [mode])
+
+  const pick = p => { setTarget(p); setCode(''); setErr(''); setMode('passcode') }
+
+  const unlock = () => {
+    const res = loadProfile(target.name, code)
+    if (!res.ok) return nope(res.reason === 'passcode' ? 'Wrong passcode — try again 🔒' : 'That wizard vanished!')
+    onEnter(res.profile)
+  }
+
+  const make = () => {
+    const n = name.trim()
+    if (n.length < 2) return nope('Your name needs at least 2 letters!')
+    if (!/^\d{4,6}$/.test(code)) return nope('Passcode must be 4–6 numbers!')
+    const res = createProfile(n, code)
+    if (!res.ok) return nope('A wizard already has that name — pick another!')
+    onEnter(res.profile)
+  }
+
+  const restore = () => {
+    const res = importScroll(scroll)
+    if (!res.ok) return nope('That scroll is unreadable ✨')
+    onEnter(res.profile)
+  }
+
+  const lastName = getLastPlayer()
+
+  return (
+    <div className="appear" style={{ textAlign: 'center', zIndex: 10, maxWidth: 440, width: '100%', padding: '0 14px' }}>
+      <div style={{ fontSize: 66, marginBottom: 4 }} className="wf">🧙‍♂️</div>
+      <h1 style={{
+        fontFamily: serif, fontSize: 'clamp(23px,5.5vw,36px)', fontWeight: 900,
+        color: C.gold, letterSpacing: 2, textShadow: `0 0 22px ${C.gold}aa`, margin: '0 0 4px',
+      }}>Wizard Math Maze</h1>
+      <p style={{ color: C.dim, fontSize: 13, margin: '0 0 20px', fontFamily: serif, letterSpacing: 1 }}>
+        Who dares enter the realm?
+      </p>
+
+      <div className={shake ? 'shake' : ''} style={panel({ borderColor: err ? C.bad : C.line, transition: 'border-color .2s' })}>
+
+        {/* ── Pick a wizard ── */}
+        {mode === 'pick' && (
+          <>
+            <div style={{ ...label({ textAlign: 'left' }) }}>CHOOSE YOUR WIZARD</div>
+            <div className="scroll" style={{ display: 'grid', gap: 8, maxHeight: '42vh', marginBottom: 12 }}>
+              {profiles.map(p => {
+                const sk = skinById(p.equippedSkin)
+                const rank = getSkin(p.totalPoints)
+                return (
+                  <button key={p.name} className="bh" onClick={() => pick(p)} style={{
+                    display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left',
+                    padding: '11px 13px', borderRadius: 14, cursor: 'pointer',
+                    background: C.panelHi, border: `2px solid ${p.name === lastName ? C.gold + '88' : C.lineHi}`,
+                  }}>
+                    <span style={{ fontSize: 30, filter: `drop-shadow(0 0 8px ${sk.color})` }}>{sk.emoji}</span>
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ display: 'block', color: '#fff', fontWeight: 900, fontSize: 17, fontFamily: sans, overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</span>
+                      <span style={{ display: 'block', color: C.dim, fontSize: 11, fontFamily: serif, letterSpacing: 1 }}>
+                        {rank.title} · {p.totalPoints.toLocaleString()} pts
+                      </span>
+                    </span>
+                    <span style={{ color: C.gold, fontSize: 18 }}>›</span>
+                  </button>
+                )
+              })}
+            </div>
+            <button className="bh" onClick={() => { setMode('new'); setName(''); setCode(''); setErr('') }}
+              style={btn('gold', { width: '100%' })}>＋ New Wizard</button>
+            <button className="bh" onClick={() => { setMode('scroll'); setErr('') }}
+              style={{ marginTop: 10, background: 'none', border: 'none', color: C.faint, fontSize: 11, cursor: 'pointer', textDecoration: 'underline' }}>
+              I have a Wizard Scroll from another device
+            </button>
+          </>
+        )}
+
+        {/* ── Passcode ── */}
+        {mode === 'passcode' && target && (
+          <>
+            <div style={{ fontSize: 44, marginBottom: 2 }}>{skinById(target.equippedSkin).emoji}</div>
+            <div style={{ color: '#fff', fontWeight: 900, fontSize: 20, marginBottom: 14, fontFamily: sans }}>{target.name}</div>
+            <label style={label({ textAlign: 'left' })}>SECRET PASSCODE</label>
+            <input
+              ref={codeRef} type="password" inputMode="numeric" pattern="[0-9]*" maxLength={6}
+              value={code} placeholder="••••"
+              onChange={e => { setCode(e.target.value.replace(/\D/g, '').slice(0, 6)); setErr('') }}
+              onKeyDown={e => e.key === 'Enter' && unlock()}
+              style={inputStyle({ textAlign: 'center', fontSize: 24, letterSpacing: 8 })}
+            />
+            {err && <Err>{err}</Err>}
+            <button className="bh" onClick={unlock} style={btn('gold', { width: '100%', marginTop: 4 })}>Enter the Realm! 🗺️</button>
+            <button className="bh" onClick={() => { setMode('pick'); setErr('') }}
+              style={{ marginTop: 10, background: 'none', border: 'none', color: C.faint, fontSize: 12, cursor: 'pointer' }}>← someone else</button>
+          </>
+        )}
+
+        {/* ── New wizard ── */}
+        {mode === 'new' && (
+          <>
+            <label style={label({ textAlign: 'left' })}>WIZARD NAME</label>
+            <input
+              type="text" maxLength={20} value={name} placeholder="e.g. Camille, Max, Zara…"
+              onChange={e => { setName(e.target.value); setErr('') }}
+              style={inputStyle()}
+            />
+            <label style={label({ textAlign: 'left' })}>
+              SECRET PASSCODE <span style={{ color: C.faint, fontSize: 9 }}>(4–6 numbers)</span>
+            </label>
+            <input
+              type="password" inputMode="numeric" pattern="[0-9]*" maxLength={6}
+              value={code} placeholder="••••"
+              onChange={e => { setCode(e.target.value.replace(/\D/g, '').slice(0, 6)); setErr('') }}
+              onKeyDown={e => e.key === 'Enter' && make()}
+              style={inputStyle({ textAlign: 'center', fontSize: 22, letterSpacing: 8 })}
+            />
+            {err && <Err>{err}</Err>}
+            <button className="bh" onClick={make} style={btn('gold', { width: '100%', marginTop: 4 })}>Begin the Journey! ✨</button>
+            {profiles.length > 0 && (
+              <button className="bh" onClick={() => { setMode('pick'); setErr('') }}
+                style={{ marginTop: 10, background: 'none', border: 'none', color: C.faint, fontSize: 12, cursor: 'pointer' }}>← back to wizards</button>
+            )}
+            <p style={{ color: C.faint, fontSize: 10, marginTop: 14, lineHeight: 1.7 }}>
+              Progress is saved right here in this browser — no account, no email.
+            </p>
+          </>
+        )}
+
+        {/* ── Import scroll ── */}
+        {mode === 'scroll' && (
+          <>
+            <label style={label({ textAlign: 'left' })}>PASTE YOUR WIZARD SCROLL</label>
+            <textarea
+              value={scroll} onChange={e => { setScroll(e.target.value); setErr('') }}
+              placeholder="WMM3-…" rows={4}
+              style={inputStyle({ fontSize: 11, fontFamily: 'monospace', resize: 'vertical' })}
+            />
+            {err && <Err>{err}</Err>}
+            <button className="bh" onClick={restore} style={btn('teal', { width: '100%', marginTop: 4 })}>Unroll the Scroll 📜</button>
+            <button className="bh" onClick={() => { setMode(profiles.length ? 'pick' : 'new'); setErr('') }}
+              style={{ marginTop: 10, background: 'none', border: 'none', color: C.faint, fontSize: 12, cursor: 'pointer' }}>← back</button>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+const inputStyle = (extra = {}) => ({
+  width: '100%', padding: '12px 14px', fontSize: 17, fontWeight: 800,
+  background: '#0a0a2c', border: `2px solid ${C.lineHi}`, borderRadius: 12,
+  color: '#fff', marginBottom: 14, outline: 'none', fontFamily: sans,
+  ...extra,
+})
+
+const Err = ({ children }) => (
+  <div style={{ color: C.bad, fontSize: 12, marginBottom: 12, fontWeight: 800 }}>{children}</div>
+)
