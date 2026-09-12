@@ -1,0 +1,32 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Cowl</title>
+<style>body{margin:0;background:#0b0a22;color:#c8a4ff;font:11px system-ui}
+h3{margin:10px 0 2px 10px;font-size:12px;letter-spacing:1px;color:#f9ca74}</style></head>
+<body><div id="out"></div>
+<script type="module">
+import { drawWizard } from '/src/engine/wizardSprite.js'
+import { FORMS } from '/src/game/skins.js'
+import { blankAppearance, HAIR_STYLES } from '/src/game/appearance.js'
+const out = document.getElementById('out')
+const hooded = FORMS.filter(f => f.hat === 'hood')
+const others = ['apprentice', 'candle', 'thorn', 'dawn'].map(id => FORMS.find(f => f.id === id))
+const look = { ...blankAppearance(), hair: HAIR_STYLES[2].key, hairColor: HAIR_STYLES[2] ? 1 : 0, skin: 2 }
+
+function sheet(title, forms, view, moving, cell = 200) {
+  const h = document.createElement('h3'); h.textContent = title; out.append(h)
+  const cv = document.createElement('canvas')
+  cv.width = forms.length * cell * 2; cv.height = cell * 1.45 * 2
+  cv.style.width = (forms.length * cell) + 'px'; cv.style.height = (cell * 1.45) + 'px'
+  out.append(cv)
+  const ctx = cv.getContext('2d'); ctx.scale(2, 2)
+  forms.forEach((f, i) => {
+    const cx = i * cell + cell / 2
+    drawWizard(ctx, { x: cx, yBase: cell * 1.22, h: cell * 1.05, form: f, appearance: look, t: 1200, moving, view })
+    ctx.fillStyle = '#c8a4ff'; ctx.font = '700 12px sans-serif'; ctx.textAlign = 'center'
+    ctx.fillText(f.title, cx, cell * 1.4)
+  })
+}
+sheet('HOODED — front', hooded, 'front', false)
+sheet('HOODED — back (as seen in the maze)', hooded, 'back', true)
+sheet('OTHER HATS for comparison', others, 'front', false)
+window.__done = true
+</script></body></html>
