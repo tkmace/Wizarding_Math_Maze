@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { listProfiles, loadProfile, createProfile, importScroll, getLastPlayer, profileExists, saveProfile } from '../store/storage.js'
-import { syncEnabled, pull as cloudPull, mergeProfiles } from '../store/sync.js'
-import { skinById, getSkin } from '../game/skins.js'
+import { syncEnabled, pull as cloudPull, mergeProfiles, findLegacy, claimLegacy } from '../store/sync.js'
+import { skinById, getSkin, getUnlocked } from '../game/skins.js'
 import { C, sans, serif, btn, panel, label } from './theme.js'
 
 /**
@@ -19,6 +19,7 @@ export default function Login({ onEnter }) {
   const [err, setErr] = useState('')
   const [shake, setShake] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [legacy, setLegacy] = useState(null)
   const codeRef = useRef(null)
 
   const nope = msg => { setErr(msg); setShake(true); setTimeout(() => setShake(false), 450) }
@@ -54,14 +55,49 @@ export default function Login({ onEnter }) {
     if (syncEnabled()) {
       setBusy(true)
       const remote = await cloudPull(n, code)
-      setBusy(false)
       if (remote) {
+        setBusy(false)
         saveProfile(remote)
         return onEnter(remote)
       }
+      // Nothing under that token — but there may be points waiting under this
+      // NAME from the old version, whose passcodes are long forgotten.
+      const old = await findLegacy(n)
+      setBusy(false)
+      if (old) { setLegacy(old); setMode('legacy'); return }
     }
 
     const res = createProfile(n, code)
+    if (!res.ok) return nope('A wizard already has that name — pick another!')
+    onEnter(res.profile)
+  }
+
+  /** Take the old points onto a freshly created profile. */
+  const takeLegacy = async () => {
+    const n = name.trim()
+    const made = createProfile(n, code)
+    if (!made.ok) return nope('A wizard already has that name — pick another!')
+
+    setBusy(true)
+    const result = await claimLegacy(made.profile, n)
+    setBusy(false)
+
+    if (!result) {
+      // Someone claimed it in the meantime. The fresh profile still stands.
+      saveProfile(made.profile)
+      return onEnter(made.profile)
+    }
+
+    // Restore the old robe too, but only if the points actually unlock it.
+    const wanted = result.claimed.equippedSkin
+    const allowed = getUnlocked(result.profile.totalPoints).some(s => s.id === wanted)
+    const restored = { ...result.profile, equippedSkin: allowed ? wanted : 'apprentice' }
+    saveProfile(restored)
+    onEnter(restored)
+  }
+
+  const startFresh = () => {
+    const res = createProfile(name.trim(), code)
     if (!res.ok) return nope('A wizard already has that name — pick another!')
     onEnter(res.profile)
   }
@@ -176,6 +212,42 @@ export default function Login({ onEnter }) {
             <p style={{ color: C.faint, fontSize: 10, marginTop: 14, lineHeight: 1.7 }}>
               Progress is saved right here in this browser — no account, no email.
             </p>
+          </>
+        )}
+
+        {/* ── Reclaim progress from the old version ── */}
+        {mode === 'legacy' && legacy && (
+          <>
+            <div style={{ fontSize: 40, marginBottom: 4 }}>📜</div>
+            <div style={{ fontFamily: serif, fontSize: 11, letterSpacing: 2, color: C.gold, fontWeight: 900, marginBottom: 10 }}>
+              AN OLD SCROLL BEARS YOUR NAME
+            </div>
+            <div style={{
+              background: '#0a0a2c', border: `2px solid ${C.gold}66`, borderRadius: 14,
+              padding: '14px 12px', marginBottom: 14,
+            }}>
+              <div style={{ color: '#fff', fontWeight: 900, fontSize: 19, fontFamily: sans }}>{legacy.name}</div>
+              <div style={{ color: C.gold, fontWeight: 900, fontSize: 26, fontFamily: sans, marginTop: 4 }}>
+                {legacy.totalPoints.toLocaleString()}
+                <span style={{ fontSize: 11, color: C.faint, marginLeft: 5, letterSpacing: 1 }}>PTS</span>
+              </div>
+              <div style={{ color: C.dim, fontSize: 11, marginTop: 6, fontFamily: serif, letterSpacing: 1 }}>
+                {skinById(legacy.equippedSkin).emoji} {skinById(legacy.equippedSkin).title}
+              </div>
+            </div>
+            <p style={{ color: C.dim, fontSize: 12, lineHeight: 1.7, margin: '0 0 14px' }}>
+              If this is you, claim it and the passcode you just chose becomes your new one.
+              Old passcodes weren’t carried over.
+            </p>
+            {err && <Err>{err}</Err>}
+            <button className="bh" onClick={takeLegacy} disabled={busy}
+              style={btn('gold', { width: '100%', opacity: busy ? 0.7 : 1 })}>
+              {busy ? <><span className="spinner">✨</span> Claiming…</> : 'That’s me — claim it! 🪄'}
+            </button>
+            <button className="bh" onClick={startFresh} disabled={busy}
+              style={btn('ghost', { width: '100%', marginTop: 9, fontSize: 13 })}>
+              Not me — start fresh
+            </button>
           </>
         )}
 
