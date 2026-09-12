@@ -17,7 +17,7 @@ export default function ParentReport({ profile, onClose }) {
       {r.totalAttempts === 0 ? (
         <p style={{ color: C.dim, fontSize: 13, textAlign: 'center', padding: '18px 8px', lineHeight: 1.7 }}>
           Nothing to show yet — clear a maze and this fills in with every fact
-          you’ve practised, which ones are solid, and which ones need another go.
+          you’ve practiced, which ones are solid, and which ones need another go.
         </p>
       ) : (
         <>

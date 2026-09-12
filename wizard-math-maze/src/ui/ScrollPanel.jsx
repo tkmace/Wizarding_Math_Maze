@@ -21,7 +21,7 @@ export default function ScrollPanel({ profile, onClose }) {
       <p style={{ color: C.dim, fontSize: 12, lineHeight: 1.7, margin: '0 0 12px' }}>
         Copy this scroll, then on the other device tap <strong style={{ color: '#fff' }}>“I have a Wizard Scroll”</strong> on
         the login screen and paste it in. Your points, rank and everything you’ve
-        practised come with you.
+        practiced come with you.
       </p>
       <textarea
         readOnly value={code} rows={5}

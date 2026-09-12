@@ -234,13 +234,29 @@ function drawDoor(ctx, d, W, H, horizonY, time, q, isAhead, fade) {
   const span = x1 - x0
   if (span < 2) return
 
-  const distAt = x => {
-    const t = span <= RAY_STEP ? 0 : (x - x0) / span
-    return d.leftDist + (d.rightDist - d.leftDist) * t
-  }
-  const hAt   = x => (H * WALL_SCALE) / distAt(x)
+  // Perspective-correct interpolation across the door's face.
+  //
+  // A door is a flat panel in the world, so on screen it is a TRAPEZOID: the
+  // near edge is tall, the far edge is short, and the top and bottom edges are
+  // straight lines running to the same vanishing point as the wall it sits in.
+  // Interpolating DISTANCE linearly across the span (which is what this used to
+  // do) gets that wrong — and drawing the surround, pillars and sill with
+  // fillRect got it wronger still, which is why a door down a side wall read as
+  // a flat rectangle pasted onto the corridor instead of part of it.
+  //
+  // The fix is the standard one: interpolate 1/distance, not distance. Wall
+  // height is (k / distance), so height then varies LINEARLY across the span,
+  // every horizontal feature becomes a straight sloping edge, and the door lies
+  // down into the wall the way the masonry beside it does.
+  const invL = 1 / d.leftDist, invR = 1 / d.rightDist
+  const K = H * WALL_SCALE
+  const at = x => span <= RAY_STEP ? 0 : clamp((x - x0) / span, 0, 1)
+  const hAt   = x => K * (invL + (invR - invL) * at(x))
   const topAt = x => horizonY - hAt(x) * 0.52
   const botAt = x => horizonY + hAt(x) * 0.48
+  // Where the arch springs from, and its highest point — both follow the slope.
+  const springAt = x => topAt(x) + hAt(x) * 0.40
+  const apexAt   = x => topAt(x) + hAt(x) * 0.09
 
   const yTop = Math.min(topAt(x0), topAt(x1)) - 4
   const yBot = Math.max(botAt(x0), botAt(x1)) + 4
@@ -251,30 +267,41 @@ function drawDoor(ctx, d, W, H, horizonY, time, q, isAhead, fade) {
   if (!clipColumns(ctx, d.cols, yTop, yBot)) { ctx.restore(); return }
   ctx.globalAlpha = fade
 
-  const wallHmid = hAt((x0 + x1) / 2)
+  const cx = (x0 + x1) / 2
+  const wallHmid = hAt(cx)
   const frameW = clamp(span * 0.11, 2, 26)
   const inL = x0 + frameW, inR = x1 - frameW
-  const cx = (x0 + x1) / 2
-  const archBase = topAt(cx) + wallHmid * 0.40   // where the arch springs from
-  const archApex = topAt(cx) + wallHmid * 0.09
+  const archBase = springAt(cx)
+  const archApex = apexAt(cx)
   const sill = botAt(cx)
   const openH = sill - archBase
   // Control point for the arch. Clamped to the wall top so a door you're
   // standing against reads as a doorway rather than one enormous bow.
   const archCtl = Math.max(topAt(cx) + wallHmid * 0.02, archApex - wallHmid * 0.10)
 
-  // ── Stone surround ──
+  /** A four-corner band between two y-functions, drawn as the trapezoid it is. */
+  const band = (ax, bx, yA0, yA1, yB0, yB1) => {
+    ctx.beginPath()
+    ctx.moveTo(ax, yA0)
+    ctx.lineTo(bx, yB0)
+    ctx.lineTo(bx, yB1)
+    ctx.lineTo(ax, yA1)
+    ctx.closePath()
+    ctx.fill()
+  }
+
+  // ── Stone surround ── the whole panel, sloping with the wall
   const sg = ctx.createLinearGradient(x0, 0, x1, 0)
   sg.addColorStop(0, '#2a2158'); sg.addColorStop(0.5, '#3b3078'); sg.addColorStop(1, '#2a2158')
   ctx.fillStyle = sg
-  ctx.fillRect(x0, yTop, span, yBot - yTop)
+  band(x0, x1, topAt(x0), botAt(x0), topAt(x1), botAt(x1))
 
   // ── The opening (arched) ──
   const opening = new Path2D()
-  opening.moveTo(inL, sill)
-  opening.lineTo(inL, archBase)
-  opening.quadraticCurveTo(cx, archCtl, inR, archBase)
-  opening.lineTo(inR, sill)
+  opening.moveTo(inL, botAt(inL))
+  opening.lineTo(inL, springAt(inL))
+  opening.quadraticCurveTo(cx, archCtl, inR, springAt(inR))
+  opening.lineTo(inR, botAt(inR))
   opening.closePath()
 
   ctx.save()
@@ -287,7 +314,7 @@ function drawDoor(ctx, d, W, H, horizonY, time, q, isAhead, fade) {
   pg.addColorStop(0.75, '#241a52')
   pg.addColorStop(1, '#0d0926')
   ctx.fillStyle = pg
-  ctx.fillRect(x0, yTop, span, yBot - yTop)
+  ctx.fillRect(x0, yTop, span, yBot - yTop)   // clipped to the opening above
 
   // Swirling arcs
   ctx.strokeStyle = col
@@ -312,22 +339,25 @@ function drawDoor(ctx, d, W, H, horizonY, time, q, isAhead, fade) {
   ctx.restore()
 
   // ── Gold frame: pillars, arch rim, keystone ──
+  // The pillars are vertical in the world, so they stay vertical on screen —
+  // but their tops and feet ride the same slope as the wall.
+  const pillarTop = x => springAt(x) - hAt(x) * 0.02
   const gg = ctx.createLinearGradient(x0, 0, x0 + frameW, 0)
   gg.addColorStop(0, PAL.goldDark); gg.addColorStop(0.45, PAL.gold); gg.addColorStop(1, PAL.goldHi)
   ctx.fillStyle = gg
-  ctx.fillRect(x0, archBase - wallHmid * 0.02, frameW, sill - archBase + wallHmid * 0.02)
+  band(x0, inL, pillarTop(x0), botAt(x0), pillarTop(inL), botAt(inL))
   const gg2 = ctx.createLinearGradient(inR, 0, x1, 0)
   gg2.addColorStop(0, PAL.goldHi); gg2.addColorStop(0.55, PAL.gold); gg2.addColorStop(1, PAL.goldDark)
   ctx.fillStyle = gg2
-  ctx.fillRect(inR, archBase - wallHmid * 0.02, frameW, sill - archBase + wallHmid * 0.02)
+  band(inR, x1, pillarTop(inR), botAt(inR), pillarTop(x1), botAt(x1))
 
   ctx.strokeStyle = PAL.gold
   ctx.lineWidth = Math.max(1.5, frameW * 0.5)
   ctx.shadowColor = col
   ctx.shadowBlur = isAhead ? 22 * pulse : 8
   ctx.beginPath()
-  ctx.moveTo(inL, archBase)
-  ctx.quadraticCurveTo(cx, archCtl, inR, archBase)
+  ctx.moveTo(inL, springAt(inL))
+  ctx.quadraticCurveTo(cx, archCtl, inR, springAt(inR))
   ctx.stroke()
   ctx.shadowBlur = 0
 
@@ -336,9 +366,10 @@ function drawDoor(ctx, d, W, H, horizonY, time, q, isAhead, fade) {
   ctx.fillStyle = PAL.goldHi
   ctx.fillRect(cx - ks / 2, archApex - ks * 0.6, ks, ks * 1.5)
 
-  // Lintel + threshold
+  // Threshold, lying along the foot of the wall rather than across the screen.
+  const thick = x => Math.max(1.5, hAt(x) * 0.02)
   ctx.fillStyle = PAL.goldDark
-  ctx.fillRect(x0, sill - Math.max(1.5, wallHmid * 0.02), span, Math.max(1.5, wallHmid * 0.02))
+  band(x0, x1, botAt(x0) - thick(x0), botAt(x0), botAt(x1) - thick(x1), botAt(x1))
 
   // ── Rune + problem text ──
   if (q && span > 22 && wallHmid > 46) {
@@ -432,13 +463,20 @@ function drawDoor(ctx, d, W, H, horizonY, time, q, isAhead, fade) {
   ctx.restore()
 
   if (isAhead) {
+    // Outline the door's actual trapezoid, not a box around it.
     ctx.save()
     ctx.globalAlpha = fade * 0.5 * pulse
     ctx.strokeStyle = col
     ctx.lineWidth = 4
     ctx.shadowColor = col
     ctx.shadowBlur = 26
-    ctx.strokeRect(x0 - 2, yTop, span + 4, yBot - yTop)
+    ctx.beginPath()
+    ctx.moveTo(x0 - 2, topAt(x0) - 2)
+    ctx.lineTo(x1 + 2, topAt(x1) - 2)
+    ctx.lineTo(x1 + 2, botAt(x1) + 2)
+    ctx.lineTo(x0 - 2, botAt(x0) + 2)
+    ctx.closePath()
+    ctx.stroke()
     ctx.restore()
   }
 }

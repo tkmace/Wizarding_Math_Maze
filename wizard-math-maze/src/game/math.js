@@ -137,7 +137,7 @@ export function calcPts(op, a, b, ans, mult) {
 
 // --- Fact identity ------------------------------------------------------------
 // Addition and multiplication are commutative, so 7x8 and 8x7 are ONE fact to
-// practise. Subtraction and division are not, so order is preserved.
+// practice. Subtraction and division are not, so order is preserved.
 export function factKey(op, a, b) {
   const s = opByKey(op).short
   if (op === 'addition' || op === 'multiplication') {
@@ -186,7 +186,7 @@ export function buildQuestion(op, a, b, diffKey, profile) {
   }
 }
 
-/** Pass `forced` = { op, a, b } to practise one specific fact. */
+/** Pass `forced` = { op, a, b } to practice one specific fact. */
 export function genQ(ops, diffKey, profile, forced = null) {
   if (forced) return buildQuestion(forced.op, forced.a, forced.b, diffKey, profile)
 

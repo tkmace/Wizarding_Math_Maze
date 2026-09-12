@@ -466,6 +466,9 @@ export default function App() {
 
       {doorQ && profile && (
         <MathDoor
+          // Keyed by the door, so a new puzzle can never inherit a half-typed
+          // answer from the last one, whatever React decides to reuse.
+          key={doorCell ? `${doorCell.row},${doorCell.col}` : 'door'}
           q={doorQ} stones={profile.stones || 0}
           swiftMs={perks.swift}
           bigKeypad={profile.settings?.bigKeypad}

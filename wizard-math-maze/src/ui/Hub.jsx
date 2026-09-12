@@ -3,7 +3,7 @@ import { formById, rankFor, nextRank, rankProgress, activePerks } from '../game/
 import { C, sans, serif, btn, panel, label } from './theme.js'
 import WizardPreview from './WizardPreview.jsx'
 
-/** The castle: choose what to practise, see your rank, head into a maze. */
+/** The castle: choose what to practice, see your rank, head into a maze. */
 export default function Hub({ profile, ops, diff, onToggleOp, onSetDiff, onStart, onWardrobe, onReport, onScroll, onLook, onLogout, pendingPicks }) {
   const form = formById(profile.equippedSkin)
   const rank = rankFor(profile.totalPoints)
@@ -70,7 +70,7 @@ export default function Hub({ profile, ops, diff, onToggleOp, onSetDiff, onStart
 
       {/* Operations */}
       <div style={panel({ padding: '14px 16px', marginBottom: 12 })}>
-        <div style={label()}>WHAT SHALL WE PRACTISE?</div>
+        <div style={label()}>WHAT SHALL WE PRACTICE?</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8 }}>
           {OPS.map(o => {
             const on = ops.has(o.key)

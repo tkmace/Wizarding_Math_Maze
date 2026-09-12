@@ -32,13 +32,15 @@ export default function Encounter({ kind, creature, ops, diff, profile, form, ap
           </div>
           <CreaturePreview creature={creature} size={150} />
           <div style={{ color: '#fff', fontWeight: 900, fontSize: 25, fontFamily: sans }}>{creature.name}</div>
+          {/* No "easier than the doors" here. The questions ARE gentler, but
+              saying so out loud turns a fight into a consolation prize. */}
           <p style={{ color: C.dim, fontSize: 13.5, lineHeight: 1.6, margin: '6px 0 16px' }}>
             {creature.taunt}
             <br />
             <span style={{ color: C.faint, fontSize: 12 }}>
               {kind === 'duel'
-                ? 'Break its spell with quick answers — easier sums than the doors.'
-                : 'Catch the runes before they scatter — easier sums than the doors.'}
+                ? 'Break its spell with quick answers.'
+                : 'Catch the runes before they scatter.'}
             </span>
           </p>
           <button className="bh" onClick={() => setPhase('game')}

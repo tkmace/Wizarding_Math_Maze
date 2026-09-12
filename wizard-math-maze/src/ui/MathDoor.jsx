@@ -17,6 +17,7 @@ export default function MathDoor({ q, stones, swiftMs = 0, bigKeypad, onCorrect,
   const [showHint, setShowHint] = useState(false)
   const [elapsed, setElapsed] = useState(0)
   const startRef = useRef(performance.now())
+  const openedAt = useRef(performance.now())
   const inputRef = useRef(null)
   // The window travels on the question (Wizard's Sense gives each operation its
   // own), widened by the worn form's Swift perk.
@@ -28,6 +29,11 @@ export default function MathDoor({ q, stones, swiftMs = 0, bigKeypad, onCorrect,
   useEffect(() => {
     setAns(''); setShowHint(false); setElapsed(0)
     startRef.current = performance.now()
+    openedAt.current = performance.now()
+    // Whatever was focused before this opened — the movement pad, the castle
+    // button, a keypad key from the last door — must not still be listening.
+    // Otherwise a later Space or Enter re-fires it behind this panel.
+    try { document.activeElement?.blur?.() } catch { /* nothing focused */ }
   }, [q.key, q.disp])
 
   // Drive the quick-recall bar. Stops ticking once the window has closed.
@@ -60,12 +66,26 @@ export default function MathDoor({ q, stones, swiftMs = 0, bigKeypad, onCorrect,
     }
   }
 
-  // Physical keyboard, for whoever is on a laptop.
+  /**
+   * Physical keyboard, for whoever is on a laptop.
+   *
+   * Three guards, all of which existed as real bugs: a key still going down
+   * from walking into the door leaked into the answer as a stray leading digit;
+   * a held-down key auto-repeated into a row of the same digit; and Space,
+   * which activates whatever button still has focus, quietly re-pressed the
+   * last keypad key that was clicked. Anything modified (⌘, Ctrl, Alt) is a
+   * browser shortcut, not an answer.
+   */
   useEffect(() => {
     const h = e => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return
+      if (e.repeat) { e.preventDefault(); return }
+      if (performance.now() - openedAt.current < 140) { e.preventDefault(); return }
       if (/^[0-9]$/.test(e.key)) { e.preventDefault(); setAns(a => (a + e.key).slice(0, 6)) }
       else if (e.key === 'Backspace') { e.preventDefault(); setAns(a => a.slice(0, -1)) }
+      else if (e.key === 'Escape') { e.preventDefault(); setAns('') }
       else if (e.key === 'Enter') { e.preventDefault(); submit() }
+      else if (e.key === ' ' || e.key === 'Spacebar') { e.preventDefault() }
     }
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
@@ -122,25 +142,39 @@ export default function MathDoor({ q, stones, swiftMs = 0, bigKeypad, onCorrect,
           }}>{q.disp}</div>
         </div>
 
-        {/* Answer box */}
-        <div ref={inputRef} style={{
-          margin: '12px 0 0', minHeight: 62, borderRadius: 16,
-          background: '#0a0a2c', border: `2px solid ${ans ? q.color : C.lineHi}`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 36, fontWeight: 900, fontFamily: sans, letterSpacing: 4,
-          color: ans ? '#fff' : C.faint, transition: 'border-color .15s',
-        }}>{ans || '?'}</div>
+        {/* Answer box. Tapping it clears the whole answer — quicker for a child
+            than hunting for ⌫ when a digit has gone astray. */}
+        <div
+          ref={inputRef}
+          onClick={() => setAns('')}
+          title="Tap to clear"
+          style={{
+            margin: '12px 0 0', minHeight: 62, borderRadius: 16,
+            background: '#0a0a2c', border: `2px solid ${ans ? q.color : C.lineHi}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 36, fontWeight: 900, fontFamily: sans, letterSpacing: 4,
+            color: ans ? '#fff' : C.faint, transition: 'border-color .15s',
+            cursor: ans ? 'pointer' : 'default',
+            WebkitTapHighlightColor: 'transparent', userSelect: 'none',
+          }}
+        >{ans || '?'}</div>
 
-        {fastLeft > 0 && q.wrongs === 0 && (
-          <div style={{ textAlign: 'center', color: C.gold, fontSize: 10, fontWeight: 900, marginTop: 6, letterSpacing: 1 }}>
-            ⚡ QUICK BONUS ACTIVE
-          </div>
-        )}
-        {q.wrongs > 0 && (
-          <div style={{ textAlign: 'center', color: C.bad, fontSize: 11, fontWeight: 800, marginTop: 6 }}>
-            Not quite — have another go. {q.wrongs === 1 ? 'One more miss and I’ll show you how.' : ''}
-          </div>
-        )}
+        {/* One fixed-height slot for whatever status line applies.
+            These used to appear and disappear — and the quick-bonus line
+            vanishing partway through a question shunted the whole keypad up
+            under the player's finger, which is a fine way to press the wrong
+            digit. The slot never changes height now. */}
+        <div style={{ height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+          {q.wrongs > 0 ? (
+            <span style={{ color: C.bad, fontSize: 11, fontWeight: 800, lineHeight: 1.3 }}>
+              Not quite — have another go.{q.wrongs === 1 ? ' One more miss and I’ll show you how.' : ''}
+            </span>
+          ) : fastLeft > 0 ? (
+            <span style={{ color: C.gold, fontSize: 10, fontWeight: 900, letterSpacing: 1 }}>
+              ⚡ QUICK BONUS ACTIVE
+            </span>
+          ) : null}
+        </div>
 
         {bigKeypad !== false && (
           <Keypad
