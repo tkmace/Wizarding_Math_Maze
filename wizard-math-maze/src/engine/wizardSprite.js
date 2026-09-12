@@ -13,6 +13,25 @@ import { resolveLook } from '../game/appearance.js'
 const TAU = Math.PI * 2
 
 /**
+ * Stroke the path that was just filled, in a darker shade of its own colour.
+ *
+ * Kept as one helper so the whole figure shares a consistent line weight, and
+ * so a later shading pass has a single place to hang cloth folds and rim light
+ * off the same silhouette.
+ */
+function outline(ctx, h, col, weight = 1) {
+  // Dark enough to read as a drawn line against the fill, but still the robe's
+  // own hue — a black outline on a near-black background just eats the edge.
+  // The fills were lightened at their edges to give this line something to sit
+  // against; without that the gradient and the outline are the same colour and
+  // the figure loses its silhouette.
+  ctx.strokeStyle = shade(col, -0.72)
+  ctx.lineWidth = Math.max(1, h * 0.011 * weight)
+  ctx.lineJoin = 'round'
+  ctx.stroke()
+}
+
+/**
  * @param ctx     canvas 2D context
  * @param o.x     horizontal centre
  * @param o.yBase vertical position of the feet
@@ -67,12 +86,17 @@ export function drawWizard(ctx, o) {
   ctx.quadraticCurveTo(hem * 0.92, yWaist * 0.62, hem + sway, 0)
   ctx.closePath()
   const rg = ctx.createLinearGradient(-hem, 0, hem, 0)
-  rg.addColorStop(0, shade(robe, -0.5))
+  rg.addColorStop(0, shade(robe, -0.3))
   rg.addColorStop(0.34, robe)
-  rg.addColorStop(0.6, shade(robe, 0.12))
-  rg.addColorStop(1, shade(robe, -0.55))
+  rg.addColorStop(0.6, shade(robe, 0.14))
+  rg.addColorStop(1, shade(robe, -0.34))
   ctx.fillStyle = rg
   ctx.fill()
+  // A drawn line around the silhouette. Flat shapes butted against each other
+  // read as assembled; the same shapes inside an outline read as drawn. The
+  // line is a dark version of the robe rather than black, so it stays part of
+  // the character instead of looking like a sticker edge.
+  outline(ctx, h, robe)
 
   // Hem band, and a front placket (or back seam) for a sense of fabric.
   ctx.fillStyle = trim
@@ -109,9 +133,7 @@ export function drawWizard(ctx, o) {
     ctx.closePath()
     ctx.fillStyle = sgn < 0 ? shade(robe, -0.28) : shade(robe, 0.08)
     ctx.fill()
-    ctx.strokeStyle = shade(robe, -0.6)
-    ctx.lineWidth = Math.max(0.8, h * 0.006)
-    ctx.stroke()
+    outline(ctx, h, robe, 0.8)
     // Cuff, then the hand clear of the sleeve.
     ctx.fillStyle = trim
     ctx.globalAlpha = 0.8
@@ -133,6 +155,7 @@ export function drawWizard(ctx, o) {
   ctx.closePath()
   ctx.fillStyle = shade(robe, 0.2)
   ctx.fill()
+  outline(ctx, h, robe, 0.8)
   ctx.strokeStyle = trim
   ctx.lineWidth = Math.max(1, h * 0.008)
   ctx.globalAlpha = 0.75
@@ -149,33 +172,9 @@ export function drawWizard(ctx, o) {
   ctx.beginPath(); ctx.arc(0, headY, headR, 0, TAU)
   ctx.fillStyle = view === 'front' ? look.skinHex : shade(look.skinHex, -0.12)
   ctx.fill()
+  outline(ctx, h, look.skinHex, 0.85)
 
-  if (view === 'front') {
-    // A face with a bit of life in it: wide eyes and a small smile read as
-    // friendly at 64px, which is the size most of the UI shows him at.
-    ctx.fillStyle = '#2a1c16'
-    const eo = headR * 0.36, ey = headY - headR * 0.08
-    ctx.beginPath(); ctx.arc(-eo, ey, headR * 0.15, 0, TAU); ctx.fill()
-    ctx.beginPath(); ctx.arc(eo, ey, headR * 0.15, 0, TAU); ctx.fill()
-    ctx.fillStyle = '#ffffff'
-    ctx.beginPath(); ctx.arc(-eo + headR * 0.06, ey - headR * 0.05, headR * 0.05, 0, TAU); ctx.fill()
-    ctx.beginPath(); ctx.arc(eo + headR * 0.06, ey - headR * 0.05, headR * 0.05, 0, TAU); ctx.fill()
-    ctx.strokeStyle = '#7a4a38'
-    ctx.lineWidth = Math.max(1, headR * 0.1)
-    ctx.beginPath()
-    ctx.arc(0, headY + headR * 0.12, headR * 0.34, 0.25 * Math.PI, 0.75 * Math.PI)
-    ctx.stroke()
-    if (form.rank >= 5) {                     // elders get a beard
-      ctx.beginPath()
-      ctx.moveTo(-headR * 0.8, headY + headR * 0.18)
-      ctx.quadraticCurveTo(-headR * 0.5, headY + headR * 3.1, 0, headY + headR * 3.3)
-      ctx.quadraticCurveTo(headR * 0.5, headY + headR * 3.1, headR * 0.8, headY + headR * 0.18)
-      ctx.quadraticCurveTo(0, headY + headR * 1.1, -headR * 0.8, headY + headR * 0.18)
-      ctx.closePath()
-      ctx.fillStyle = '#f4f4ff'
-      ctx.fill()
-    }
-  }
+  if (view === 'front') drawFace(ctx, h, headY, headR, look, form)
 
   // ── Hair in front of the head: fringe and side locks ──
   drawHair(ctx, h, headY, headR, look, view, 'front')
@@ -185,6 +184,101 @@ export function drawWizard(ctx, o) {
 
   drawAura(ctx, h, form.aura, t, trim, 'over')
   ctx.restore()
+}
+
+// --- Face ---------------------------------------------------------------------
+/**
+ * The front-facing face.
+ *
+ * Two dots and an arc is a smiley, not a character — it's readable but it isn't
+ * ALIVE, which is what went missing when the emoji wizards were replaced with
+ * drawn ones. What brings a cartoon face to life, in rough order of payoff:
+ * brows (they carry nearly all the expression), an eyelid line over the eye so
+ * it reads as an eye rather than a bead, a nose to give the face a middle, and
+ * warm cheeks. All four are here.
+ *
+ * Everything is expressed as a fraction of headR, so this works at 64px in a
+ * wardrobe tile and at 168px on the hub without a second set of numbers. It's
+ * also where an expression system would go later — the brow angle and the mouth
+ * arc are the only two values a "delighted" or "worried" face would change.
+ */
+function drawFace(ctx, h, headY, headR, look, form) {
+  const eo = headR * 0.36               // eye offset from centre
+  const ey = headY - headR * 0.06
+  const eR = headR * 0.17
+  const ink = '#2a1c16'
+
+  // Cheeks first, under everything — warmth, not makeup.
+  ctx.save()
+  ctx.globalAlpha = 0.3
+  ctx.fillStyle = '#e2725b'
+  for (const s of [-1, 1]) {
+    ctx.beginPath()
+    ctx.ellipse(s * headR * 0.56, headY + headR * 0.22, headR * 0.2, headR * 0.13, 0, 0, TAU)
+    ctx.fill()
+  }
+  ctx.restore()
+
+  // Eyes: a dark almond with a lid line across the top and a catchlight.
+  for (const s of [-1, 1]) {
+    ctx.beginPath()
+    ctx.ellipse(s * eo, ey, eR * 0.82, eR, 0, 0, TAU)
+    ctx.fillStyle = ink
+    ctx.fill()
+    // Lid — a heavier stroke across the top third, which is what stops an eye
+    // reading as a bead.
+    ctx.beginPath()
+    ctx.arc(s * eo, ey, eR * 0.94, Math.PI * 1.08, Math.PI * 1.92)
+    ctx.strokeStyle = ink
+    ctx.lineWidth = Math.max(1, eR * 0.44)
+    ctx.lineCap = 'round'
+    ctx.stroke()
+    // Catchlight
+    ctx.beginPath()
+    ctx.arc(s * eo + eR * 0.3, ey - eR * 0.3, eR * 0.3, 0, TAU)
+    ctx.fillStyle = '#ffffff'
+    ctx.fill()
+  }
+
+  // Brows, in the hair colour, tilted up at the outside for an open look.
+  ctx.strokeStyle = shade(look.hairHex, -0.25)
+  ctx.lineWidth = Math.max(1, headR * 0.095)
+  ctx.lineCap = 'round'
+  for (const s of [-1, 1]) {
+    ctx.beginPath()
+    ctx.moveTo(s * (eo - headR * 0.22), ey - headR * 0.36)
+    ctx.quadraticCurveTo(s * eo, ey - headR * 0.5, s * (eo + headR * 0.24), ey - headR * 0.33)
+    ctx.stroke()
+  }
+
+  // Nose — barely there, but a face without a middle looks flat.
+  ctx.strokeStyle = shade(look.skinHex, -0.42)
+  ctx.lineWidth = Math.max(1, headR * 0.075)
+  ctx.beginPath()
+  ctx.moveTo(0, headY + headR * 0.02)
+  ctx.lineTo(0, headY + headR * 0.17)
+  ctx.stroke()
+
+  // Mouth. A beard hides it, so elders get the beard instead.
+  if (form.rank >= 5) {
+    ctx.beginPath()
+    ctx.moveTo(-headR * 0.8, headY + headR * 0.18)
+    ctx.quadraticCurveTo(-headR * 0.5, headY + headR * 3.1, 0, headY + headR * 3.3)
+    ctx.quadraticCurveTo(headR * 0.5, headY + headR * 3.1, headR * 0.8, headY + headR * 0.18)
+    ctx.quadraticCurveTo(0, headY + headR * 1.1, -headR * 0.8, headY + headR * 0.18)
+    ctx.closePath()
+    ctx.fillStyle = '#f4f4ff'
+    ctx.fill()
+    outline(ctx, h, '#c8c8e0', 0.7)
+  } else {
+    ctx.strokeStyle = '#7a4a38'
+    ctx.lineWidth = Math.max(1, headR * 0.11)
+    ctx.lineCap = 'round'
+    ctx.beginPath()
+    ctx.arc(0, headY + headR * 0.14, headR * 0.34, 0.22 * Math.PI, 0.78 * Math.PI)
+    ctx.stroke()
+  }
+  ctx.lineCap = 'butt'
 }
 
 // --- Hair ---------------------------------------------------------------------
@@ -283,15 +377,17 @@ function drawHat(ctx, h, kind, robe, trim, t, view = 'front') {
     ctx.quadraticCurveTo(width * 0.18, brimY - height * 0.5, width / 2, brimY)
     ctx.closePath()
     const g = ctx.createLinearGradient(-width / 2, 0, width / 2, 0)
-    g.addColorStop(0, shade(hatCol, -0.4)); g.addColorStop(0.45, hatCol); g.addColorStop(1, shade(hatCol, -0.45))
+    g.addColorStop(0, shade(hatCol, -0.26)); g.addColorStop(0.45, hatCol); g.addColorStop(1, shade(hatCol, -0.3))
     ctx.fillStyle = g
     ctx.fill()
+    outline(ctx, h, robe)
   }
   const brim = (w, thick) => {
     ctx.beginPath()
     ctx.ellipse(0, brimY, w / 2, thick, 0, 0, TAU)
     ctx.fillStyle = shade(robe, -0.25)
     ctx.fill()
+    outline(ctx, h, robe)
   }
   const band = w => {
     ctx.fillStyle = trim
@@ -349,10 +445,11 @@ function drawHat(ctx, h, kind, robe, trim, t, view = 'front') {
     }
 
     const g = ctx.createLinearGradient(-W, 0, W, 0)
-    g.addColorStop(0, shade(hatCol, -0.5)); g.addColorStop(0.38, hatCol)
-    g.addColorStop(0.72, shade(hatCol, -0.18)); g.addColorStop(1, shade(hatCol, -0.55))
+    g.addColorStop(0, shade(hatCol, -0.34)); g.addColorStop(0.38, hatCol)
+    g.addColorStop(0.72, shade(hatCol, -0.14)); g.addColorStop(1, shade(hatCol, -0.38))
     ctx.fillStyle = g
     ctx.fill('evenodd')
+    outline(ctx, h, robe)
 
     if (front) {
       // Trim piping round the opening — reads as a lined hood, and it's the only
@@ -408,6 +505,7 @@ function drawHat(ctx, h, kind, robe, trim, t, view = 'front') {
       ctx.quadraticCurveTo(s * h * 0.20, brimY - h * 0.08, s * h * 0.10, brimY - h * 0.04)
       ctx.closePath()
       ctx.fillStyle = trim; ctx.fill()
+      outline(ctx, h, trim, 0.7)
     }
     band(h * 0.30)
   } else if (kind === 'crown') {
@@ -425,6 +523,7 @@ function drawHat(ctx, h, kind, robe, trim, t, view = 'front') {
     const g = ctx.createLinearGradient(-w / 2, 0, w / 2, 0)
     g.addColorStop(0, shade(trim, -0.35)); g.addColorStop(0.5, trim); g.addColorStop(1, shade(trim, -0.4))
     ctx.fillStyle = g; ctx.fill()
+    outline(ctx, h, trim, 0.8)
     for (let i = 0; i < 3; i++) {
       ctx.beginPath()
       ctx.arc(-w * 0.25 + i * w * 0.25, brimY - h * 0.035, h * 0.015, 0, TAU)

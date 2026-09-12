@@ -1,0 +1,48 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Faces</title>
+<style>body{margin:0;background:#0b0a22;color:#c8a4ff;font:11px system-ui}
+h3{margin:12px 0 3px 10px;font-size:12px;letter-spacing:1px;color:#f9ca74}
+canvas{display:block;margin:0 0 4px 10px}</style></head>
+<body><div id="out"></div>
+<script type="module">
+import { drawWizard } from '/src/engine/wizardSprite.js'
+import { FORMS } from '/src/game/skins.js'
+import { SKIN_TONES, HAIR_COLORS, HAIR_STYLES, blankAppearance } from '/src/game/appearance.js'
+const out = document.getElementById('out')
+const f = id => FORMS.find(x => x.id === id)
+
+function row(title, items, size) {
+  const h = document.createElement('h3'); h.textContent = title; out.append(h)
+  const cv = document.createElement('canvas')
+  const cell = size * 1.05
+  cv.width = items.length * cell * 2; cv.height = cell * 1.35 * 2
+  cv.style.width = (items.length * cell) + 'px'; cv.style.height = (cell * 1.35) + 'px'
+  out.append(cv)
+  const ctx = cv.getContext('2d'); ctx.scale(2, 2)
+  items.forEach((it, i) => {
+    drawWizard(ctx, {
+      x: i * cell + cell / 2, yBase: cell * 1.22, h: size,
+      form: it.form, appearance: it.look, t: 1200, moving: false, view: 'front',
+    })
+  })
+}
+const look = (skin, hairColor, hairStyle) => ({ ...blankAppearance(), skin, hairColor, hairStyle })
+
+// Big, the size of the hub portrait and then some.
+row('BIG — hub size and larger', [
+  { form: f('apprentice'), look: look(1, 1, 2) },
+  { form: f('candle'), look: look(3, 3, 0) },
+  { form: f('storm'), look: look(0, 4, 3) },
+  { form: f('dawn'), look: look(4, 0, 1) },
+], 260)
+
+// Every skin tone, so the outline and cheeks have to work on all of them.
+row('SKIN TONES at wardrobe size', SKIN_TONES.map((_, i) => (
+  { form: f('frost'), look: look(i, 2, 1) }
+)), 130)
+
+// Small — the wardrobe tile, which is where most of these are actually seen.
+row('WARDROBE TILE (64px)', ['apprentice','candle','leaf','frost','storm','thorn','starweaver','runesage','astral','grand']
+  .map(id => ({ form: f(id), look: look(2, 1, 2) })), 64)
+
+window.__done = true
+</script></body></html>
