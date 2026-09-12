@@ -44,5 +44,8 @@ row('SKIN TONES at wardrobe size', SKIN_TONES.map((_, i) => (
 row('WARDROBE TILE (64px)', ['apprentice','candle','leaf','frost','storm','thorn','starweaver','runesage','astral','grand']
   .map(id => ({ form: f(id), look: look(2, 1, 2) })), 64)
 
+// Hats big, to check the crown's spikes and the horned/wide shapes.
+row('HATS at size', ['dawn','astral','grand','flamebinder','thorn','tide','glass','moon']
+  .map(id => ({ form: f(id), look: look(1, 2, 1) })), 190)
 window.__done = true
 </script></body></html>

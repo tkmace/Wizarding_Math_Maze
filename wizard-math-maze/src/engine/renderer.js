@@ -602,8 +602,8 @@ function drawPlayerWizard(ctx, W, H, form, appearance, moving, time, lean) {
   if (!form) return
   drawWizard(ctx, {
     x: W / 2,
-    yBase: H * 0.94,
-    h: H * 0.26,
+    yBase: H * 0.95,
+    h: H * 0.235,
     form, appearance, t: time, moving, lean,
     view: 'back',
   })
