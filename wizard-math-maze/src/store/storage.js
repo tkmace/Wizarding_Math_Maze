@@ -36,6 +36,7 @@ export function blankProfile(name, passcode) {
     totalPoints: 0,
     equippedSkin: STARTER,
     chosen: {},                    // rank -> chosen form id, one pick per rank
+    bought: [],                    // form ids bought with rune stones
     appearance: randomAppearance(),// face and hair — hers, kept across every form
     skill: blankSkill(),           // per-operation 0..1, drives Wizard's Sense
     stones: 0,
@@ -66,6 +67,7 @@ export function migrate(p) {
     settings: { ...base.settings, ...(p.settings || {}) },
     facts: p.facts || {},
     chosen: { ...(p.chosen || {}) },
+    bought: Array.isArray(p.bought) ? [...p.bought] : [],
     skill: { ...blankSkill(), ...(p.skill || {}) },
     appearance: { ...blankAppearance(), ...(p.appearance || {}) },
   }
@@ -145,6 +147,7 @@ export function exportScroll(profile) {
     n: profile.name, p: profile.passcode, t: profile.totalPoints, s: profile.equippedSkin,
     st: profile.stones, pl: profile.plays, f: profile.facts, x: profile.stats,
     g: profile.settings, c: profile.chosen, k: profile.skill, ap: profile.appearance,
+    b: profile.bought,
   }
   const json = JSON.stringify(slim)
   return `WMM4-${btoa(unescape(encodeURIComponent(json)))}`
@@ -159,7 +162,7 @@ export function importScroll(code) {
     const p = migrate({
       name: s.n, passcode: s.p, totalPoints: s.t, equippedSkin: s.s,
       stones: s.st, plays: s.pl, facts: s.f, stats: s.x,
-      settings: s.g, chosen: s.c, skill: s.k, appearance: s.ap,
+      settings: s.g, chosen: s.c, skill: s.k, appearance: s.ap, bought: s.b,
       v: s.c ? 4 : 3,
     })
     const all = readAll()

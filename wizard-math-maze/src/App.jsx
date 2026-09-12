@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { genMaze, revealFrom, WALL, PATH, DOOR, END, FACING_DELTA, cellKey } from './game/maze.js'
 import { recordAnswer } from './game/curriculum.js'
 import { roundPts, SENSE } from './game/math.js'
-import { formById, rankFor, pendingRanks, activePerks, STARTER } from './game/skins.js'
+import { formById, rankFor, pendingRanks, activePerks, buyState, STARTER } from './game/skins.js'
 import { rollEncounter, encounterReward } from './game/encounters.js'
 import { saveProfile } from './store/storage.js'
 import { syncEnabled, push as cloudPush } from './store/sync.js'
@@ -352,6 +352,24 @@ export default function App() {
 
   const equip = useCallback(id => commit({ ...profile, equippedSkin: id }), [profile, commit])
 
+  /**
+   * Buy a form she passed over, with rune stones. The price and the three gates
+   * are re-checked here rather than trusted from the button, so a stale render
+   * can't hand out a free form or overdraw the runes.
+   */
+  const buy = useCallback(id => {
+    const form = formById(id)
+    const b = buyState(profile, form)
+    if (!b.can) return
+    commit({
+      ...profile,
+      stones: (profile.stones || 0) - b.cost,
+      bought: [...(profile.bought || []), id],
+      equippedSkin: id,
+    })
+    syncUp()
+  }, [profile, commit, syncUp])
+
   const saveLook = useCallback(look => {
     commit({ ...profile, appearance: look })
     setScreen('hub')
@@ -384,7 +402,11 @@ export default function App() {
       {screen === 'login' && <Login onEnter={enter} />}
 
       {screen === 'pick' && profile && pending.length > 0 && (
-        <SkinChoice rank={pending[0]} appearance={profile.appearance} onChoose={choose} />
+        <SkinChoice
+          rank={pending[0]} appearance={profile.appearance} onChoose={choose}
+          points={profile.totalPoints} owed={pending.length}
+          fresh={newRank === pending[0]}
+        />
       )}
 
       {screen === 'hub' && profile && !pending.length && (
@@ -421,7 +443,7 @@ export default function App() {
       )}
 
       {screen === 'wardrobe' && profile && (
-        <Wardrobe profile={profile} onEquip={equip} onClose={() => setScreen('hub')} />
+        <Wardrobe profile={profile} onEquip={equip} onBuy={buy} onClose={() => setScreen('hub')} />
       )}
       {screen === 'report' && profile && (
         <ParentReport profile={profile} onClose={() => setScreen('hub')} />

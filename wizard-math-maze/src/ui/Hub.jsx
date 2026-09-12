@@ -50,6 +50,24 @@ export default function Hub({ profile, ops, diff, onToggleOp, onSetDiff, onStart
         </div>
       </div>
 
+      {/* Into the maze — the thing she came here to press. */}
+      <button className="bh" onClick={onStart} style={btn('gold', { width: '100%', fontSize: 19, minHeight: 58 })}>
+        Enter the Maze! 🗝️
+      </button>
+
+      {/* Wardrobe + look */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8, margin: '10px 0 14px' }}>
+        <button className="bh" onClick={onWardrobe} style={btn('ghost', { fontSize: 13, position: 'relative' })}>
+          🧥 Wardrobe
+          {pendingPicks > 0 && <span style={{
+            position: 'absolute', top: -5, right: -5, minWidth: 17, height: 17, borderRadius: 9,
+            background: C.bad, border: `2px solid ${C.bg}`, color: '#fff',
+            fontSize: 10, fontWeight: 900, lineHeight: '13px',
+          }}>{pendingPicks}</span>}
+        </button>
+        <button className="bh" onClick={onLook} style={btn('ghost', { fontSize: 13 })}>🪞 My Look</button>
+      </div>
+
       {/* Operations */}
       <div style={panel({ padding: '14px 16px', marginBottom: 12 })}>
         <div style={label()}>WHAT SHALL WE PRACTISE?</div>
@@ -118,24 +136,8 @@ export default function Hub({ profile, ops, diff, onToggleOp, onSetDiff, onStart
         )}
       </div>
 
-      <button className="bh" onClick={onStart} style={btn('gold', { width: '100%', fontSize: 19, minHeight: 58 })}>
-        Enter the Maze! 🗝️
-      </button>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8, marginTop: 10 }}>
-        <button className="bh" onClick={onWardrobe} style={btn('ghost', { fontSize: 13, position: 'relative' })}>
-          🧥 Wardrobe
-          {pendingPicks > 0 && <span style={{
-            position: 'absolute', top: -5, right: -5, minWidth: 17, height: 17, borderRadius: 9,
-            background: C.bad, border: `2px solid ${C.bg}`, color: '#fff',
-            fontSize: 10, fontWeight: 900, lineHeight: '13px',
-          }}>{pendingPicks}</span>}
-        </button>
-        <button className="bh" onClick={onReport} style={btn('ghost', { fontSize: 13 })}>📊 My Progress</button>
-      </div>
-
-      <button className="bh" onClick={onLook} style={btn('ghost', { width: '100%', marginTop: 8, fontSize: 13 })}>
-        🪞 My Look — face &amp; hair
+      <button className="bh" onClick={onReport} style={btn('ghost', { width: '100%', fontSize: 13 })}>
+        📊 My Progress
       </button>
 
       <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginTop: 16 }}>

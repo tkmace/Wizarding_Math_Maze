@@ -148,6 +148,36 @@ export const FORMS = [
 
 export const STARTER = 'apprentice'
 
+// --- Rune prices for the forms you didn't pick --------------------------------
+// The free pick at each rank is still one-of-three and still permanent. The two
+// you passed over aren't gone for ever any more — they can be BOUGHT with rune
+// stones, which are earned by playing (roughly 3-4 a maze) rather than by
+// points.
+//
+// The prices come from Tom's rule: a form should cost about the runes you'd be
+// holding one or two ranks above the rank it belongs to. Runes accrue roughly
+// LINEARLY with play (~3.5 a maze) while point thresholds DOUBLE each rank, so
+// the rule works beautifully low down and explodes at the top — hence the taper
+// above rank 4. Two properties are preserved at every rank:
+//
+//   1. The price is always more than the runes you'd hold when you first reach
+//      that rank, so buying always arrives LATER than the free choice.
+//   2. Prices only ever go up, so a higher form is never the cheaper one.
+//
+//   rank  free at    runes held   price   ≈ mazes of saving
+//    1      100 pts       3         20          5
+//    2      300           9         40          9
+//    3      700          20         70         14
+//    4    1,500          44        110         19
+//    5    3,000          88        170         23
+//    6    6,000         175        250         21
+//    7   11,000         321        400         23
+//    8   20,000         583        700         33
+const RUNE_COST = { 1: 20, 2: 40, 3: 70, 4: 110, 5: 170, 6: 250, 7: 400, 8: 700 }
+
+/** What an unchosen form at this rank costs in rune stones. */
+export const runeCost = rank => RUNE_COST[rank] || 0
+
 export const formById = id => FORMS.find(f => f.id === id) || FORMS[0]
 export const formsAtRank = rank => FORMS.filter(f => f.rank === rank)
 export const rankInfo = rank => RANKS.find(r => r.rank === rank) || RANKS[0]
@@ -182,11 +212,36 @@ export function pendingRanks(profile) {
   return out
 }
 
-/** Every form the player can actually wear. */
+/** Every form the player can actually wear — picked at a rank, or bought with runes. */
 export function ownedForms(profile) {
-  const chosen = profile?.chosen || {}
-  const ids = [STARTER, ...Object.values(chosen)]
+  const ids = ownedIds(profile)
   return FORMS.filter(f => ids.includes(f.id))
+}
+
+export function ownedIds(profile) {
+  const chosen = Object.values(profile?.chosen || {})
+  const bought = Array.isArray(profile?.bought) ? profile.bought : []
+  return [STARTER, ...chosen, ...bought]
+}
+
+export const owns = (profile, id) => ownedIds(profile).includes(id)
+
+/**
+ * Can this form be bought right now? Three gates, in the order a player meets
+ * them: the rank has to be reached, the free choice at that rank has to be made
+ * (so the permanent decision still comes first and still means something), and
+ * the runes have to be there.
+ */
+export function buyState(profile, form) {
+  const reached = rankFor(profile?.totalPoints || 0).rank
+  const cost = runeCost(form.rank)
+  const runes = profile?.stones || 0
+  if (owns(profile, form.id)) return { own: true, cost }
+  if (form.rank === 0 || !cost) return { blocked: 'none', cost }
+  if (form.rank > reached) return { blocked: 'rank', cost }
+  if (!(profile?.chosen || {})[form.rank]) return { blocked: 'choose', cost }
+  if (runes < cost) return { blocked: 'runes', cost, short: cost - runes }
+  return { can: true, cost }
 }
 
 /**

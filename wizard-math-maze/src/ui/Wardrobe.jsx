@@ -1,4 +1,4 @@
-import { RANKS, FORMS, formsAtRank, formById, rankFor } from '../game/skins.js'
+import { RANKS, FORMS, formsAtRank, formById, rankFor, runeCost, buyState, ownedIds } from '../game/skins.js'
 import { C, sans, serif, btn, panel } from './theme.js'
 import WizardPreview from './WizardPreview.jsx'
 
@@ -6,16 +6,22 @@ import WizardPreview from './WizardPreview.jsx'
  * The whole ladder, laid out from here to the top. Ranks she hasn't reached are
  * shown greyed with their point cost rather than hidden, because the point of a
  * wardrobe in a game like this is to show what's worth playing for.
+ *
+ * The form she picked at a rank is free and permanent. The two she passed over
+ * are still hers to chase — with rune stones rather than points, and always
+ * later than the free choice was (see runeCost in game/skins.js).
  */
-export default function Wardrobe({ profile, onEquip, onClose }) {
+export default function Wardrobe({ profile, onEquip, onBuy, onClose }) {
   const reached = rankFor(profile.totalPoints).rank
   const chosen = profile.chosen || {}
   const worn = profile.equippedSkin
+  const owned = ownedIds(profile)
+  const runes = profile.stones || 0
 
   return (
     <Sheet
       title="The Wardrobe"
-      subtitle={`${Object.keys(chosen).length + 1} of ${FORMS.length} forms · ${profile.totalPoints.toLocaleString()} pts`}
+      subtitle={`${owned.length} of ${FORMS.length} forms · 🔮 ${runes} runes`}
       onClose={onClose}
     >
       <div style={{ display: 'grid', gap: 14 }}>
@@ -36,6 +42,11 @@ export default function Wardrobe({ profile, onEquip, onClose }) {
                 </span>
                 {locked && <span style={{ fontSize: 10, color: C.faint, marginLeft: 'auto' }}>🔒 locked</span>}
                 {undecided && <span style={{ fontSize: 10, color: C.bad, fontWeight: 900, marginLeft: 'auto' }}>choose one!</span>}
+                {!locked && !undecided && r.rank > 0 && (
+                  <span style={{ fontSize: 10, color: C.teal, marginLeft: 'auto' }}>
+                    others 🔮 {runeCost(r.rank)}
+                  </span>
+                )}
               </div>
 
               <div style={{
@@ -46,16 +57,16 @@ export default function Wardrobe({ profile, onEquip, onClose }) {
                 {forms.map(f => {
                   const isPicked = pickedId === f.id
                   const isWorn = worn === f.id
-                  // Not chosen at a rank she's already decided = sealed for ever.
-                  const sealed = !locked && pickedId && !isPicked
-                  const dim = locked || sealed
+                  const isOwned = owned.includes(f.id)
+                  const b = buyState(profile, f)
+                  const dim = !isOwned && !b.can
 
                   return (
-                    <div key={f.id} style={{
+                    <div key={f.id} data-form={f.id} style={{
                       borderRadius: 14, padding: '9px 6px 8px', textAlign: 'center',
-                      border: `2px solid ${isWorn ? f.trim : isPicked ? C.lineHi : C.line}`,
+                      border: `2px solid ${isWorn ? f.trim : b.can ? C.teal : isOwned ? C.lineHi : C.line}`,
                       background: isWorn ? `${f.robe}2a` : dim ? '#09091f' : C.panelHi,
-                      opacity: dim ? 0.42 : 1,
+                      opacity: dim ? 0.52 : 1,
                       position: 'relative',
                     }}>
                       <WizardPreview form={f} appearance={profile.appearance} size={64} animate={isWorn} greyscale={dim} />
@@ -67,7 +78,13 @@ export default function Wardrobe({ profile, onEquip, onClose }) {
                         {f.perk?.label}
                       </div>
 
-                      {isPicked && !isWorn && (
+                      {isWorn && (
+                        <div style={{ marginTop: 4, color: f.trim, fontFamily: serif, fontSize: 9.5, fontWeight: 900, letterSpacing: 1 }}>
+                          ✦ WORN
+                        </div>
+                      )}
+
+                      {!isWorn && isOwned && (
                         <button className="bh" onClick={() => onEquip(f.id)} style={{
                           marginTop: 4, width: '100%', padding: '6px 0', borderRadius: 9,
                           border: 'none', background: `linear-gradient(135deg,${f.trim},${f.robe})`,
@@ -75,14 +92,30 @@ export default function Wardrobe({ profile, onEquip, onClose }) {
                           fontSize: 9.5, letterSpacing: 1, cursor: 'pointer',
                         }}>WEAR</button>
                       )}
-                      {isWorn && (
-                        <div style={{ marginTop: 4, color: f.trim, fontFamily: serif, fontSize: 9.5, fontWeight: 900, letterSpacing: 1 }}>
-                          ✦ WORN
+
+                      {/* Not hers yet: either a buy button, or why not. */}
+                      {!isOwned && b.can && (
+                        <button className="bh" onClick={() => onBuy(f.id)} style={{
+                          marginTop: 4, width: '100%', padding: '6px 0', borderRadius: 9,
+                          border: `1.5px solid ${C.teal}`, background: `${C.teal}22`,
+                          color: C.teal, fontFamily: serif, fontWeight: 900,
+                          fontSize: 9.5, letterSpacing: 0.5, cursor: 'pointer',
+                        }}>BUY 🔮{b.cost}</button>
+                      )}
+                      {!isOwned && b.blocked === 'runes' && (
+                        <div style={{ marginTop: 4 }}>
+                          <div style={{ color: C.teal, fontSize: 10, fontWeight: 900 }}>🔮 {b.cost}</div>
+                          <div style={{ color: C.faint, fontSize: 8.5 }}>save {b.short} more</div>
                         </div>
                       )}
-                      {sealed && (
+                      {!isOwned && b.blocked === 'choose' && (
+                        <div style={{ marginTop: 4, color: C.faint, fontSize: 9, lineHeight: 1.3 }}>
+                          choose first
+                        </div>
+                      )}
+                      {!isOwned && b.blocked === 'rank' && (
                         <div style={{ marginTop: 4, color: C.faint, fontSize: 9, letterSpacing: 0.5 }}>
-                          not chosen
+                          🔒 locked
                         </div>
                       )}
                     </div>
@@ -92,15 +125,30 @@ export default function Wardrobe({ profile, onEquip, onClose }) {
             </div>
           )
         })}
+
+        <p style={{ color: C.faint, fontSize: 10.5, lineHeight: 1.6, margin: '2px 2px 0' }}>
+          🔮 Rune stones are found in the mazes and dropped by creatures. Spend
+          them on a hint at a door — or save them up and buy a form you passed
+          over. The one you chose at each rank is always free.
+        </p>
       </div>
     </Sheet>
   )
 }
 
-/** Shared full-screen sheet used by the wardrobe, report and scroll panels. */
+/**
+ * Shared full-screen sheet used by the wardrobe, report and scroll panels.
+ *
+ * The way out lives at the TOP: these sheets are long and scrolling to the
+ * bottom to get home is a chore on a phone. A copy stays at the bottom so
+ * whoever HAS scrolled all the way down doesn't have to scroll back up.
+ */
 export function Sheet({ title, subtitle, onClose, children, closeLabel = 'Back to the Castle 🏰' }) {
   return (
     <div className="appear scroll" style={{ zIndex: 10, width: '100%', maxWidth: 470, padding: '8px 14px 24px' }}>
+      <button className="bh" onClick={onClose} style={btn('gold', { width: '100%', marginBottom: 12 })}>
+        {closeLabel}
+      </button>
       <h2 style={{
         fontFamily: serif, fontSize: 26, fontWeight: 900, color: C.gold,
         letterSpacing: 1.5, textAlign: 'center', margin: '6px 0 2px',
@@ -108,7 +156,9 @@ export function Sheet({ title, subtitle, onClose, children, closeLabel = 'Back t
       }}>{title}</h2>
       {subtitle && <p style={{ color: C.dim, fontSize: 13, textAlign: 'center', margin: '0 0 16px', fontFamily: serif, letterSpacing: 1 }}>{subtitle}</p>}
       <div style={panel({ padding: '14px 13px' })}>{children}</div>
-      <button className="bh" onClick={onClose} style={btn('gold', { width: '100%', marginTop: 14 })}>{closeLabel}</button>
+      <button className="bh" onClick={onClose} style={btn('ghost', { width: '100%', marginTop: 12, fontSize: 13 })}>
+        {closeLabel}
+      </button>
     </div>
   )
 }

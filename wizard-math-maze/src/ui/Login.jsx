@@ -95,8 +95,14 @@ export default function Login({ onEnter }) {
     const wanted = mapLegacySkin(result.claimed.equippedSkin)
     const form = formById(wanted)
     const earned = rankFor(result.profile.totalPoints).rank >= form.rank
+    // Rank 0 is the starting robe, not a choice, so it never goes in `chosen`.
     const restored = earned
-      ? { ...result.profile, equippedSkin: wanted, chosen: { ...(result.profile.chosen || {}), [form.rank]: wanted } }
+      ? {
+        ...result.profile, equippedSkin: wanted,
+        chosen: form.rank > 0
+          ? { ...(result.profile.chosen || {}), [form.rank]: wanted }
+          : { ...(result.profile.chosen || {}) },
+      }
       : { ...result.profile, equippedSkin: 'apprentice' }
     saveProfile(restored)
     onEnter(restored)

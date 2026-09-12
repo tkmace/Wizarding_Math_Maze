@@ -181,7 +181,7 @@ export function drawWizard(ctx, o) {
   drawHair(ctx, h, headY, headR, look, view, 'front')
 
   // ── Hat, drawn last so its brim sits over the head ──
-  drawHat(ctx, h, form.hat || 'pointed', robe, trim, t)
+  drawHat(ctx, h, form.hat || 'pointed', robe, trim, t, view)
 
   drawAura(ctx, h, form.aura, t, trim, 'over')
   ctx.restore()
@@ -272,7 +272,7 @@ function drawHair(ctx, h, headY, headR, look, view, pass) {
 }
 
 // --- Hats ---------------------------------------------------------------------
-function drawHat(ctx, h, kind, robe, trim, t) {
+function drawHat(ctx, h, kind, robe, trim, t, view = 'front') {
   const brimY = -h * 0.725
   const hatCol = shade(robe, 0.1)
 
@@ -315,17 +315,90 @@ function drawHat(ctx, h, kind, robe, trim, t) {
     band(h * 0.32)
     star(h * 0.02, brimY - h * 0.31, h * 0.075)
   } else if (kind === 'hood') {
+    // A proper draped cowl, not a dome on a stick. It's one path with the face
+    // opening punched out of it (evenodd), so the cloth genuinely FRAMES the
+    // face — falling past the jaw and onto the shoulders — instead of sitting
+    // on top of the head like a bell. The peak flops forward, which is what
+    // stops a hood reading as a helmet.
+    // Kept snug: no wider than the shoulders and hemmed at the collar, so the
+    // robe, the cape and the trim are all still visible underneath. An oversized
+    // cowl swallows the whole figure and every hooded form looks the same.
+    const W = h * 0.168                // half-width where the cloth meets the shoulders
+    const peakY = brimY - h * 0.15
+    const hemY = brimY + h * 0.205
+    const faceY = -h * 0.665           // matches headY in drawWizard
+    const faceRX = h * 0.096, faceRY = h * 0.114
+    const front = view === 'front'
+
     ctx.beginPath()
-    ctx.moveTo(-h * 0.19, brimY + h * 0.10)
-    ctx.quadraticCurveTo(-h * 0.20, brimY - h * 0.20, 0, brimY - h * 0.22)
-    ctx.quadraticCurveTo(h * 0.20, brimY - h * 0.20, h * 0.19, brimY + h * 0.10)
-    ctx.quadraticCurveTo(0, brimY + h * 0.02, -h * 0.19, brimY + h * 0.10)
+    // Left shoulder, up the outside of the cowl to the peak.
+    ctx.moveTo(-W, hemY)
+    ctx.bezierCurveTo(-W * 1.12, brimY + h * 0.02, -h * 0.16, peakY + h * 0.10, -h * 0.026, peakY + h * 0.012)
+    // The peak: a real point, tipping forward, so it reads as a hood from behind
+    // too rather than as a dome.
+    ctx.quadraticCurveTo(h * 0.022, peakY - h * 0.026, h * 0.072, peakY + h * 0.03)
+    // Down the right side to the other shoulder.
+    ctx.bezierCurveTo(h * 0.14, brimY + h * 0.01, W * 1.1, brimY + h * 0.11, W, hemY)
+    // Hem, sagging slightly between the shoulders.
+    ctx.quadraticCurveTo(0, hemY + h * 0.035, -W, hemY)
     ctx.closePath()
-    const g = ctx.createLinearGradient(-h * 0.19, 0, h * 0.19, 0)
-    g.addColorStop(0, shade(hatCol, -0.45)); g.addColorStop(0.45, hatCol); g.addColorStop(1, shade(hatCol, -0.5))
-    ctx.fillStyle = g; ctx.fill()
-    ctx.strokeStyle = trim; ctx.lineWidth = Math.max(1, h * 0.007)
-    ctx.globalAlpha = 0.65; ctx.stroke(); ctx.globalAlpha = 1
+    // From behind there is no opening — you're looking at the back of the hood.
+    if (front) {
+      ctx.moveTo(faceRX, faceY)
+      ctx.ellipse(0, faceY, faceRX, faceRY, 0, 0, TAU)
+    }
+
+    const g = ctx.createLinearGradient(-W, 0, W, 0)
+    g.addColorStop(0, shade(hatCol, -0.5)); g.addColorStop(0.38, hatCol)
+    g.addColorStop(0.72, shade(hatCol, -0.18)); g.addColorStop(1, shade(hatCol, -0.55))
+    ctx.fillStyle = g
+    ctx.fill('evenodd')
+
+    if (front) {
+      // Trim piping round the opening — reads as a lined hood, and it's the only
+      // place a hooded form's second colour shows near the face.
+      ctx.save()
+      ctx.beginPath()
+      ctx.ellipse(0, faceY, faceRX, faceRY, 0, 0, TAU)
+      ctx.strokeStyle = trim
+      ctx.lineWidth = Math.max(1, h * 0.008)
+      ctx.globalAlpha = 0.7
+      ctx.stroke()
+      // Shadow across the brow, so the face sits INSIDE the hood.
+      ctx.beginPath()
+      ctx.ellipse(0, faceY, faceRX, faceRY, 0, 0, TAU)
+      ctx.clip()
+      ctx.globalAlpha = 1
+      const s = ctx.createLinearGradient(0, faceY - faceRY, 0, faceY + faceRY * 0.3)
+      s.addColorStop(0, 'rgba(4,2,16,.6)'); s.addColorStop(1, 'rgba(4,2,16,0)')
+      ctx.fillStyle = s
+      ctx.fillRect(-faceRX, faceY - faceRY, faceRX * 2, faceRY * 1.45)
+      ctx.restore()
+    } else {
+      // A centre seam down the back of the hood, so it isn't a flat blob.
+      ctx.save()
+      ctx.globalAlpha = 0.3
+      ctx.strokeStyle = shade(hatCol, -0.5)
+      ctx.lineWidth = Math.max(1, h * 0.007)
+      ctx.beginPath()
+      ctx.moveTo(h * 0.012, peakY + h * 0.03)
+      ctx.quadraticCurveTo(-h * 0.008, brimY - h * 0.02, 0, hemY - h * 0.01)
+      ctx.stroke()
+      ctx.restore()
+    }
+
+    // A fold down each side of the cowl.
+    ctx.save()
+    ctx.globalAlpha = 0.28
+    ctx.strokeStyle = shade(hatCol, -0.55)
+    ctx.lineWidth = Math.max(1, h * 0.006)
+    for (const sx of [-1, 1]) {
+      ctx.beginPath()
+      ctx.moveTo(sx * h * 0.118, brimY - h * 0.045)
+      ctx.quadraticCurveTo(sx * h * 0.152, brimY + h * 0.07, sx * h * 0.132, hemY)
+      ctx.stroke()
+    }
+    ctx.restore()
   } else if (kind === 'horned') {
     cone(h * 0.30, h * 0.30, h * 0.015)
     for (const s of [-1, 1]) {
