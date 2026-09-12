@@ -1,0 +1,27 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Creatures</title>
+<style>body{margin:0;background:#120a2c;color:#c8a4ff;font:11px system-ui}
+h3{margin:12px 0 3px 10px;font-size:12px;letter-spacing:1px;color:#f9ca74}
+canvas{display:block;margin:0 0 4px 10px}</style></head>
+<body><div id="out"></div>
+<script type="module">
+import { drawCreature, CREATURES } from '/src/engine/creatureSprite.js'
+const out = document.getElementById('out')
+function row(title, size, opts) {
+  const h3 = document.createElement('h3'); h3.textContent = title; out.append(h3)
+  const cv = document.createElement('canvas')
+  const cell = size * 1.5
+  cv.width = CREATURES.length * cell * 2; cv.height = cell * 1.35 * 2
+  cv.style.width = (CREATURES.length * cell) + 'px'; cv.style.height = (cell * 1.35) + 'px'
+  out.append(cv)
+  const ctx = cv.getContext('2d'); ctx.scale(2, 2)
+  CREATURES.forEach((c, i) => {
+    drawCreature(ctx, { x: i * cell + cell / 2, y: cell * 1.15, h: size, creature: c, t: 1200, ...opts })
+    ctx.fillStyle = '#c8a4ff'; ctx.font = '700 11px sans-serif'; ctx.textAlign = 'center'
+    ctx.fillText(c.name, i * cell + cell / 2, cell * 1.3)
+  })
+}
+row('CREATURES — idle (duel size)', 200, {})
+row('CHARGING', 200, { charge: 0.8 })
+row('HIT', 200, { hit: 0.7 })
+window.__done = true
+</script></body></html>

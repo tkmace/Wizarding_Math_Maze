@@ -52,6 +52,20 @@ async function walkToEncounter(page, limit = 500) {
   for (let i = 0; i < limit; i++) {
     if (await page.locator('text=SOMETHING BLOCKS THE WAY').count()) return true
     if (await page.locator('text=/SPELL DUEL|RUNE CATCH/').count()) return true
+    // Clearing the maze parks us on the win screen, where the arrow keys do
+    // nothing — without this the walk burns its whole budget standing there.
+    if (await page.locator('text=Maze Conquered').count()) {
+      await page.locator('button', { hasText: /Another Maze|Choose my new form/ }).first().click().catch(() => {})
+      await page.waitForTimeout(900)
+      continue
+    }
+    if (await page.locator('text=Choose the form you will take').count()) {
+      await page.locator('button').filter({ hasText: /points|failure|bonus|rune stone|sight|gate/ }).first().click()
+      await page.waitForTimeout(250)
+      await page.locator('button', { hasText: /^Become the/ }).click(); await page.waitForTimeout(220)
+      await page.locator('button', { hasText: 'Yes — become it' }).click(); await page.waitForTimeout(700)
+      continue
+    }
     // Step past any door puzzle that opens on the way.
     if (await page.locator('button', { hasText: 'Step back' }).count()) {
       await page.locator('button', { hasText: 'Step back' }).click({ timeout: 4000 }).catch(() => {})
