@@ -38,12 +38,19 @@ export const HAIR_STYLES = [
 // The numbers are all RATIOS of the head radius, so a part works identically on
 // a 64px wardrobe tile and a 168px hub portrait.
 
-/** Head outline. `w` is width at the temples, `jaw` how far the chin tapers in. */
+/**
+ * Head outline. `w` is width at the temples, `jaw` how far the chin tapers in.
+ *
+ * Every shape here taps a little narrower and a little longer than it did.
+ * A head as wide as it is tall is the single strongest "cartoon" signal there
+ * is — it reads as a ball with a face on it — and the fix is not to redraw
+ * anything, only to let the jaw come in and the chin sit lower.
+ */
 export const FACE_SHAPES = [
-  { id: 0, name: 'Round',  w: 1.00, jaw: 0.70, chin: 1.12 },
-  { id: 1, name: 'Oval',   w: 0.94, jaw: 0.60, chin: 1.20 },
-  { id: 2, name: 'Square', w: 1.02, jaw: 0.86, chin: 1.06 },
-  { id: 3, name: 'Heart',  w: 1.04, jaw: 0.50, chin: 1.16 },
+  { id: 0, name: 'Round',  w: 0.97, jaw: 0.66, chin: 1.18 },
+  { id: 1, name: 'Oval',   w: 0.92, jaw: 0.57, chin: 1.25 },
+  { id: 2, name: 'Square', w: 1.00, jaw: 0.82, chin: 1.12 },
+  { id: 3, name: 'Heart',  w: 1.02, jaw: 0.48, chin: 1.21 },
 ]
 
 /**
@@ -51,10 +58,10 @@ export const FACE_SHAPES = [
  * round, lower = more human), `tilt` rotates the outer corner up.
  */
 export const EYE_SHAPES = [
-  { id: 0, name: 'Round',  r: 0.170, sq: 0.94, tilt: 0.00 },
-  { id: 1, name: 'Almond', r: 0.175, sq: 0.84, tilt: 0.09 },
-  { id: 2, name: 'Wide',   r: 0.188, sq: 0.88, tilt: 0.04 },
-  { id: 3, name: 'Keen',   r: 0.158, sq: 0.78, tilt: 0.14 },
+  { id: 0, name: 'Round',  r: 0.148, sq: 0.88, tilt: 0.00 },
+  { id: 1, name: 'Almond', r: 0.152, sq: 0.79, tilt: 0.10 },
+  { id: 2, name: 'Wide',   r: 0.164, sq: 0.83, tilt: 0.05 },
+  { id: 3, name: 'Keen',   r: 0.137, sq: 0.74, tilt: 0.15 },
 ]
 
 export const EYE_COLORS = [
@@ -76,10 +83,10 @@ export const BROW_SHAPES = [
 
 /** Noses. `len` is how far down the face, `w` how wide the tip. */
 export const NOSE_SHAPES = [
-  { id: 0, name: 'Button',  len: 0.26, w: 0.10, bridge: 0.00 },
-  { id: 1, name: 'Straight',len: 0.32, w: 0.09, bridge: 0.14 },
-  { id: 2, name: 'Round',   len: 0.28, w: 0.13, bridge: 0.06 },
-  { id: 3, name: 'Fine',    len: 0.30, w: 0.07, bridge: 0.18 },
+  { id: 0, name: 'Button',  len: 0.30, w: 0.095, bridge: 0.09 },
+  { id: 1, name: 'Straight',len: 0.34, w: 0.085, bridge: 0.16 },
+  { id: 2, name: 'Round',   len: 0.31, w: 0.120, bridge: 0.08 },
+  { id: 3, name: 'Fine',    len: 0.32, w: 0.070, bridge: 0.19 },
 ]
 
 /**
@@ -88,10 +95,10 @@ export const NOSE_SHAPES = [
  * would reach for later.
  */
 export const MOUTH_SHAPES = [
-  { id: 0, name: 'Smile',  w: 0.46, open: 0.00, curve: 0.34 },
-  { id: 1, name: 'Grin',   w: 0.52, open: 0.30, curve: 0.36 },
-  { id: 2, name: 'Beam',   w: 0.58, open: 0.38, curve: 0.42 },
-  { id: 3, name: 'Gentle', w: 0.38, open: 0.00, curve: 0.26 },
+  { id: 0, name: 'Smile',  w: 0.40, open: 0.00, curve: 0.29 },
+  { id: 1, name: 'Grin',   w: 0.45, open: 0.21, curve: 0.30 },
+  { id: 2, name: 'Beam',   w: 0.50, open: 0.30, curve: 0.35 },
+  { id: 3, name: 'Gentle', w: 0.34, open: 0.00, curve: 0.23 },
 ]
 
 /**

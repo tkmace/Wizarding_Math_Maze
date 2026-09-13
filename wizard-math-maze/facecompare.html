@@ -1,0 +1,34 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Faces</title>
+<style>body{margin:0;background:#0b0a22;color:#c8a4ff;font:11px system-ui;padding:8px}
+h3{margin:10px 0 2px;font-size:12px;color:#f9ca74;letter-spacing:1px}
+.row{display:flex;gap:6px;flex-wrap:wrap}.c{text-align:center}
+canvas{display:block;border:1px solid #2a2a55;background:#12122e}</style></head>
+<body><div id="out"></div>
+<script type="module">
+import { drawWizard } from '/src/engine/wizardSprite.js'
+import { SKIN_TONES, HAIR_COLORS, EYE_SHAPES } from '/src/game/appearance.js'
+import { FORMS, formById } from '/src/game/skins.js'
+const out=document.getElementById('out')
+function row(title,items,size){
+  const h=document.createElement('h3'); h.textContent=title; out.append(h)
+  const r=document.createElement('div'); r.className='row'; out.append(r)
+  items.forEach(({form,look,name})=>{
+    const d=document.createElement('div'); d.className='c'
+    const cv=document.createElement('canvas'); cv.width=size*2; cv.height=size*2
+    cv.style.width=size+'px'; cv.style.height=size+'px'; d.append(cv)
+    drawWizard(cv.getContext('2d'),{x:size,yBase:size*2*0.94,h:size*2*0.82,form,appearance:look,t:1200,moving:false,view:'front'})
+    if(name){const t=document.createElement('div');t.textContent=name;d.append(t)}
+    r.append(d)
+  })
+}
+const base={skin:1,hairColor:1,hairStyle:1,face:0,eyes:1,eyeColor:1,brows:0,nose:0,mouth:1,beard:0}
+row('Hub portrait (168px)',[{form:formById('apprentice'),look:base},
+  {form:formById('frost'),look:{...base,skin:3,hairColor:0,hairStyle:2,eyes:1}},
+  {form:formById('ember'),look:{...base,skin:0,hairColor:2,hairStyle:3,eyes:2}}],168)
+row('Every skin tone (120px)', SKIN_TONES.map(s=>({form:formById('frost'),look:{...base,skin:s.id},name:s.name})),120)
+row('Every eye shape (120px)', EYE_SHAPES.map(e=>({form:formById('apprentice'),look:{...base,eyes:e.id},name:e.name})),120)
+row('Hair colours + beards (120px)', HAIR_COLORS.map(hc=>({form:formById('storm'),look:{...base,hairColor:hc.id,beard:hc.id%2?2:0},name:hc.name})),120)
+row('Wardrobe tiles (86px)', FORMS.slice(0,9).map(f=>({form:f,look:base})),86)
+row('Choice-screen thumbs (58px)', FORMS.slice(0,9).map(f=>({form:f,look:base})),58)
+window.__done=true
+</script></body></html>

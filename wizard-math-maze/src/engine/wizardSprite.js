@@ -25,8 +25,11 @@ function outline(ctx, h, col, weight = 1) {
   // The fills were lightened at their edges to give this line something to sit
   // against; without that the gradient and the outline are the same colour and
   // the figure loses its silhouette.
-  ctx.strokeStyle = shade(col, -0.72)
-  ctx.lineWidth = Math.max(1, h * 0.011 * weight)
+  // Lighter and thinner than it was. A thick, nearly black contour is the
+  // loudest cartoon signal in this whole file — at -0.72 and 0.011 it read as
+  // ink around a sticker rather than as the shaded edge of a solid thing.
+  ctx.strokeStyle = shade(col, -0.58)
+  ctx.lineWidth = Math.max(0.9, h * 0.0085 * weight)
   ctx.lineJoin = 'round'
   ctx.stroke()
 }
@@ -141,7 +144,11 @@ export function drawWizard(ctx, o) {
   // rather than a cone with a face on top.
   const hem = h * 0.235, waist = h * 0.155, shoulder = h * 0.185
   const yWaist = -h * 0.29, yShoulder = -h * 0.45
-  const headY = -h * 0.605, headR = h * 0.142
+  // A smaller head is most of what separates a chibi from a person: this figure
+  // was about three and a half heads tall, which is toddler proportions, and is
+  // now closer to four. Small enough a step that the silhouette still reads on a
+  // 40px wardrobe tile, big enough that the faces stopped looking like dolls.
+  const headY = -h * 0.618, headR = h * 0.126
   const seed = (form.robe || '').length + (form.title || '').length * 7
 
   // ── Contact shadow, so the figure stands on something ──
@@ -316,8 +323,10 @@ export function drawWizard(ctx, o) {
   // The clasp that holds it, at the throat. A small piece of jewellery does a
   // lot of work: it says "this is fastened at the neck", which is the detail
   // that turns a coloured shape into a garment.
-  const clY = yShoulder - h * 0.012
-  const clR = h * 0.026
+  // Below the chin, not behind it. The head is narrower than it was, so a clasp
+  // tucked under the old jawline now sits out in the open at the throat.
+  const clY = yShoulder + h * 0.006
+  const clR = h * 0.021
   ctx.beginPath(); ctx.arc(0, clY, clR, 0, TAU)
   const cg = ctx.createRadialGradient(-clR * 0.3, clY - clR * 0.35, clR * 0.1, 0, clY, clR)
   cg.addColorStop(0, shade(trim, 0.6)); cg.addColorStop(0.6, trim); cg.addColorStop(1, shade(trim, -0.45))
@@ -372,6 +381,17 @@ export function drawWizard(ctx, o) {
   headPath()
   outline(ctx, h, look.skinHex, 0.85)
 
+  // The shadow the jaw casts on the throat. Without it the head is a shape
+  // resting on the collar; with it there is something underneath it.
+  ctx.save()
+  headPath(); ctx.clip()
+  const jg = ctx.createLinearGradient(0, headY + headR * 0.55, 0, headY + headR * 1.25)
+  jg.addColorStop(0, 'rgba(60,34,26,0)')
+  jg.addColorStop(1, 'rgba(60,34,26,0.30)')
+  ctx.fillStyle = jg
+  ctx.fillRect(-headR * 1.2, headY + headR * 0.55, headR * 2.4, headR * 0.8)
+  ctx.restore()
+
   if (view === 'front') drawFace(ctx, h, headY, headR, look, form)
 
   // ── Hair in front of the head: fringe and side locks ──
@@ -425,12 +445,14 @@ function drawCheeks(ctx, f, look) {
   ctx.save()
   for (const s of [-1, 1]) {
     const cx = s * headR * 0.62, cy = headY + headR * 0.34
-    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, headR * 0.3)
-    g.addColorStop(0, 'rgba(230,116,98,0.42)')
-    g.addColorStop(1, 'rgba(230,116,98,0)')
+    // Barely there. At 0.42 this was rouge on a doll; what a real cheek does at
+    // this size is catch a little more warmth than the jaw around it.
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, headR * 0.34)
+    g.addColorStop(0, 'rgba(214,124,104,0.19)')
+    g.addColorStop(1, 'rgba(214,124,104,0)')
     ctx.fillStyle = g
     ctx.beginPath()
-    ctx.ellipse(cx, cy, headR * 0.3, headR * 0.2, 0, 0, TAU)
+    ctx.ellipse(cx, cy, headR * 0.34, headR * 0.22, 0, 0, TAU)
     ctx.fill()
   }
   ctx.restore()
@@ -489,7 +511,7 @@ function drawEyes(ctx, f, look) {
     ctx.restore()
 
     // Iris, pupil, and the ring that keeps the colour from going flat.
-    const ir = Math.min(rx, ry) * 0.9
+    const ir = Math.min(rx, ry) * 0.86
     const ix = cx + lookX, iy = ey + ry * 0.08
     ctx.save()
     eyePath(); ctx.clip()
@@ -510,22 +532,22 @@ function drawEyes(ctx, f, look) {
     // what makes an eye look wet rather than painted.
     ctx.fillStyle = '#ffffff'
     ctx.beginPath()
-    ctx.ellipse(ix - ir * 0.36, iy - ir * 0.44, ir * 0.3, ir * 0.24, -0.5, 0, TAU)
+    ctx.ellipse(ix - ir * 0.38, iy - ir * 0.46, ir * 0.23, ir * 0.18, -0.5, 0, TAU)
     ctx.fill()
-    ctx.globalAlpha = 0.5
-    ctx.beginPath(); ctx.arc(ix + ir * 0.4, iy + ir * 0.4, ir * 0.16, 0, TAU); ctx.fill()
+    ctx.globalAlpha = 0.42
+    ctx.beginPath(); ctx.arc(ix + ir * 0.42, iy + ir * 0.42, ir * 0.12, 0, TAU); ctx.fill()
     ctx.globalAlpha = 1
 
     // Lash line: heavier at the outer corner, which is most of what separates a
     // human eye from a circle.
     ctx.save()
-    ctx.strokeStyle = '#33211a'
+    ctx.strokeStyle = '#42291f'
     ctx.lineCap = 'round'
-    ctx.lineWidth = Math.max(1, ry * 0.3)
+    ctx.lineWidth = Math.max(0.9, ry * 0.26)
     ctx.beginPath()
     ctx.ellipse(cx, ey, rx * 1.01, ry * 1.01, tilt, Math.PI * 1.04, Math.PI * 1.96)
     ctx.stroke()
-    ctx.lineWidth = Math.max(1, ry * 0.42)
+    ctx.lineWidth = Math.max(0.9, ry * 0.36)
     ctx.beginPath()
     ctx.ellipse(cx, ey, rx * 1.01, ry * 1.01, tilt, Math.PI * (s < 0 ? 1.04 : 1.52), Math.PI * (s < 0 ? 1.46 : 1.96))
     ctx.stroke()
@@ -600,7 +622,7 @@ function drawMouth(ctx, f, look) {
     ctx.save()
     ctx.strokeStyle = '#7a4034'
     ctx.lineCap = 'round'
-    ctx.lineWidth = Math.max(1, headR * 0.075)
+    ctx.lineWidth = Math.max(0.9, headR * 0.062)
     ctx.beginPath()
     ctx.moveTo(-mw, my - lift * 0.5)
     ctx.quadraticCurveTo(0, my + lift, mw, my - lift * 0.5)
@@ -901,7 +923,7 @@ function drawHair(ctx, h, headY, headR, look, view, pass) {
 
 // --- Hats ---------------------------------------------------------------------
 function drawHat(ctx, h, kind, robe, trim, t, view = 'front') {
-  const brimY = -h * 0.718
+  const brimY = -h * 0.712
   const hatCol = shade(robe, 0.1)
   // How far the hat's lower edge bows DOWN at the centre.
   //
@@ -963,6 +985,15 @@ function drawHat(ctx, h, kind, robe, trim, t, view = 'front') {
     ctx.fillText('✦', sx, sy)
     ctx.restore()
   }
+
+  // Every hat below was drawn to fit a head of radius 0.142h. The head is
+  // smaller now, so they are squeezed to match about the brim line rather than
+  // re-tuned one at a time — otherwise each one perches with its corners in the
+  // air either side of a skull that no longer reaches them.
+  ctx.save()
+  ctx.translate(0, brimY)
+  ctx.scale(0.90, 0.97)
+  ctx.translate(0, -brimY)
 
   if (kind === 'wide') {
     seat(h * 0.62)
@@ -1139,6 +1170,7 @@ function drawHat(ctx, h, kind, robe, trim, t, view = 'front') {
     band(h * 0.30)
     star(h * 0.035, brimY - h * 0.35, h * 0.08)
   }
+  ctx.restore()
 }
 
 // --- Staves -------------------------------------------------------------------

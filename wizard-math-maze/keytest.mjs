@@ -30,6 +30,10 @@ await page.waitForSelector('text=WHAT SHALL WE PRACTICE', { timeout: 15000 })
 await page.locator('button', { hasText: 'Enter the Maze' }).click()
 await page.waitForTimeout(1200)
 
+// A first-run card can turn up mid-question (a rune picked up on the way in,
+// the sealed exit) and sits over the keypad. Clear it before reading or
+// pressing anything, or the assertion reads a box that isn't reachable.
+const guard = async () => { await clearCoach(page) }
 const boxText = () => page.evaluate(() => {
   const els = [...document.querySelectorAll('div')]
   const el = els.find(d => d.title === 'Tap to clear')
@@ -98,6 +102,7 @@ else {
   await page.keyboard.press('Escape')
   await page.waitForTimeout(80)
   check('Escape clears the box', await boxText() === '?', JSON.stringify(await boxText()))
+  await guard()
   await page.keyboard.down('8')
   await page.waitForTimeout(900)
   await page.keyboard.up('8')
@@ -106,6 +111,7 @@ else {
 
   // ── 4. Space cannot re-fire a keypad button that still has focus ──────────
   await page.keyboard.press('Escape'); await page.waitForTimeout(80)
+  await guard()
   await page.locator('button').filter({ hasText: /^7$/ }).first().click()
   await page.waitForTimeout(100)
   await page.keyboard.press(' ')
@@ -113,6 +119,7 @@ else {
   check('Space after clicking 7 leaves just 7', await boxText() === '7', JSON.stringify(await boxText()))
 
   // ── 5. Tapping the box clears it ─────────────────────────────────────────
+  await guard()
   await page.locator('div[title="Tap to clear"]').click()
   await page.waitForTimeout(120)
   check('tapping the box clears it', await boxText() === '?', JSON.stringify(await boxText()))

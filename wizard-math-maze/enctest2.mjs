@@ -46,7 +46,8 @@ async function answer(page,correct){
   const m=d.trim().match(/^(\d+) ([+−×÷]) (\d+)$/); const a=+m[1],c=+m[3]
   let v=m[2]==='+'?a+c:m[2]==='−'?a-c:m[2]==='×'?a*c:a/c; if(!correct) v+=3
   for(const ch of String(v)) await page.locator('button',{hasText:new RegExp(`^${ch}$`)}).first().click()
-  await page.locator('button',{hasText:'✓'}).click(); await page.waitForTimeout(400); return true
+  await clearCoach(page)
+    await page.locator('button',{hasText:'✓'}).click(); await page.waitForTimeout(400); return true
 }
 const pts=page=>page.evaluate(()=>{const p=JSON.parse(localStorage.getItem('wmm.profiles.v3')||'{}').cam
   return p&&{total:p.totalPoints,stones:p.stones}})
@@ -60,6 +61,7 @@ while((!sawRunes||!lossChecked) && tries++<8){
   if(isDuel && !lossChecked){
     // Bank a little first so there is something a loss could take.
     const before=await pts(page)
+    await clearCoach(page)
     await page.locator('button',{hasText:'Raise your wand'}).click(); await page.waitForTimeout(500)
     for(let i=0;i<14;i++){
       if(await page.locator('text=slips away').count()) break
@@ -73,6 +75,7 @@ while((!sawRunes||!lossChecked) && tries++<8){
     console.log('duel LOST: points',before.total,'->',after.total, after.total>=before.total?'PASS (nothing taken)':'FAIL')
     lossChecked=true
   } else if(!isDuel && !sawRunes){
+    await clearCoach(page)
     await page.locator('button',{hasText:'Catch the runes'}).click(); await page.waitForTimeout(900)
     await page.screenshot({path:`${OUT}/74-rune-catch.png`})
     // Read the rune positions straight off the component by clicking each in turn
