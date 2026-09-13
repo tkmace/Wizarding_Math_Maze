@@ -51,10 +51,10 @@ export const FACE_SHAPES = [
  * round, lower = more human), `tilt` rotates the outer corner up.
  */
 export const EYE_SHAPES = [
-  { id: 0, name: 'Round',  r: 0.235, sq: 0.94, tilt: 0.00 },
-  { id: 1, name: 'Almond', r: 0.240, sq: 0.84, tilt: 0.09 },
-  { id: 2, name: 'Wide',   r: 0.255, sq: 0.88, tilt: 0.04 },
-  { id: 3, name: 'Keen',   r: 0.220, sq: 0.78, tilt: 0.14 },
+  { id: 0, name: 'Round',  r: 0.170, sq: 0.94, tilt: 0.00 },
+  { id: 1, name: 'Almond', r: 0.175, sq: 0.84, tilt: 0.09 },
+  { id: 2, name: 'Wide',   r: 0.188, sq: 0.88, tilt: 0.04 },
+  { id: 3, name: 'Keen',   r: 0.158, sq: 0.78, tilt: 0.14 },
 ]
 
 export const EYE_COLORS = [

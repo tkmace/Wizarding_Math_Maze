@@ -155,6 +155,29 @@ export function drawWizard(ctx, o) {
   ctx.fill()
   ctx.restore()
 
+  // ── Cloak, hanging behind ──
+  // Drawn before the robe so it reads as a separate garment worn OVER it: the
+  // two panels fall past the robe's silhouette on each side, which is the whole
+  // visual point of a cloak. Without them the "cape" was a collar and nothing
+  // else, and the wizard looked like they were wearing one layer.
+  const cloakCol = shade(robe, -0.3)
+  for (const sgn of [-1, 1]) {
+    const panel = () => {
+      ctx.beginPath()
+      ctx.moveTo(sgn * shoulder * 0.92, yShoulder + h * 0.015)
+      ctx.bezierCurveTo(sgn * hem * 1.06, yWaist, sgn * hem * 1.2, -h * 0.1, sgn * hem * 1.12, -h * 0.008)
+      ctx.quadraticCurveTo(sgn * hem * 0.96, -h * 0.028, sgn * hem * 0.82, -h * 0.012)
+      ctx.bezierCurveTo(sgn * hem * 0.92, -h * 0.16, sgn * waist * 1.0, yWaist, sgn * shoulder * 0.5, yShoulder + h * 0.02)
+      ctx.closePath()
+    }
+    panel()
+    ctx.fillStyle = cloakCol
+    ctx.fill()
+    volume(ctx, panel, { x: sgn < 0 ? -hem * 1.25 : 0, y: yShoulder, w: hem * 1.25, h: -yShoulder }, 0.8)
+    panel()
+    outline(ctx, h, cloakCol, 0.85)
+  }
+
   // ── Shoes peeking under the hem ──
   ctx.fillStyle = shade(robe, -0.7)
   for (const sgn of [-1, 1]) {
@@ -267,23 +290,45 @@ export function drawWizard(ctx, o) {
   }
 
   // ── Shoulder cape / collar ──
+  const capeW = shoulder + h * 0.05
   const cape = () => {
     ctx.beginPath()
-    ctx.moveTo(-shoulder - h * 0.042, yShoulder + h * 0.032)
-    ctx.quadraticCurveTo(0, yShoulder - h * 0.08, shoulder + h * 0.042, yShoulder + h * 0.032)
-    ctx.quadraticCurveTo(0, yShoulder + h * 0.082, -shoulder - h * 0.042, yShoulder + h * 0.032)
+    ctx.moveTo(-capeW, yShoulder + h * 0.028)
+    ctx.quadraticCurveTo(0, yShoulder - h * 0.082, capeW, yShoulder + h * 0.028)
+    // A draped hem rather than one smooth curve — cloth gathers where it hangs.
+    ctx.quadraticCurveTo(capeW * 0.72, yShoulder + h * 0.088, capeW * 0.42, yShoulder + h * 0.058)
+    ctx.quadraticCurveTo(0, yShoulder + h * 0.108, -capeW * 0.42, yShoulder + h * 0.058)
+    ctx.quadraticCurveTo(-capeW * 0.72, yShoulder + h * 0.088, -capeW, yShoulder + h * 0.028)
     ctx.closePath()
   }
   cape()
   ctx.fillStyle = shade(robe, 0.22)
   ctx.fill()
-  volume(ctx, cape, { x: -shoulder * 1.3, y: yShoulder - h * 0.08, w: shoulder * 2.6, h: h * 0.17 }, 0.9)
+  volume(ctx, cape, { x: -capeW * 1.2, y: yShoulder - h * 0.09, w: capeW * 2.4, h: h * 0.2 }, 0.9)
   cape()
   outline(ctx, h, robe, 0.8)
   ctx.strokeStyle = trim
   ctx.lineWidth = Math.max(1, h * 0.008)
   ctx.globalAlpha = 0.75
   ctx.stroke()
+  ctx.globalAlpha = 1
+
+  // The clasp that holds it, at the throat. A small piece of jewellery does a
+  // lot of work: it says "this is fastened at the neck", which is the detail
+  // that turns a coloured shape into a garment.
+  const clY = yShoulder - h * 0.012
+  const clR = h * 0.026
+  ctx.beginPath(); ctx.arc(0, clY, clR, 0, TAU)
+  const cg = ctx.createRadialGradient(-clR * 0.3, clY - clR * 0.35, clR * 0.1, 0, clY, clR)
+  cg.addColorStop(0, shade(trim, 0.6)); cg.addColorStop(0.6, trim); cg.addColorStop(1, shade(trim, -0.45))
+  ctx.fillStyle = cg
+  ctx.fill()
+  ctx.strokeStyle = shade(trim, -0.6)
+  ctx.lineWidth = Math.max(0.8, h * 0.005)
+  ctx.stroke()
+  ctx.fillStyle = '#ffffff'
+  ctx.globalAlpha = 0.7
+  ctx.beginPath(); ctx.arc(-clR * 0.3, clY - clR * 0.33, clR * 0.24, 0, TAU); ctx.fill()
   ctx.globalAlpha = 1
 
   // ── Staff, held off to one side so it never covers the hat ──
@@ -360,7 +405,7 @@ function drawFace(ctx, h, headY, headR, look, form) {
   // however the parts are swapped.
   const f = {
     h, headY, headR,
-    eo: headR * 0.40,                 // eye centre, out from the midline
+    eo: headR * 0.36,                 // eye centre, out from the midline
     ey: headY + headR * 0.02,         // eye line
   }
   drawCheeks(ctx, f, look)
@@ -443,7 +488,7 @@ function drawEyes(ctx, f, look) {
     ctx.restore()
 
     // Iris, pupil, and the ring that keeps the colour from going flat.
-    const ir = Math.min(rx, ry) * 0.84
+    const ir = Math.min(rx, ry) * 0.9
     const ix = cx + lookX, iy = ey + ry * 0.08
     ctx.save()
     eyePath(); ctx.clip()
@@ -1080,47 +1125,165 @@ function drawHat(ctx, h, kind, robe, trim, t, view = 'front') {
 }
 
 // --- Staves -------------------------------------------------------------------
+/**
+ * The staff.
+ *
+ * It used to be a straight stroked line with a glowing ball stuck on top, which
+ * reads as a lollipop. A staff is a piece of WOOD: it tapers, it isn't quite
+ * straight, it has grain and knots, and the thing on the end is a set stone
+ * rather than a floating light. The gem is faceted with a bright top face and a
+ * darker underside, wrapped in a binding where it meets the shaft — the glow is
+ * still there, but it comes off a solid object now.
+ */
 function drawStaff(ctx, h, kind, trim, t, stride) {
-  const sx = h * 0.24 + stride * h * 0.01
-  const top = -h * (kind === 'wand' ? 0.52 : 0.86)
-  const bottom = kind === 'wand' ? -h * 0.30 : -h * 0.02
+  const sx = h * 0.255 + stride * h * 0.01
+  const wand = kind === 'wand'
+  const top = -h * (wand ? 0.5 : 0.88)
+  const bottom = wand ? -h * 0.3 : -h * 0.015
+  const wood = '#6f4c2e', woodHi = '#9a7146', woodLo = '#432c18'
+  const thick = h * (wand ? 0.013 : 0.019)
+  const bend = h * (wand ? 0.004 : 0.012)   // staves are cut, not milled
 
   ctx.save()
-  ctx.strokeStyle = '#6b4a2f'
-  ctx.lineWidth = Math.max(1.2, h * (kind === 'wand' ? 0.014 : 0.021))
-  ctx.lineCap = 'round'
-  ctx.beginPath()
-  ctx.moveTo(sx, bottom)
-  ctx.lineTo(sx + (kind === 'crook' ? -h * 0.01 : 0), top)
+
+  // ── Shaft: a tapered sliver rather than a stroked line, so it can be
+  //    thicker at the grip and thinner at the tip and carry its own shading.
+  const shaft = () => {
+    ctx.beginPath()
+    ctx.moveTo(sx - thick, bottom)
+    ctx.quadraticCurveTo(sx - thick * 0.7 - bend, (top + bottom) / 2, sx - thick * 0.55, top)
+    ctx.lineTo(sx + thick * 0.55, top)
+    ctx.quadraticCurveTo(sx + thick * 1.1 - bend, (top + bottom) / 2, sx + thick, bottom)
+    ctx.closePath()
+  }
+  shaft()
+  const wg = ctx.createLinearGradient(sx - thick, 0, sx + thick, 0)
+  wg.addColorStop(0, woodLo); wg.addColorStop(0.38, wood)
+  wg.addColorStop(0.62, woodHi); wg.addColorStop(1, woodLo)
+  ctx.fillStyle = wg
+  ctx.fill()
+  // Grain and a couple of knots.
+  ctx.save()
+  shaft(); ctx.clip()
+  ctx.strokeStyle = woodLo
+  ctx.globalAlpha = 0.35
+  ctx.lineWidth = Math.max(0.6, thick * 0.22)
+  for (const f of [0.3, 0.62]) {
+    ctx.beginPath()
+    ctx.moveTo(sx - thick * f, bottom)
+    ctx.quadraticCurveTo(sx - thick * f - bend, (top + bottom) / 2, sx - thick * f * 0.7, top)
+    ctx.stroke()
+  }
+  ctx.globalAlpha = 0.5
+  ctx.fillStyle = woodLo
+  for (const f of [0.34, 0.68]) {
+    const ky = bottom + (top - bottom) * f
+    ctx.beginPath()
+    ctx.ellipse(sx - thick * 0.1, ky, thick * 0.5, thick * 0.32, 0.4, 0, TAU)
+    ctx.fill()
+  }
+  ctx.restore()
+  shaft()
+  ctx.strokeStyle = '#2e1d0f'
+  ctx.lineWidth = Math.max(0.8, h * 0.005)
+  ctx.lineJoin = 'round'
   ctx.stroke()
 
+  /** A glow behind whatever is set on the end. */
   const glow = (gx, gy, r) => {
     const g = ctx.createRadialGradient(gx, gy, 0, gx, gy, r)
-    g.addColorStop(0, '#ffffff')
-    g.addColorStop(0.35, trim)
+    g.addColorStop(0, `${trim}`)
+    g.addColorStop(0.3, `${trim}`)
     g.addColorStop(1, 'rgba(0,0,0,0)')
+    ctx.save()
+    ctx.globalAlpha = (0.28 + 0.14 * Math.sin(t / 300))
     ctx.fillStyle = g
-    ctx.globalAlpha = 0.75 + 0.25 * Math.sin(t / 300)
     ctx.beginPath(); ctx.arc(gx, gy, r, 0, TAU); ctx.fill()
+    ctx.restore()
+  }
+
+  /** A cut stone: bright top facets, dark belly, a highlight and a binding. */
+  const gem = (gx, gy, r) => {
+    glow(gx, gy, r * 2.6)
+    // Binding where the stone meets the wood.
+    ctx.fillStyle = '#8a6a3a'
+    ctx.beginPath()
+    ctx.ellipse(gx, gy + r * 0.92, r * 0.62, r * 0.3, 0, 0, TAU)
+    ctx.fill()
+    ctx.strokeStyle = '#4a3418'
+    ctx.lineWidth = Math.max(0.6, h * 0.004)
+    ctx.stroke()
+
+    ctx.beginPath()
+    ctx.moveTo(gx, gy - r)
+    ctx.lineTo(gx + r * 0.72, gy - r * 0.2)
+    ctx.lineTo(gx, gy + r)
+    ctx.lineTo(gx - r * 0.72, gy - r * 0.2)
+    ctx.closePath()
+    const gg = ctx.createLinearGradient(gx - r, gy - r, gx + r, gy + r)
+    gg.addColorStop(0, shade(trim, 0.55))
+    gg.addColorStop(0.45, trim)
+    gg.addColorStop(1, shade(trim, -0.45))
+    ctx.fillStyle = gg
+    ctx.fill()
+    // Facet lines
+    ctx.strokeStyle = shade(trim, 0.6)
+    ctx.globalAlpha = 0.7
+    ctx.lineWidth = Math.max(0.6, h * 0.0035)
+    ctx.beginPath()
+    ctx.moveTo(gx - r * 0.72, gy - r * 0.2); ctx.lineTo(gx, gy - r * 0.06)
+    ctx.lineTo(gx + r * 0.72, gy - r * 0.2)
+    ctx.moveTo(gx, gy - r * 0.06); ctx.lineTo(gx, gy + r)
+    ctx.stroke()
+    ctx.globalAlpha = 1
+    ctx.strokeStyle = shade(trim, -0.6)
+    ctx.lineWidth = Math.max(0.7, h * 0.0045)
+    ctx.beginPath()
+    ctx.moveTo(gx, gy - r)
+    ctx.lineTo(gx + r * 0.72, gy - r * 0.2)
+    ctx.lineTo(gx, gy + r)
+    ctx.lineTo(gx - r * 0.72, gy - r * 0.2)
+    ctx.closePath()
+    ctx.stroke()
+    // Catchlight on the upper-left facet.
+    ctx.fillStyle = '#ffffff'
+    ctx.globalAlpha = 0.75
+    ctx.beginPath()
+    ctx.ellipse(gx - r * 0.26, gy - r * 0.4, r * 0.16, r * 0.26, -0.5, 0, TAU)
+    ctx.fill()
     ctx.globalAlpha = 1
   }
 
   if (kind === 'orb') {
-    ctx.beginPath(); ctx.arc(sx, top - h * 0.02, h * 0.045, 0, TAU)
-    ctx.fillStyle = trim; ctx.fill()
-    glow(sx, top - h * 0.02, h * 0.10)
+    gem(sx - bend * 0.6, top - h * 0.035, h * 0.048)
   } else if (kind === 'crook') {
+    // A shepherd's curl, in the same wood as the shaft.
+    ctx.strokeStyle = wood
+    ctx.lineWidth = thick * 1.7
+    ctx.lineCap = 'round'
     ctx.beginPath()
-    ctx.arc(sx + h * 0.03, top + h * 0.01, h * 0.042, Math.PI, TAU * 0.78)
-    ctx.strokeStyle = '#6b4a2f'
+    ctx.arc(sx + h * 0.032 - bend, top + h * 0.012, h * 0.042, Math.PI, TAU * 0.8)
     ctx.stroke()
-    glow(sx + h * 0.06, top + h * 0.01, h * 0.06)
+    ctx.strokeStyle = '#2e1d0f'
+    ctx.lineWidth = Math.max(0.6, h * 0.004)
+    ctx.stroke()
+    glow(sx + h * 0.06 - bend, top + h * 0.012, h * 0.07)
   } else if (kind === 'staff') {
-    ctx.beginPath(); ctx.arc(sx, top, h * 0.03, 0, TAU)
-    ctx.fillStyle = trim; ctx.fill()
-    glow(sx, top, h * 0.085)
+    // A stone held in a forked head.
+    const gx = sx - bend * 0.6, gy = top - h * 0.02
+    ctx.strokeStyle = wood
+    ctx.lineWidth = thick * 1.2
+    ctx.lineCap = 'round'
+    for (const sgn of [-1, 1]) {
+      ctx.beginPath()
+      ctx.moveTo(gx + sgn * thick * 0.2, top + h * 0.03)
+      ctx.quadraticCurveTo(gx + sgn * h * 0.045, gy + h * 0.005, gx + sgn * h * 0.03, gy - h * 0.025)
+      ctx.stroke()
+    }
+    gem(gx, gy, h * 0.04)
   } else {
-    glow(sx, top, h * 0.07)
+    // Wand: a small stone at the tip.
+    gem(sx - bend * 0.4, top - h * 0.012, h * 0.026)
   }
   ctx.restore()
 }
