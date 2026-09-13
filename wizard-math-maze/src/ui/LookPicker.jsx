@@ -2,6 +2,7 @@ import { useState } from 'react'
 import {
   SKIN_TONES, HAIR_COLORS, HAIR_STYLES, blankAppearance,
   EYE_SHAPES, EYE_COLORS, BEARD_STYLES,
+  FACE_SHAPES, BROW_SHAPES, NOSE_SHAPES, MOUTH_SHAPES,
 } from '../game/appearance.js'
 import { formById } from '../game/skins.js'
 import { nestById } from '../game/nests.js'
@@ -146,7 +147,7 @@ export default function LookPicker({ profile, onSave, onClose, onNest }) {
 
       <button className="bh" onClick={() => setLook(l => ({ ...l, ...surprise() }))}
         style={btn('ghost', { width: '100%', marginBottom: 10, fontSize: 13 })}>
-        🎲 Surprise me
+        🎲 Surprise me — a whole new face
       </button>
 
       <button className="bh" onClick={() => onSave(look)} style={btn('gold', { width: '100%', fontSize: 17, minHeight: 54 })}>
@@ -159,13 +160,23 @@ export default function LookPicker({ profile, onSave, onClose, onNest }) {
   )
 }
 
-/** Roll the parts this screen offers — never the ones it doesn't, or the dice
- *  would change things she has no way to change back. */
+/**
+ * Roll everything.
+ *
+ * The face shape, brows, nose and mouth have no row of their own — those came
+ * out because four more rows of chips turned a quick screen into a police
+ * sketch — but they are what stop every wizard being the same person in
+ * different colours, so they vary per wizard and the dice can change them.
+ * This button is the way back from a face she doesn't like, which is what a
+ * part needs before it's allowed to be randomised at all.
+ */
 function surprise() {
   const r = list => list[Math.floor(Math.random() * list.length)].id
   return {
     skin: r(SKIN_TONES), hairColor: r(HAIR_COLORS), hairStyle: r(HAIR_STYLES),
     eyes: r(EYE_SHAPES), eyeColor: r(EYE_COLORS),
+    face: r(FACE_SHAPES), brows: r(BROW_SHAPES),
+    nose: r(NOSE_SHAPES), mouth: r(MOUTH_SHAPES),
   }
 }
 
