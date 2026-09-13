@@ -118,11 +118,18 @@ export default function MathDoor({ q, stones, swiftMs = 0, bigKeypad, onCorrect,
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 60, display: 'flex',
-      alignItems: 'center', justifyContent: 'center', padding: 12, gap: 12,
+      alignItems: 'center', justifyContent: 'center', padding: 12,
       background: 'rgba(4,3,18,.82)', backdropFilter: 'blur(5px)',
     }}>
+      {/* An inner row so the two panels are the same height: the row is as tall
+          as the door panel's own content, and the scratch panel stretches to
+          meet it. Centring them separately left the pad floating short. */}
+      <div style={{
+        display: 'flex', alignItems: 'stretch', justifyContent: 'center',
+        gap: 12, maxHeight: '96vh', width: '100%',
+      }}>
       <div className={`appear scroll ${shake ? 'shake' : ''}`} style={{
-        width: '100%', maxWidth: 400, maxHeight: '96vh',
+        width: '100%', maxWidth: 400,
         background: C.panel,
         border: `3px solid ${q.color}`,
         borderRadius: 24,
@@ -225,14 +232,16 @@ export default function MathDoor({ q, stones, swiftMs = 0, bigKeypad, onCorrect,
           150px would be worse than not offering one. */}
       {roomy && (
         <div className="appear" style={{
-          width: '100%', maxWidth: 400, maxHeight: '96vh',
+          width: '100%', maxWidth: 400,
+          display: 'flex', flexDirection: 'column',
           background: C.panel, border: `3px solid ${C.line}`, borderRadius: 24,
           boxShadow: 'inset 0 0 70px #00000066',
           padding: '16px 16px 18px',
         }}>
-          <ScratchPad height={Math.min(430, Math.round(window.innerHeight * 0.52))} tint={q.color} />
+          <ScratchPad tint={q.color} />
         </div>
       )}
+      </div>
     </div>
   )
 }

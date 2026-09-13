@@ -18,7 +18,6 @@ export default function SkinChoice({ rank, appearance, onChoose, points = 0, owe
   const forms = formsAtRank(rank)
   const info = rankInfo(rank)
   const [sel, setSel] = useState(null)
-  const [confirming, setConfirming] = useState(false)
 
   const chosen = forms.find(f => f.id === sel)
 
@@ -106,30 +105,30 @@ export default function SkinChoice({ rank, appearance, onChoose, points = 0, owe
         </div>
       )}
 
-      {!confirming ? (
-        <button className="bh" onClick={() => chosen && setConfirming(true)} disabled={!chosen}
-          style={btn('gold', {
-            width: '100%', marginTop: 14, fontSize: 17, minHeight: 54,
-            opacity: chosen ? 1 : 0.45, cursor: chosen ? 'pointer' : 'default',
-          })}>
-          {chosen ? `Become the ${chosen.title}` : 'Choose your robes'}
-        </button>
-      ) : (
-        <div style={{ marginTop: 14 }}>
-          <div style={{ color: C.gold, fontSize: 12, fontWeight: 900, marginBottom: 9 }}>
-            Sure? This one is free — the other two at this rank will then cost
-            🔮 {runeCost(rank)} runes each.
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            <button className="bh" onClick={() => setConfirming(false)} style={btn('ghost', { fontSize: 13 })}>
-              Let me look again
-            </button>
-            <button className="bh" onClick={() => onChoose(chosen.id)} style={btn('gold', { fontSize: 13 })}>
-              Yes — become it
-            </button>
-          </div>
+      {/* One tap to pick, one to commit.
+          This used to be three: choose, "Become the X", and then a separate
+          are-you-sure with two more buttons. The warning it was guarding is
+          worth saying, but it is worth saying WHILE she is looking at the robe
+          she has picked — not as a checkpoint after she has already decided.
+          So it sits under the choice from the moment there is one, and the
+          button below it does the thing it says. */}
+      {chosen && (
+        <div style={{
+          marginTop: 10, color: C.gold, fontSize: 11.5, fontWeight: 800,
+          lineHeight: 1.55, textAlign: 'center',
+        }}>
+          This one is free and yours for keeps — the other two at this rank
+          will then cost 🔮 {runeCost(rank)} runes each.
         </div>
       )}
+
+      <button className="bh" onClick={() => chosen && onChoose(chosen.id)} disabled={!chosen}
+        style={btn('gold', {
+          width: '100%', marginTop: 10, fontSize: 17, minHeight: 56,
+          opacity: chosen ? 1 : 0.45, cursor: chosen ? 'pointer' : 'default',
+        })}>
+        {chosen ? `Become the ${chosen.title}! ✨` : 'Tap a robe to choose it'}
+      </button>
     </div>
   )
 }

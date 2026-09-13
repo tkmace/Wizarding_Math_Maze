@@ -18,7 +18,8 @@ export const TIPS = {
     icon: '🗺️',
     title: 'Into the maze',
     lines: [
-      'Walk with the **▲** button, or swipe the picture. **↺** and **↻** turn you around.',
+      'Walk with {fwd}, or swipe the picture.',
+      '{left} and {right} turn you to face a new corridor.',
       'Somewhere in here is the way out. Find it, and you win the maze.',
     ],
     cta: "Let's go!",

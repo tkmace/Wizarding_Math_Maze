@@ -31,12 +31,17 @@ export default function Coach({ id, onClose }) {
           fontFamily: serif, fontSize: 21, fontWeight: 900, color: C.gold,
           letterSpacing: 1, margin: '8px 0 10px',
         }}>{tip.title}</h3>
-        {tip.lines.map((line, i) => (
-          <p key={i} style={{
-            color: i === 0 ? '#fff' : C.dim, fontSize: i === 0 ? 14.5 : 13,
-            lineHeight: 1.65, margin: '0 0 10px', fontFamily: sans,
-          }}>{bold(line)}</p>
-        ))}
+        {/* Everything up to the last line is the instruction and reads white;
+            the last line is the context and steps back. */}
+        {tip.lines.map((line, i) => {
+          const lead = i < tip.lines.length - 1
+          return (
+            <p key={i} style={{
+              color: lead ? '#fff' : C.dim, fontSize: lead ? 14.5 : 13,
+              lineHeight: 1.75, margin: '0 0 9px', fontFamily: sans,
+            }}>{bold(line)}</p>
+          )
+        })}
         <button className="bh" onClick={onClose}
           style={btn('gold', { width: '100%', marginTop: 6, fontSize: 16, minHeight: 52 })}>
           {tip.cta}
@@ -46,10 +51,50 @@ export default function Coach({ id, onClose }) {
   )
 }
 
-/** **like this** — the few words in each tip that are the actual instruction. */
+/**
+ * **like this** — the few words in each tip that are the actual instruction —
+ * and {left} / {right} / {fwd}, which draw the buttons themselves rather than
+ * naming them. A child matching a picture to a button beats a child matching a
+ * word to a button, and it keeps the card honest when the buttons change.
+ */
 function bold(line) {
   return line.split(/\*\*(.+?)\*\*/g).map((part, i) =>
     i % 2
       ? <strong key={i} style={{ color: C.goldHi }}>{part}</strong>
-      : <span key={i}>{part}</span>)
+      : <span key={i}>{icons(part, i)}</span>)
+}
+
+const KEY = { '{left}': 'left', '{right}': 'right', '{fwd}': 'fwd' }
+
+function icons(text, key) {
+  return text.split(/(\{left\}|\{right\}|\{fwd\})/g).map((part, i) => {
+    const which = KEY[part]
+    if (!which) return <span key={i}>{part}</span>
+    return (
+      <span key={i} style={{
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        width: 30, height: 26, verticalAlign: 'middle', margin: '0 1px',
+        borderRadius: 7, border: `1.5px solid ${C.lineHi}`,
+        background: 'linear-gradient(180deg,#1b1b52,#12123a)',
+      }}>
+        {which === 'fwd'
+          ? <span style={{ color: C.goldHi, fontSize: 13, lineHeight: 1 }}>▲</span>
+          : <TurnGlyph dir={which} />}
+      </span>
+    )
+  })
+}
+
+function TurnGlyph({ dir }) {
+  const flip = dir === 'right' ? -1 : 1
+  return (
+    <svg viewBox="0 0 40 40" width="17" height="17" aria-hidden="true" style={{ display: 'block' }}>
+      <g transform={`scale(${flip},1) translate(${flip < 0 ? -40 : 0},0)`}
+        fill="none" stroke={C.goldHi} strokeWidth="5"
+        strokeLinecap="round" strokeLinejoin="round">
+        <path d="M28 34 L28 16 L14 16" />
+        <path d="M20 9 L11 16 L20 23" />
+      </g>
+    </svg>
+  )
 }

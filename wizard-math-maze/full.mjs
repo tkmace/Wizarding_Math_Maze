@@ -59,7 +59,7 @@ for (let i=0;i<700 && !won;i++){
     await page.locator('button').filter({hasText:/points|failure|bonus|rune stone|sight|gate/}).first().click()
     await page.waitForTimeout(250)
     await page.locator('button',{hasText:/^Become the/}).click(); await page.waitForTimeout(220)
-    await page.locator('button',{hasText:'Yes — become it'}).click(); await page.waitForTimeout(700)
+    await page.waitForTimeout(700)   // the pick commits on one tap now
     continue
   }
   if (await page.locator('text=Maze Conquered').count()) { won=true; break }
@@ -90,7 +90,7 @@ for (let k=0;k<8;k++){
   await page.locator('button').filter({hasText:/points|failure|bonus|rune stone|sight|gate/}).first().click()
   await page.waitForTimeout(250)
   await page.locator('button',{hasText:/^Become the/}).click(); await page.waitForTimeout(220)
-  await page.locator('button',{hasText:'Yes — become it'}).click(); await page.waitForTimeout(700)
+  await page.waitForTimeout(700)   // the pick commits on one tap now
 }
 const pts = await page.evaluate(() => JSON.parse(localStorage.getItem('wmm.profiles.v3')).camille)
 console.log('after reload:', pts.name, pts.totalPoints, 'pts,', Object.keys(pts.facts).length, 'facts,', pts.stats.mazesCleared, 'mazes,', pts.stones, 'stones')

@@ -53,8 +53,14 @@ console.log('   forms offered:', titles, titles===3?'PASS':'FAIL')
 console.log('   previews carry her face:', await page.locator('canvas').count()>=3?'PASS':'FAIL')
 
 await page.locator('button').filter({hasText:/Ember Acolyte/}).first().click(); await page.waitForTimeout(350)
-await page.locator('button',{hasText:/^Become the/}).click(); await page.waitForTimeout(300)
-await page.locator('button',{hasText:'Yes — become it'}).click(); await page.waitForTimeout(900)
+// The "this one is free, the others cost runes" line used to be a separate
+// confirm step. It has to still be on screen when the commit button is.
+console.log('   warning shown beside the button:',
+            await page.locator('text=/yours for keeps/').count()>0?'PASS':'FAIL')
+await page.screenshot({path:`${OUT}/92-pick-selected.png`,fullPage:true})
+console.log('   two taps, not three:',
+            await page.locator('button',{hasText:'Yes — become it'}).count()===0?'PASS':'FAIL')
+await page.locator('button',{hasText:/^Become the/}).click(); await page.waitForTimeout(1100)
 // 420 pts owes only rank 2, so she should land in the hub now.
 const more = await page.locator('text=Choose the robes you will wear').count()>0
 console.log('2. no further picks outstanding:', more?'FAIL (unexpected extra pick)':'PASS')

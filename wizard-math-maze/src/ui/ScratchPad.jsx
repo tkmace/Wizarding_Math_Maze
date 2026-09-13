@@ -14,7 +14,7 @@ import { C, sans, serif } from './theme.js'
  * costs nothing, and so a resize can redraw rather than wipe. Nothing here is
  * saved or scored — it is deliberately just paper.
  */
-export default function ScratchPad({ height = 420, tint = C.teal }) {
+export default function ScratchPad({ height, tint = C.teal }) {
   const canvasRef = useRef(null)
   const strokes = useRef([])          // [[{x,y}, …], …] in CSS pixels
   const live = useRef(null)
@@ -64,18 +64,27 @@ export default function ScratchPad({ height = 420, tint = C.teal }) {
     ctx.shadowBlur = 0
   }, [tint])
 
+  // The pad fills whatever box it's given, so it can be told to match the
+  // height of the panel beside it rather than guessing a number. A plain window
+  // resize listener isn't enough for that — the box changes size when the panel
+  // next to it grows a line of status text, with no window event at all.
   useEffect(() => {
     const cv = canvasRef.current
     if (!cv) return
     const size = () => {
       const dpr = Math.min(2, window.devicePixelRatio || 1)
-      cv.width = Math.round(cv.clientWidth * dpr)
-      cv.height = Math.round(cv.clientHeight * dpr)
+      const w = Math.max(1, Math.round(cv.clientWidth * dpr))
+      const h = Math.max(1, Math.round(cv.clientHeight * dpr))
+      if (cv.width === w && cv.height === h) return      // resizing clears it
+      cv.width = w
+      cv.height = h
       redraw()
     }
     size()
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(size) : null
+    ro?.observe(cv)
     window.addEventListener('resize', size)
-    return () => window.removeEventListener('resize', size)
+    return () => { ro?.disconnect(); window.removeEventListener('resize', size) }
   }, [redraw])
 
   const at = e => {
@@ -108,7 +117,7 @@ export default function ScratchPad({ height = 420, tint = C.teal }) {
   const clear = () => { strokes.current = []; live.current = null; setCount(0); redraw() }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1, minHeight: 0 }}>
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10,
       }}>
@@ -129,7 +138,9 @@ export default function ScratchPad({ height = 420, tint = C.teal }) {
         onPointerLeave={up}
         onContextMenu={e => e.preventDefault()}
         style={{
-          display: 'block', width: '100%', height, borderRadius: 16,
+          display: 'block', width: '100%',
+          ...(height ? { height } : { flex: 1, minHeight: 120 }),
+          borderRadius: 16,
           border: `2px solid ${C.lineHi}`, cursor: 'crosshair',
           touchAction: 'none', WebkitUserSelect: 'none', userSelect: 'none',
           WebkitTouchCallout: 'none', WebkitTapHighlightColor: 'transparent',

@@ -14,6 +14,29 @@ import { C, serif } from './theme.js'
  * listener that catches a release anywhere at all, and an unmount cleanup that
  * catches the case where there is no release to catch.
  */
+/**
+ * A turn arrow: up the shaft, then a right angle off to one side.
+ *
+ * It used to be ↺ and ↻, which are rotation symbols — they say "spin on the
+ * spot", and a child reading them expects the whole view to whirl. A shaft with
+ * a right angle in it says what actually happens: you carry on, but from here
+ * you are facing that way.
+ */
+function Turn({ dir, color }) {
+  const flip = dir === 'right' ? -1 : 1
+  return (
+    <svg viewBox="0 0 40 40" width="30" height="30" aria-hidden="true"
+      style={{ display: 'block', margin: '0 auto', overflow: 'visible' }}>
+      <g transform={`scale(${flip},1) translate(${flip < 0 ? -40 : 0},0)`}
+        fill="none" stroke={color} strokeWidth="4.2"
+        strokeLinecap="round" strokeLinejoin="round">
+        <path d="M28 34 L28 16 L14 16" />
+        <path d="M20 9 L11 16 L20 23" />
+      </g>
+    </svg>
+  )
+}
+
 export default function Controls({ onAction, disabled }) {
   const timer = useRef(null)
 
@@ -74,9 +97,9 @@ export default function Controls({ onAction, disabled }) {
   return (
     <div style={{ width: '100%', maxWidth: 340, margin: '10px auto 0' }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
-        {pad('↺', 'turnLeft', 'Turn left')}
+        {pad(<Turn dir="left" color={disabled ? C.faint : C.goldHi} />, 'turnLeft', 'Turn left')}
         {pad('▲', 'forward', 'Walk forward')}
-        {pad('↻', 'turnRight', 'Turn right')}
+        {pad(<Turn dir="right" color={disabled ? C.faint : C.goldHi} />, 'turnRight', 'Turn right')}
         <div />
         {pad('▼', 'backward', 'Step back')}
         <div />

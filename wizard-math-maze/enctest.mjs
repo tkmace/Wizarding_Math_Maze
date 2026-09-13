@@ -69,7 +69,7 @@ async function walkToEncounter(page, limit = 500) {
       await page.locator('button').filter({ hasText: /points|failure|bonus|rune stone|sight|gate/ }).first().click()
       await page.waitForTimeout(250)
       await page.locator('button', { hasText: /^Become the/ }).click(); await page.waitForTimeout(220)
-      await page.locator('button', { hasText: 'Yes — become it' }).click(); await page.waitForTimeout(700)
+      await page.waitForTimeout(700)   // the pick commits on one tap now
       continue
     }
     // Step past any door puzzle that opens on the way.

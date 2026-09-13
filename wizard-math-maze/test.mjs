@@ -161,7 +161,6 @@ async function run(label, width, height) {
     await page.waitForTimeout(300)
     await page.locator('button', { hasText: /^Become the/ }).click()
     await page.waitForTimeout(250)
-    await page.locator('button', { hasText: 'Yes — become it' }).click()
     await page.waitForTimeout(700)
     console.log(`[${label}] took an owed rank pick on the way out`)
   }

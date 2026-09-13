@@ -119,7 +119,6 @@ async function takePicks(page, max = 8) {
     await page.waitForTimeout(250)
     await page.locator('button', { hasText: /^Become the/ }).click()
     await page.waitForTimeout(220)
-    await page.locator('button', { hasText: 'Yes — become it' }).click()
     await page.waitForTimeout(700)
     taken++
   }

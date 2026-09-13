@@ -176,7 +176,6 @@ if (choosing) {
   await page.locator('button', { hasText: /^Become the/ }).click()
   await page.waitForTimeout(400)
   await snap(page, '46b-confirm')
-  await page.locator('button', { hasText: 'Yes — become it' }).click()
   await page.waitForTimeout(1000)
   const after = await prof(page)
   console.log('   chosen recorded:', JSON.stringify(after.chosen), '| wearing:', after.skin,
