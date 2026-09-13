@@ -412,8 +412,9 @@ function drawFace(ctx, h, headY, headR, look, form) {
   drawEyes(ctx, f, look)
   drawBrows(ctx, f, look)
   drawNose(ctx, f, look)
-  // An elder's beard draws the mouth itself, between moustache and whiskers.
-  if (form.rank >= 5) drawBeard(ctx, f, look)
+  // Facial hair is hers to choose, not the robe's to impose. drawBeard draws
+  // the mouth itself, between the moustache and the whiskers.
+  if (look.beard?.id) drawBeard(ctx, f, look)
   else drawMouth(ctx, f, look)
   ctx.lineCap = 'butt'
 }
@@ -664,60 +665,74 @@ function drawMouth(ctx, f, look) {
  */
 function drawBeard(ctx, f, look) {
   const { h, headY, headR } = f
+  const style = look.beard || { reach: 1, tash: true }
+  const reach = style.reach
+  // Below the jaw everything scales with `reach`, so one path gives a cropped
+  // beard and an elder's waterfall without a second set of numbers. Above the
+  // jaw — sideburns, the upper edge, the moustache — nothing moves, because
+  // that's where the beard joins the face and it has to join it the same way.
+  const dn = v => headY + headR * (0.78 + (v - 0.78) * reach)
   // Silvered hair, not white paper: a dark-haired elder greys, a fair one goes
   // white, and either way the beard belongs to the head it's attached to.
-  const col = mix(look.hairHex, '#eceaf6', 0.68)
+  // Silvering goes with LENGTH, not with the wearer. A long beard is an
+  // elder's and greys almost white; a moustache on a young wizard should be
+  // the colour of the hair above it, or it reads as a smudge rather than hair.
+  const col = mix(look.hairHex, '#eceaf6', 0.22 + 0.46 * reach)
   const dark = shade(col, -0.22)
 
   // Sideburns: the beard has to grow out of the hair, or it looks stuck on.
   ctx.fillStyle = col
   for (const s of [-1, 1]) {
+    const drop = reach > 0 ? 1 : 0.62        // a moustache still gets short sideburns
     ctx.beginPath()
     ctx.moveTo(s * headR * 0.94, headY - headR * 0.12)
-    ctx.quadraticCurveTo(s * headR * 1.0, headY + headR * 0.5, s * headR * 0.66, headY + headR * 0.86)
-    ctx.quadraticCurveTo(s * headR * 0.82, headY + headR * 0.36, s * headR * 0.74, headY - headR * 0.1)
+    ctx.quadraticCurveTo(s * headR * 1.0, headY + headR * 0.5 * drop, s * headR * 0.66, headY + headR * 0.86 * drop)
+    ctx.quadraticCurveTo(s * headR * 0.82, headY + headR * 0.36 * drop, s * headR * 0.74, headY - headR * 0.1)
     ctx.closePath()
     ctx.fill()
   }
 
-  // The mass below the mouth: jaw, chin, and a waved hem.
-  const jawY = headY + headR * 0.78
-  const tipY = headY + headR * 2.0
+  // The mass below the mouth: jaw, chin, and a waved hem. Skipped entirely for
+  // a moustache, which is the whole point of having one.
+  const jawY = dn(0.78)
+  const tipY = dn(2.0)
   const beard = () => {
     ctx.beginPath()
     ctx.moveTo(-headR * 0.8, headY + headR * 0.28)
-    ctx.quadraticCurveTo(-headR * 0.86, jawY, -headR * 0.6, headY + headR * 1.35)
+    ctx.quadraticCurveTo(-headR * 0.86, jawY, -headR * 0.6, dn(1.35))
     // Three lobes along the bottom, so the hem is hair rather than a hem.
-    ctx.quadraticCurveTo(-headR * 0.5, tipY * 0.55 + headY * 0.45, -headR * 0.26, headY + headR * 1.78)
-    ctx.quadraticCurveTo(-headR * 0.12, tipY, 0, headY + headR * 1.92)
-    ctx.quadraticCurveTo(headR * 0.12, tipY, headR * 0.26, headY + headR * 1.78)
-    ctx.quadraticCurveTo(headR * 0.5, tipY * 0.55 + headY * 0.45, headR * 0.6, headY + headR * 1.35)
+    ctx.quadraticCurveTo(-headR * 0.5, tipY * 0.55 + headY * 0.45, -headR * 0.26, dn(1.78))
+    ctx.quadraticCurveTo(-headR * 0.12, tipY, 0, dn(1.92))
+    ctx.quadraticCurveTo(headR * 0.12, tipY, headR * 0.26, dn(1.78))
+    ctx.quadraticCurveTo(headR * 0.5, tipY * 0.55 + headY * 0.45, headR * 0.6, dn(1.35))
     ctx.quadraticCurveTo(headR * 0.86, jawY, headR * 0.8, headY + headR * 0.28)
     // Upper edge, dipping below the mouth so the smile stays visible.
     ctx.quadraticCurveTo(0, headY + headR * 1.02, -headR * 0.8, headY + headR * 0.28)
     ctx.closePath()
   }
-  beard()
-  ctx.fillStyle = col
-  ctx.fill()
-  volume(ctx, beard, { x: -headR, y: headY, w: headR * 2, h: headR * 2.1 }, 0.6)
+  if (reach > 0) {
+    beard()
+    ctx.fillStyle = col
+    ctx.fill()
+    volume(ctx, beard, { x: -headR, y: headY, w: headR * 2, h: headR * 2.1 }, 0.6)
 
-  // Strands, so it has grain.
-  ctx.save()
-  beard(); ctx.clip()
-  ctx.strokeStyle = dark
-  ctx.globalAlpha = 0.45
-  ctx.lineWidth = Math.max(0.8, headR * 0.045)
-  ctx.lineCap = 'round'
-  for (const sx of [-0.44, -0.16, 0.16, 0.44]) {
-    ctx.beginPath()
-    ctx.moveTo(headR * sx * 1.5, headY + headR * 0.95)
-    ctx.quadraticCurveTo(headR * sx * 1.2, headY + headR * 1.45, headR * sx, headY + headR * 1.85)
-    ctx.stroke()
+    // Strands, so it has grain.
+    ctx.save()
+    beard(); ctx.clip()
+    ctx.strokeStyle = dark
+    ctx.globalAlpha = 0.45
+    ctx.lineWidth = Math.max(0.8, headR * 0.045)
+    ctx.lineCap = 'round'
+    for (const sx of [-0.44, -0.16, 0.16, 0.44]) {
+      ctx.beginPath()
+      ctx.moveTo(headR * sx * 1.5, dn(0.95))
+      ctx.quadraticCurveTo(headR * sx * 1.2, dn(1.45), headR * sx, dn(1.85))
+      ctx.stroke()
+    }
+    ctx.restore()
+    beard()
+    outline(ctx, h, col, 0.65)
   }
-  ctx.restore()
-  beard()
-  outline(ctx, h, col, 0.65)
 
   // The mouth sits between moustache and beard.
   drawMouth(ctx, f, look)
@@ -734,12 +749,14 @@ function drawBeard(ctx, f, look) {
     ctx.quadraticCurveTo(-headR * 0.42, mY + headR * 0.32, -headR * 0.58, mY - headR * 0.06)
     ctx.closePath()
   }
-  tash()
-  ctx.fillStyle = shade(col, 0.08)
-  ctx.fill()
-  volume(ctx, tash, { x: -headR * 0.6, y: mY - headR * 0.3, w: headR * 1.2, h: headR * 0.7 }, 0.5)
-  tash()
-  outline(ctx, h, col, 0.6)
+  if (style.tash) {
+    tash()
+    ctx.fillStyle = shade(col, 0.08)
+    ctx.fill()
+    volume(ctx, tash, { x: -headR * 0.6, y: mY - headR * 0.3, w: headR * 1.2, h: headR * 0.7 }, 0.5)
+    tash()
+    outline(ctx, h, col, 0.6)
+  }
 }
 
 // --- Hair ---------------------------------------------------------------------

@@ -37,8 +37,13 @@ export default function WinScreen({ profile, run, onAgain, onCastle, newRank, fo
             RANK {newRank} · MAZE CONQUERED
           </div>
 
-          <div className="rankGlow" style={{
-            position: 'relative', overflow: 'hidden',
+          {/* The banner IS the button. It's the brightest thing on the screen
+              and it shows the three robes, so of course it gets pressed — and
+              before this it did nothing, which made the real button below it
+              feel like a consolation prize. */}
+          <button className="rankGlow bh" onClick={onAgain} style={{
+            position: 'relative', overflow: 'hidden', width: '100%',
+            cursor: 'pointer', textAlign: 'center', display: 'block',
             ...panel({ padding: '14px 12px 12px', borderColor: C.gold }),
           }}>
             <div className="shine" />
@@ -46,7 +51,7 @@ export default function WinScreen({ profile, run, onAgain, onCastle, newRank, fo
               {choices.length} new robes await you
             </div>
             <div style={{ color: C.dim, fontSize: 11.5, marginTop: 3, lineHeight: 1.5 }}>
-              Choose one to wear — it's yours for keeps.
+              Tap to choose one — it's yours for keeps.
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: `repeat(${choices.length},1fr)`, gap: 6, marginTop: 10 }}>
               {choices.map(f => (
@@ -61,7 +66,11 @@ export default function WinScreen({ profile, run, onAgain, onCastle, newRank, fo
                 </div>
               ))}
             </div>
-          </div>
+            <div style={{
+              marginTop: 9, color: C.gold, fontFamily: serif, fontSize: 12,
+              fontWeight: 900, letterSpacing: 1.5,
+            }}>TAP TO CHOOSE ✨</div>
+          </button>
         </div>
       ) : (
         <>

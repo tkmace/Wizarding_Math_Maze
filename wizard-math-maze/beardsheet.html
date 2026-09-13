@@ -1,0 +1,34 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Beards</title>
+<style>body{margin:0;background:#0b0a22;color:#c8a4ff;font:11px system-ui;padding:8px}
+h3{margin:10px 0 2px;font-size:12px;color:#f9ca74;letter-spacing:1px}
+.row{display:flex;gap:6px}.c{text-align:center}
+canvas{display:block;border:1px solid #2a2a55;background:#0e0e2e}</style></head>
+<body><div id="out"></div>
+<script type="module">
+import { drawWizard } from '/src/engine/wizardSprite.js'
+import { BEARD_STYLES } from '/src/game/appearance.js'
+import { FORMS, formById } from '/src/game/skins.js'
+const out=document.getElementById('out')
+function row(title, form, size, looks){
+  const h=document.createElement('h3'); h.textContent=title; out.append(h)
+  const r=document.createElement('div'); r.className='row'; out.append(r)
+  looks.forEach(({look,name})=>{
+    const d=document.createElement('div'); d.className='c'
+    const cv=document.createElement('canvas'); cv.width=size*2; cv.height=size*2
+    cv.style.width=size+'px'; cv.style.height=size+'px'; d.append(cv)
+    drawWizard(cv.getContext('2d'),{x:size,yBase:size*2*0.94,h:size*2*0.82,form,appearance:look,t:1200,moving:false,view:'front'})
+    const t=document.createElement('div'); t.textContent=name; d.append(t); r.append(d)
+  })
+}
+const base={skin:1,hairColor:1,hairStyle:1,face:0,eyes:1,eyeColor:1,brows:0,nose:0,mouth:1}
+const elder = FORMS.find(f=>f.rank>=5) || formById('apprentice')
+row('Apprentice robe — every beard', formById('apprentice'), 150,
+  BEARD_STYLES.map(b=>({look:{...base,beard:b.id},name:b.name})))
+row('A rank-5+ robe ('+elder.title+') — every beard', elder, 150,
+  BEARD_STYLES.map(b=>({look:{...base,beard:b.id},name:b.name})))
+row('Long beard, every hair colour', elder, 120,
+  [0,1,2,3,4].map(c=>({look:{...base,hairColor:c,beard:3},name:'hair '+c})))
+row('Wardrobe tile size (86px), no beard vs long', formById('apprentice'), 86,
+  [{look:{...base,beard:0},name:'none'},{look:{...base,beard:3},name:'long'},{look:{...base,beard:2},name:'short'},{look:{...base,beard:1},name:'tash'}])
+window.__done=true
+</script></body></html>

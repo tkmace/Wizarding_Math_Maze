@@ -94,11 +94,31 @@ export const MOUTH_SHAPES = [
   { id: 3, name: 'Gentle', w: 0.38, open: 0.00, curve: 0.26 },
 ]
 
+/**
+ * Facial hair.
+ *
+ * This used to be decided by the ROBE: anything from rank 5 up drew an elder's
+ * beard on whoever was wearing it, which meant a girl who worked her way to
+ * Archmage was handed a beard she never asked for. It's a choice now, off by
+ * default, and it applies at every rank — a bearded apprentice is just as
+ * available as a clean-shaven archmage.
+ *
+ * `reach` is how far the mass hangs below the jaw, as a multiple of the full
+ * elder's beard; `tash` is whether there's a moustache above the mouth.
+ */
+export const BEARD_STYLES = [
+  { id: 0, name: 'None',      reach: 0.00, tash: false },
+  { id: 1, name: 'Moustache', reach: 0.00, tash: true  },
+  { id: 2, name: 'Short',     reach: 0.52, tash: true  },
+  { id: 3, name: 'Long',      reach: 1.00, tash: true  },
+]
+
 export const HAIR_STYLES_COUNT = () => HAIR_STYLES.length
 
 export const blankAppearance = () => ({
   skin: 1, hairColor: 1, hairStyle: 1,
   face: 0, eyes: 1, eyeColor: 1, brows: 0, nose: 0, mouth: 1,
+  beard: 0,
 })
 
 const pick = (list, i, fallback) => list[i] || list[fallback]
@@ -121,6 +141,7 @@ export function resolveLook(appearance) {
     brows: pick(BROW_SHAPES, a.brows, 0),
     nose: pick(NOSE_SHAPES, a.nose, 0),
     mouth: pick(MOUTH_SHAPES, a.mouth, 1),
+    beard: pick(BEARD_STYLES, a.beard, 0),
   }
 }
 

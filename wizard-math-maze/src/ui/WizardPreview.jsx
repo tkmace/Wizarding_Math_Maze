@@ -12,9 +12,16 @@ export default function WizardPreview({ form, appearance, size = 140, view = 'fr
   useEffect(() => {
     const cv = ref.current
     if (!cv || !form) return
-    const dpr = Math.min(2, window.devicePixelRatio || 1)
-    cv.width = size * dpr
-    cv.height = size * dpr
+    // Oversample small previews. A wardrobe tile is a fraction of the hub
+    // portrait, and at one device pixel per CSS pixel the face — eyes a couple
+    // of pixels across — turns to mush, which is why the gallery looked less
+    // detailed than every other screen. Drawing it at 3x and letting the
+    // browser scale down costs nothing at these sizes and keeps the same art.
+    const dpr = size < 120
+      ? Math.min(3, Math.max(2, window.devicePixelRatio || 1))
+      : Math.min(2, window.devicePixelRatio || 1)
+    cv.width = Math.round(size * dpr)
+    cv.height = Math.round(size * dpr)
 
     let raf
     const frame = t => {

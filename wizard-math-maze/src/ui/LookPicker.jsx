@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
   SKIN_TONES, HAIR_COLORS, HAIR_STYLES, blankAppearance,
-  EYE_SHAPES, EYE_COLORS,
+  EYE_SHAPES, EYE_COLORS, BEARD_STYLES,
 } from '../game/appearance.js'
 import { formById } from '../game/skins.js'
 import { C, sans, serif, btn, panel, label } from './theme.js'
@@ -96,6 +96,12 @@ export default function LookPicker({ profile, onSave, onClose }) {
         <Chips items={EYE_SHAPES} selected={look.eyes} onPick={i => set('eyes', i)} />
         <div style={{ ...label(), marginTop: 12 }}>EYE COLOUR</div>
         <Swatches items={EYE_COLORS} selected={look.eyeColor} onPick={i => set('eyeColor', i)} colorOf={s => s.hex} size={40} />
+
+        {/* Facial hair used to come with the ROBE — every rank above Archmage
+            drew an elder's beard on whoever was wearing it. It's a choice now,
+            off unless she asks for it, and available at every rank. */}
+        <div style={{ ...label(), marginTop: 12 }}>BEARD</div>
+        <Chips items={BEARD_STYLES} selected={look.beard} onPick={i => set('beard', i)} />
       </div>
 
       <button className="bh" onClick={() => setLook(l => ({ ...l, ...surprise() }))}

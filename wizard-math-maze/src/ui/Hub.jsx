@@ -23,15 +23,25 @@ export default function Hub({ profile, ops, diff, onToggleOp, onSetDiff, onStart
       <div style={{ textAlign: 'center', marginBottom: 10, position: 'relative' }}>
         {nest && (
           <button className="bh" onClick={onNest} aria-label={`Nest: ${nest.name}`} style={{
-            position: 'absolute', right: 2, top: 8, zIndex: 2,
+            position: 'absolute', right: 0, top: 2, zIndex: 2, width: 92,
             background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
-            filter: `drop-shadow(0 0 12px ${nest.shield}88)`,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1,
             WebkitTapHighlightColor: 'transparent',
           }}>
-            <NestCrest nest={nest} size={54} />
-            <span style={{ color: C.faint, fontSize: 8.5, letterSpacing: 1, fontFamily: serif, fontWeight: 900 }}>
-              {nest.name.replace(' Eagles', '').toUpperCase()}
+            <span style={{ color: C.faint, fontSize: 9, letterSpacing: 2.5, fontFamily: serif, fontWeight: 900 }}>
+              NEST
+            </span>
+            <span style={{ filter: `drop-shadow(0 0 14px ${nest.shield}88)` }}>
+              <NestCrest nest={nest} size={70} />
+            </span>
+            <span style={{
+              color: '#fff', fontSize: 11, lineHeight: 1.1, fontFamily: sans, fontWeight: 900,
+              textShadow: `0 0 10px ${nest.shield}`,
+            }}>
+              {nest.name.replace(' Eagles', '')}
+            </span>
+            <span style={{ color: C.faint, fontSize: 9, lineHeight: 1.1, fontFamily: sans, fontWeight: 800 }}>
+              Eagles
             </span>
           </button>
         )}
@@ -63,10 +73,28 @@ export default function Hub({ profile, ops, diff, onToggleOp, onSetDiff, onStart
             boxShadow: `0 0 12px ${form.trim}99`, transition: 'width .5s ease-out',
           }} />
         </div>
-        <div style={{ color: C.faint, fontSize: 10, marginTop: 6 }}>
-          {next
-            ? `${(next.threshold - profile.totalPoints).toLocaleString()} points to ${next.name} — 3 new robes to choose from`
-            : `${rank.name} — every robe unlocked. ☄️`}
+        {/* What the bar is actually counting down to. This used to be one line
+            of 10px grey, which is not much of a carrot for the thing the whole
+            ladder is built around — so the number that matters is now the size
+            of a headline and the reward is spelled out under it. */}
+        <div style={{ marginTop: 9, textAlign: 'center' }}>
+          {next ? (
+            <>
+              <div style={{ color: '#fff', fontSize: 15, fontWeight: 900, fontFamily: sans, lineHeight: 1.3 }}>
+                <span style={{ color: C.gold, fontSize: 19 }}>
+                  {(next.threshold - profile.totalPoints).toLocaleString()}
+                </span>
+                {' '}more points to {next.name}
+              </div>
+              <div style={{ color: C.dim, fontSize: 12, fontWeight: 800, marginTop: 1 }}>
+                🧥 then choose from 3 new robes
+              </div>
+            </>
+          ) : (
+            <div style={{ color: C.gold, fontSize: 15, fontWeight: 900, fontFamily: sans }}>
+              {rank.name} — every robe unlocked. ☄️
+            </div>
+          )}
         </div>
       </div>
 

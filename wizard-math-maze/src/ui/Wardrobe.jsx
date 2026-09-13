@@ -51,8 +51,9 @@ export default function Wardrobe({ profile, onEquip, onBuy, onClose }) {
 
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: `repeat(${Math.min(3, forms.length)},1fr)`,
-                gap: 7,
+                gridTemplateColumns: 'repeat(3,1fr)',
+                justifyItems: 'stretch',
+                gap: 6,
               }}>
                 {forms.map(f => {
                   const isPicked = pickedId === f.id
@@ -63,13 +64,13 @@ export default function Wardrobe({ profile, onEquip, onBuy, onClose }) {
 
                   return (
                     <div key={f.id} data-form={f.id} style={{
-                      borderRadius: 14, padding: '9px 6px 8px', textAlign: 'center',
+                      borderRadius: 14, padding: '8px 4px 8px', textAlign: 'center',
                       border: `2px solid ${isWorn ? f.trim : b.can ? C.teal : isOwned ? C.lineHi : C.line}`,
                       background: isWorn ? `${f.robe}2a` : dim ? '#09091f' : C.panelHi,
                       opacity: dim ? 0.52 : 1,
                       position: 'relative',
                     }}>
-                      <WizardPreview form={f} appearance={profile.appearance} size={64} animate={isWorn} greyscale={dim} />
+                      <WizardPreview form={f} appearance={profile.appearance} size={86} animate={isWorn} greyscale={dim} style={{ margin: '0 auto' }} />
                       <div style={{
                         color: dim ? C.faint : '#fff', fontWeight: 900, fontSize: 11.5,
                         fontFamily: sans, lineHeight: 1.25, marginTop: 3, minHeight: 26,

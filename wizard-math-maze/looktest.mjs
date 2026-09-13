@@ -32,18 +32,26 @@ console.log('   new profile got a random look:', JSON.stringify(before))
 await page.locator('button',{hasText:'My Look'}).click(); await page.waitForTimeout(700)
 await page.screenshot({path:`${OUT}/81-look-picker.png`,fullPage:true})
 console.log('2. picker shows', await page.locator('button[aria-label]').count(), 'swatches and',
-            await page.locator('button',{hasText:/Cropped|Short|Shoulder|Long/}).count(), 'hair lengths')
+            await page.locator('button',{hasText:'Falls past the shoulders'}).count()
+            + await page.locator('button',{hasText:'Down to the collar'}).count()
+            + await page.locator('button',{hasText:'Just past the ears'}).count()
+            + await page.locator('button',{hasText:'Neat under the hat'}).count(), 'hair lengths')
 
 // Pick the darkest skin, silver hair, long.
 const swatches=await page.locator('button[aria-label]').all()
 await swatches[4].click(); await page.waitForTimeout(200)      // Umber
 await swatches[9].click(); await page.waitForTimeout(200)      // Silver
-await page.locator('button',{hasText:'Long'}).click(); await page.waitForTimeout(400)
+// "Long" now names a hair length AND a beard, so match on the description.
+await page.locator('button',{hasText:'Falls past the shoulders'}).click(); await page.waitForTimeout(300)
+// Facial hair is a choice now rather than something the robe imposes.
+console.log('   beard offered, and off by default:',
+            await page.locator('button',{hasText:/^Moustache$/}).count()===1 && before.beard===0 ? 'PASS' : 'FAIL')
+await page.locator('button',{hasText:/^Short$/}).click(); await page.waitForTimeout(400)
 await page.screenshot({path:`${OUT}/82-look-chosen.png`,fullPage:true})
 await page.locator('button',{hasText:"That's me"}).click(); await page.waitForTimeout(700)
 const after=await look()
 console.log('3. saved look:', JSON.stringify(after),
-            after.skin===4&&after.hairColor===4&&after.hairStyle===3?'PASS':'FAIL')
+            after.skin===4&&after.hairColor===4&&after.hairStyle===3&&after.beard===2?'PASS':'FAIL')
 await page.screenshot({path:`${OUT}/83-hub-new-look.png`,fullPage:true})
 
 // In-game: new projection + the look carried through

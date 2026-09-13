@@ -11,6 +11,6 @@ const which = new URL(location.href).searchParams.get('rank')
 createRoot(document.getElementById('root')).render(
   <div style={{ minHeight: '100vh', background: '#080820', display: 'flex', justifyContent: 'center' }}>
     <WinScreen profile={profile} run={run} newRank={which === null ? 2 : (which === 'none' ? null : +which)}
-      form={formById('apprentice')} onAgain={() => {}} onCastle={() => {}} />
+      form={formById('apprentice')} onAgain={() => { window.__again = (window.__again||0)+1 }} onCastle={() => {}} />
   </div>
 )
