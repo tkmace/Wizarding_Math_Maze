@@ -1,5 +1,6 @@
 import { chromium } from 'playwright'
 import http from 'http'; import fs from 'fs'; import path from 'path'
+import { takeNest } from './harness.mjs'
 const ROOT='/home/claude/wmm/dist'
 const MIME={'.html':'text/html','.js':'text/javascript','.css':'text/css','.webmanifest':'application/manifest+json'}
 const srv=http.createServer((q,r)=>{let p=decodeURIComponent(q.url.split('?')[0]); if(p==='/')p='/index.html'
@@ -15,6 +16,7 @@ page.on('console',m=>{if(m.type()==='error'&&!m.text().includes('TUNNEL'))errs.p
 await page.goto('http://localhost:4174/',{waitUntil:'networkidle'})
 await page.fill('input[type=text]','Camille'); await page.fill('input[type=password]','1234')
 await page.click('text=Begin the Journey'); await page.waitForTimeout(500)
+await takeNest(page)
 await page.click('text=Multiplication'); await page.click('text=Addition')  // multiplication only
 // Fixed tiers are collapsed by default; open them before picking one.
 await page.locator('text=Show fixed skill level modes').click().catch(()=>{})
@@ -49,7 +51,7 @@ for (let i=0;i<700 && !won;i++){
     await page.waitForTimeout(800)
     continue
   }
-  if (await page.locator('text=Choose the form you will take').count()) {
+  if (await page.locator('text=Choose the robes you will wear').count()) {
     await page.locator('button').filter({hasText:/points|failure|bonus|rune stone|sight|gate/}).first().click()
     await page.waitForTimeout(250)
     await page.locator('button',{hasText:/^Become the/}).click(); await page.waitForTimeout(220)
@@ -77,10 +79,10 @@ await page.click('text=Camille')
 await page.fill('input[type=password]','1234')
 await page.locator('button',{hasText:'Enter the Realm'}).click()
 // The cloud check derives a PBKDF2 token before the hub opens, so give it room.
-await page.waitForSelector('text=/WHAT SHALL WE PRACTICE|Choose the form you will take/',{timeout:20000})
+await page.waitForSelector('text=/WHAT SHALL WE PRACTICE|Choose the robes you will wear/',{timeout:20000})
 // Points banked in the maze may owe her a form pick, collected before the hub.
 for (let k=0;k<8;k++){
-  if (!(await page.locator('text=Choose the form you will take').count())) break
+  if (!(await page.locator('text=Choose the robes you will wear').count())) break
   await page.locator('button').filter({hasText:/points|failure|bonus|rune stone|sight|gate/}).first().click()
   await page.waitForTimeout(250)
   await page.locator('button',{hasText:/^Become the/}).click(); await page.waitForTimeout(220)

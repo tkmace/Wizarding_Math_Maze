@@ -1,5 +1,6 @@
 import { chromium } from 'playwright'
 import http from 'http'; import fs from 'fs'; import path from 'path'
+import { takeNest } from './harness.mjs'
 const ROOT='/home/claude/wmm/dist'
 const M={'.html':'text/html','.js':'text/javascript','.webmanifest':'application/manifest+json'}
 const srv=http.createServer((q,r)=>{const u=new URL(q.url,'http://x')
@@ -18,6 +19,7 @@ page.on('console',m=>{const t=m.text(); if(m.type()==='error'&&!/TUNNEL|503|Fail
 await page.goto('http://localhost:4220/',{waitUntil:'networkidle'}); await page.waitForTimeout(450)
 await page.fill('input[type=text]','Camille'); await page.fill('input[type=password]','1234')
 await page.locator('button',{hasText:'Begin the Journey'}).click()
+await takeNest(page)
 await page.waitForSelector('text=WHAT SHALL WE PRACTICE',{timeout:15000})
 await page.waitForTimeout(500)
 await page.screenshot({path:`${OUT}/80-hub-with-look.png`,fullPage:true})

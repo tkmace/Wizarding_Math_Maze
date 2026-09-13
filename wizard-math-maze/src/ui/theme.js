@@ -92,6 +92,35 @@ input,button{font-size:16px}                /* stops iOS zooming on focus */
 @keyframes pr{0%,100%{box-shadow:0 0 0 0 rgba(249,202,116,.5)}50%{box-shadow:0 0 0 12px rgba(249,202,116,0)}}
 .spinner{display:inline-block;animation:sn 1s linear infinite}
 @keyframes sn{to{transform:rotate(360deg)}}
+
+/* --- The rank-up celebration ---------------------------------------------
+   Earning new robes is the reward the whole point ladder is built around, so
+   it gets its own entrance rather than sharing the win screen's. The banner
+   drops in and overshoots; the ribbon sweeps a shine across it; the confetti
+   falls from above the fold. All of it stops under prefers-reduced-motion. */
+.rankIn{animation:rkin .75s cubic-bezier(.18,1.3,.4,1) both}
+@keyframes rkin{0%{opacity:0;transform:scale(.55) translateY(-26px) rotate(-4deg)}
+  60%{opacity:1;transform:scale(1.06) translateY(0) rotate(1deg)}
+  100%{opacity:1;transform:scale(1) translateY(0) rotate(0)}}
+.rankGlow{animation:rkg 2.2s ease-in-out infinite}
+@keyframes rkg{0%,100%{box-shadow:0 0 22px 2px rgba(249,202,116,.35), inset 0 0 26px rgba(249,202,116,.12)}
+  50%{box-shadow:0 0 42px 8px rgba(249,202,116,.6), inset 0 0 40px rgba(249,202,116,.22)}}
+.shine{position:absolute;inset:0;overflow:hidden;border-radius:inherit;pointer-events:none}
+.shine::after{content:'';position:absolute;top:-60%;left:-140%;width:60%;height:220%;
+  transform:rotate(18deg);animation:shn 2.8s ease-in-out .6s infinite;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.36),transparent)}
+@keyframes shn{0%{left:-140%}45%,100%{left:160%}}
+.confetti{position:fixed;top:-6vh;pointer-events:none;z-index:40;
+  animation:cfl var(--dur) linear var(--dl) forwards}
+@keyframes cfl{0%{opacity:0;transform:translateY(0) rotate(0)}
+  8%{opacity:1}
+  100%{opacity:0;transform:translateY(112vh) rotate(var(--spin))}}
+.bigStar{animation:bst 1.6s ease-in-out infinite}
+@keyframes bst{0%,100%{transform:scale(1) rotate(-6deg)}50%{transform:scale(1.14) rotate(6deg)}}
+@media (prefers-reduced-motion: reduce){
+  .rankIn,.rankGlow,.shine::after,.confetti,.bigStar{animation:none}
+  .confetti{display:none}
+}
 .scroll{overflow-y:auto;-webkit-overflow-scrolling:touch}
 .scroll::-webkit-scrollbar{width:8px}
 .scroll::-webkit-scrollbar-thumb{background:${C.lineHi};border-radius:8px}

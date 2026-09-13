@@ -49,10 +49,10 @@ export default function SkinChoice({ rank, appearance, onChoose, points = 0, owe
           Your <strong style={{ color: C.gold }}>{points.toLocaleString()} points</strong> have
           already carried you to <strong style={{ color: C.gold }}>{rankInfo(reached).name}</strong> —
           {owed === 1 ? (
-            <> and they've earned you a form to choose
+            <> and they've earned you a set of robes to choose
               {reached > rank && <> back at <strong style={{ color: C.gold }}>{info.name}</strong></>}.</>
           ) : (
-            <> and they've earned you <strong style={{ color: C.gold }}>{owed} forms</strong> to
+            <> and they've earned you <strong style={{ color: C.gold }}>{owed} sets of robes</strong> to
               choose. Here's the first, at{' '}
               <strong style={{ color: C.gold }}>{info.name}</strong>.</>
           )}
@@ -60,7 +60,7 @@ export default function SkinChoice({ rank, appearance, onChoose, points = 0, owe
       )}
 
       <p style={{ color: C.dim, fontSize: 13, margin: '0 0 16px', lineHeight: 1.6 }}>
-        Choose the form you will take. It's yours free and for keeps — the other
+        Choose the robes you will wear. They're yours free and for keeps — the other
         two can only be bought later with 🔮 {runeCost(rank)} rune stones, so
         choose the magic you want, not just the robe you like.
       </p>
@@ -112,7 +112,7 @@ export default function SkinChoice({ rank, appearance, onChoose, points = 0, owe
             width: '100%', marginTop: 14, fontSize: 17, minHeight: 54,
             opacity: chosen ? 1 : 0.45, cursor: chosen ? 'pointer' : 'default',
           })}>
-          {chosen ? `Become the ${chosen.title}` : 'Choose a form'}
+          {chosen ? `Become the ${chosen.title}` : 'Choose your robes'}
         </button>
       ) : (
         <div style={{ marginTop: 14 }}>

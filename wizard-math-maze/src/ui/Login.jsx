@@ -3,6 +3,7 @@ import { listProfiles, loadProfile, createProfile, importScroll, getLastPlayer, 
 import { syncEnabled, pull as cloudPull, mergeProfiles, findLegacy, claimLegacy } from '../store/sync.js'
 import { formById, rankFor, mapLegacySkin } from '../game/skins.js'
 import WizardPreview from './WizardPreview.jsx'
+import NestCrest from './NestCrest.jsx'
 import { C, sans, serif, btn, panel, label } from './theme.js'
 
 /**
@@ -156,6 +157,7 @@ export default function Login({ onEnter }) {
                         {rank.name} · {p.totalPoints.toLocaleString()} pts
                       </span>
                     </span>
+                    {p.nest && <NestCrest nest={p.nest} size={26} />}
                     <span style={{ color: C.gold, fontSize: 18 }}>›</span>
                   </button>
                 )

@@ -21,7 +21,7 @@ export default function Wardrobe({ profile, onEquip, onBuy, onClose }) {
   return (
     <Sheet
       title="The Wardrobe"
-      subtitle={`${owned.length} of ${FORMS.length} forms · 🔮 ${runes} runes`}
+      subtitle={`${owned.length} of ${FORMS.length} robes · Current inventory: 🔮 ${runes} rune${runes === 1 ? '' : 's'}`}
       onClose={onClose}
     >
       <div style={{ display: 'grid', gap: 14 }}>
@@ -38,7 +38,7 @@ export default function Wardrobe({ profile, onEquip, onBuy, onClose }) {
                   {r.name.toUpperCase()}
                 </span>
                 <span style={{ fontSize: 11, color: C.faint }}>
-                  {r.threshold === 0 ? 'start' : `${r.threshold.toLocaleString()} pts`}
+                  {r.threshold === 0 ? 'where every wizard starts' : `Unlocks at ${r.threshold.toLocaleString()} points`}
                 </span>
                 {locked && <span style={{ fontSize: 10, color: C.faint, marginLeft: 'auto' }}>🔒 locked</span>}
                 {undecided && <span style={{ fontSize: 10, color: C.bad, fontWeight: 900, marginLeft: 'auto' }}>choose one!</span>}
@@ -128,7 +128,7 @@ export default function Wardrobe({ profile, onEquip, onBuy, onClose }) {
 
         <p style={{ color: C.faint, fontSize: 10.5, lineHeight: 1.6, margin: '2px 2px 0' }}>
           🔮 Rune stones are found in the mazes and dropped by creatures. Spend
-          them on a hint at a door — or save them up and buy a form you passed
+          them on a hint at a door — or save them up and buy robes you passed
           over. The one you chose at each rank is always free.
         </p>
       </div>

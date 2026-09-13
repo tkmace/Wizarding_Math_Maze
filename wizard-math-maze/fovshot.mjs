@@ -1,0 +1,10 @@
+import { chromium } from 'playwright'
+const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--no-sandbox','--disable-dev-shm-usage']})
+const page=await b.newPage({viewport:{width:830,height:1130},deviceScaleFactor:2})
+const errs=[]; page.on('pageerror',e=>errs.push(e.message)); page.on('console',m=>{if(m.type()==='error')errs.push(m.text())})
+await page.goto('http://localhost:4200/fovtest.html',{waitUntil:'networkidle'})
+await page.waitForFunction(()=>window.__done,{timeout:15000})
+await page.waitForTimeout(400)
+await page.screenshot({path:'/tmp/claude-0/-home-claude/9e4f1146-1d92-5690-b689-30dcc0c1e170/scratchpad/60-fov-compare.png',fullPage:true})
+console.log('errors:',errs.length?errs.join(' | '):'none')
+await b.close()

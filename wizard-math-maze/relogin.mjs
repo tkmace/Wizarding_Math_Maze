@@ -1,5 +1,6 @@
 import { chromium } from 'playwright'
 import http from 'http'; import fs from 'fs'; import path from 'path'
+import { takeNest } from './harness.mjs'
 const ROOT='/home/claude/wmm/dist'
 const M={'.html':'text/html','.js':'text/javascript','.webmanifest':'application/manifest+json'}
 const srv=http.createServer((q,r)=>{let p=q.url.split('?')[0]; if(p==='/')p='/index.html'
@@ -35,7 +36,7 @@ await page.evaluate(() => {
 async function takePicks(page, max = 8) {
   let taken = 0
   for (let i = 0; i < max; i++) {
-    if (!(await page.locator('text=Choose the form you will take').count())) break
+    if (!(await page.locator('text=Choose the robes you will wear').count())) break
     await page.locator('button').filter({ hasText: /points|failure|bonus|rune stone|sight|gate/ }).first().click()
     await page.waitForTimeout(250)
     await page.locator('button', { hasText: /^Become the/ }).click()
@@ -53,6 +54,7 @@ await page.waitForTimeout(300)
 await page.locator('input[type=password]').fill('1234')
 await page.locator('button', { hasText: 'Enter the Realm' }).click()
 await page.waitForTimeout(900)
+await takeNest(page)
 // 3,120 banked points have carried her to Sage, so she's owed a form pick at
 // every rank her old skin didn't already settle.
 console.log('form picks owed on return:', await takePicks(page))
@@ -78,6 +80,7 @@ console.log('wrong passcode rejected:', await page.locator('text=Wrong passcode'
 // Weak facts should dominate the doors of a fresh maze
 await page.locator('input[type=password]').fill('1234')
 await page.locator('button', { hasText: 'Enter the Realm' }).click(); await page.waitForTimeout(600)
+await takeNest(page)
 await page.locator('button', { hasText: 'Enter the Maze' }).click(); await page.waitForTimeout(800)
 const seen = await page.evaluate(() => { return null })
 console.log('ERRORS:', errs.length ? errs.join(' | ') : 'none')

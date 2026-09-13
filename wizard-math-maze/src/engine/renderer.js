@@ -1,6 +1,7 @@
 import { castRay, FOV } from './raycaster.js'
 import { WALL, DOOR, END, cellKey } from '../game/maze.js'
 import { drawWizard } from './wizardSprite.js'
+import { drawCreature } from './creatureSprite.js'
 
 // ─── Look & feel ──────────────────────────────────────────────────────────────
 const HORIZON = 0.42        // horizon above centre → more floor, reads as looking slightly down
@@ -120,6 +121,11 @@ export function renderFrame(ctx, s) {
   // ── Sprites ─────────────────────────────────────────────────────────────────
   drawStones(ctx, s, W, H, horizonY, zbuf, fov)
   drawExitGlow(ctx, s, W, H, horizonY, zbuf, s.gateMet !== false, fov)
+
+  // ── The ambush ──────────────────────────────────────────────────────────────
+  // Something leaping into the corridor, a beat before the pop-up takes over.
+  const amb = s.effects?.find(e => e.kind === 'ambush')
+  if (amb) drawAmbush(ctx, W, H, horizonY, amb, time)
 
   // ── Foreground ──────────────────────────────────────────────────────────────
   drawVignette(ctx, W, H)
@@ -583,6 +589,66 @@ function drawExitGlow(ctx, s, W, H, horizonY, zbuf, gateMet, fov) {
 }
 
 // ─── Foreground furniture ─────────────────────────────────────────────────────
+/**
+ * The moment before an encounter.
+ *
+ * A pop-up that simply appears mid-corridor reads as a glitch: nothing in the
+ * maze caused it, so there is nothing to connect it to. So the creature is
+ * shown doing the interrupting — it drops into the hallway ahead, lands with a
+ * ring of dust and a flash of its own colour, and only then does the pop-up
+ * open. Half a second, but it turns "why is this here" into "it jumped out".
+ */
+function drawAmbush(ctx, W, H, horizonY, amb, time) {
+  const p = clamp((time - amb.start) / amb.dur, 0, 1)
+  const groundY = horizonY + H * 0.30
+
+  // Drop in from above the top of the frame, with a squash on landing.
+  const land = clamp(p / 0.55, 0, 1)
+  const ease = 1 - Math.pow(1 - land, 3)
+  const y = groundY - (1 - ease) * H * 0.85
+  const bounce = land >= 1 ? Math.sin((p - 0.55) / 0.45 * Math.PI) : 0
+  const h = H * (0.30 + 0.20 * ease)
+
+  // Shadow on the floor, tightening as it comes down.
+  ctx.save()
+  ctx.globalAlpha = 0.22 + 0.38 * ease
+  ctx.fillStyle = '#000'
+  ctx.beginPath()
+  ctx.ellipse(W / 2, groundY, h * 0.34 * (1.7 - 0.7 * ease), h * 0.09, 0, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.restore()
+
+  // The landing shock: an expanding ring in the creature's own colour.
+  if (land >= 1) {
+    const r = (p - 0.55) / 0.45
+    ctx.save()
+    ctx.globalAlpha = (1 - r) * 0.6
+    ctx.strokeStyle = amb.creature?.accent || PAL.gold
+    ctx.lineWidth = Math.max(1.5, H * 0.008 * (1 - r))
+    ctx.beginPath()
+    ctx.ellipse(W / 2, groundY, h * (0.3 + r * 1.5), h * (0.08 + r * 0.4), 0, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.restore()
+  }
+
+  ctx.save()
+  ctx.translate(W / 2, y)
+  ctx.scale(1 + bounce * 0.10, 1 - bounce * 0.10)     // squash as it hits
+  ctx.translate(-W / 2, -y)
+  drawCreature(ctx, { x: W / 2, y, h, creature: amb.creature, t: time, charge: 0.25 + p * 0.5 })
+  ctx.restore()
+
+  // A short flash of the creature's colour over the whole frame as it lands.
+  if (p > 0.5 && p < 0.78) {
+    const f = 1 - Math.abs(p - 0.62) / 0.16
+    ctx.save()
+    ctx.globalAlpha = Math.max(0, f) * 0.3
+    ctx.fillStyle = amb.creature?.accent || PAL.gold
+    ctx.fillRect(0, 0, W, H)
+    ctx.restore()
+  }
+}
+
 function drawVignette(ctx, W, H) {
   const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.32, W / 2, H / 2, Math.max(W, H) * 0.72)
   g.addColorStop(0, 'rgba(0,0,0,0)')

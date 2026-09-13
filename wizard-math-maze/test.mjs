@@ -2,6 +2,7 @@ import { chromium } from 'playwright'
 import http from 'http'
 import fs from 'fs'
 import path from 'path'
+import { takeNest } from './harness.mjs'
 
 const ROOT = '/home/claude/wmm/dist'
 const MIME = { '.html':'text/html', '.js':'text/javascript', '.css':'text/css', '.webmanifest':'application/manifest+json', '.svg':'image/svg+xml' }
@@ -32,6 +33,7 @@ async function run(label, width, height) {
   await page.fill('input[type=text]', 'Camille')
   await page.fill('input[type=password]', '1234')
   await page.click('text=Begin the Journey')
+  await takeNest(page)
   await page.waitForTimeout(700)
   await page.screenshot({ path:`${OUT}/02-hub-${label}.png`, fullPage:true })
 
@@ -139,7 +141,7 @@ async function run(label, width, height) {
   await page.waitForTimeout(500)
   // Banking points can rank her up, and a rank-up owes a pick before the hub
   // comes back. Take it, or the report click lands on the choice screen.
-  if (await page.locator('text=Choose the form you will take').count()) {
+  if (await page.locator('text=Choose the robes you will wear').count()) {
     await page.locator('button').filter({ hasText: /points|failure|bonus|rune stone|sight|gate/ }).first().click()
     await page.waitForTimeout(300)
     await page.locator('button', { hasText: /^Become the/ }).click()

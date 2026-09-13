@@ -1,5 +1,6 @@
 import { chromium } from 'playwright'
 import http from 'http'; import fs from 'fs'; import path from 'path'
+import { takeNest } from './harness.mjs'
 const ROOT='/home/claude/wmm/dist'
 const M={'.html':'text/html','.js':'text/javascript','.webmanifest':'application/manifest+json'}
 const srv=http.createServer((q,r)=>{const u=new URL(q.url,'http://x')
@@ -31,8 +32,9 @@ await page.screenshot({path:`${OUT}/90-login-cards.png`})
 await page.locator('button',{hasText:'Camille'}).click(); await page.waitForTimeout(300)
 await page.locator('input[type=password]').fill('1234')
 await page.locator('button',{hasText:'Enter the Realm'}).click(); await page.waitForTimeout(900)
+await takeNest(page)
 
-const choosing = await page.locator('text=Choose the form you will take').count()>0
+const choosing = await page.locator('text=Choose the robes you will wear').count()>0
 console.log('1. owed picks collected on login:', choosing?'PASS':'FAIL')
 await page.screenshot({path:`${OUT}/91-pick-after-migration.png`,fullPage:true})
 // The old 'mage' skin maps to a rank-1 form and is recorded as that rank's
@@ -54,7 +56,7 @@ await page.locator('button').filter({hasText:/Ember Acolyte/}).first().click(); 
 await page.locator('button',{hasText:/^Become the/}).click(); await page.waitForTimeout(300)
 await page.locator('button',{hasText:'Yes — become it'}).click(); await page.waitForTimeout(900)
 // 420 pts owes only rank 2, so she should land in the hub now.
-const more = await page.locator('text=Choose the form you will take').count()>0
+const more = await page.locator('text=Choose the robes you will wear').count()>0
 console.log('2. no further picks outstanding:', more?'FAIL (unexpected extra pick)':'PASS')
 const st = await page.evaluate(()=>{const p=JSON.parse(localStorage.getItem('wmm.profiles.v3')).camille
   return {chosen:p.chosen, worn:p.equippedSkin, look:p.appearance, v:p.v}})

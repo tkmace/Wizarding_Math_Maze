@@ -38,6 +38,7 @@ export function blankProfile(name, passcode) {
     chosen: {},                    // rank -> chosen form id, one pick per rank
     bought: [],                    // form ids bought with rune stones
     appearance: randomAppearance(),// face and hair — hers, kept across every form
+    nest: null,                    // one of the four nests, chosen on first run
     skill: blankSkill(),           // per-operation 0..1, drives Wizard's Sense
     stones: 0,
     plays: 0,
@@ -97,6 +98,7 @@ export function listProfiles() {
       totalPoints: p.totalPoints || 0,
       equippedSkin: p.equippedSkin || STARTER,
       appearance: p.appearance,
+      nest: p.nest || null,
       lastPlayed: p.lastPlayed,
       mazesCleared: p.stats?.mazesCleared || 0,
     }))

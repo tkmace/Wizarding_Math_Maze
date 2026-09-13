@@ -1,20 +1,40 @@
+import { useState } from 'react'
 import { OPS, DIFFS, SENSE, senseTier, skillOf } from '../game/math.js'
 import { formById, rankFor, nextRank, rankProgress, activePerks } from '../game/skins.js'
+import { nestById } from '../game/nests.js'
 import { C, sans, serif, btn, panel, label } from './theme.js'
 import WizardPreview from './WizardPreview.jsx'
+import NestCrest from './NestCrest.jsx'
 
 /** The castle: choose what to practice, see your rank, head into a maze. */
-export default function Hub({ profile, ops, diff, onToggleOp, onSetDiff, onStart, onWardrobe, onReport, onScroll, onLook, onLogout, pendingPicks }) {
+export default function Hub({ profile, ops, diff, onToggleOp, onSetDiff, onStart, onWardrobe, onReport, onScroll, onLook, onNest, onLogout, pendingPicks }) {
   const form = formById(profile.equippedSkin)
   const rank = rankFor(profile.totalPoints)
   const next = nextRank(profile.totalPoints)
   const pct = rankProgress(profile.totalPoints)
   const perks = activePerks(profile)
+  const [showFixed, setShowFixed] = useState(diff !== SENSE)
+  const nest = nestById(profile.nest)
 
   return (
     <div className="appear scroll" style={{ zIndex: 10, width: '100%', maxWidth: 470, padding: '8px 14px 24px' }}>
-      {/* Wizard + rank */}
-      <div style={{ textAlign: 'center', marginBottom: 10 }}>
+      {/* Wizard + rank. The nest crest hangs beside her: not a menu item, just
+          the badge she belongs to, and a tap away from being changed. */}
+      <div style={{ textAlign: 'center', marginBottom: 10, position: 'relative' }}>
+        {nest && (
+          <button className="bh" onClick={onNest} aria-label={`Nest: ${nest.name}`} style={{
+            position: 'absolute', right: 2, top: 8, zIndex: 2,
+            background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+            filter: `drop-shadow(0 0 12px ${nest.shield}88)`,
+            WebkitTapHighlightColor: 'transparent',
+          }}>
+            <NestCrest nest={nest} size={54} />
+            <span style={{ color: C.faint, fontSize: 8.5, letterSpacing: 1, fontFamily: serif, fontWeight: 900 }}>
+              {nest.name.replace(' Eagles', '').toUpperCase()}
+            </span>
+          </button>
+        )}
         <div className="wf" style={{ filter: `drop-shadow(0 0 26px ${form.trim}88)` }}>
           <WizardPreview form={form} appearance={profile.appearance} size={168} style={{ margin: '0 auto' }} />
         </div>
@@ -45,8 +65,8 @@ export default function Hub({ profile, ops, diff, onToggleOp, onSetDiff, onStart
         </div>
         <div style={{ color: C.faint, fontSize: 10, marginTop: 6 }}>
           {next
-            ? `${(next.threshold - profile.totalPoints).toLocaleString()} points to ${next.name} — 3 new forms to choose from`
-            : `${rank.name} — every form unlocked. ☄️`}
+            ? `${(next.threshold - profile.totalPoints).toLocaleString()} points to ${next.name} — 3 new robes to choose from`
+            : `${rank.name} — every robe unlocked. ☄️`}
         </div>
       </div>
 
@@ -101,11 +121,17 @@ export default function Hub({ profile, ops, diff, onToggleOp, onSetDiff, onStart
         </div>
       </div>
 
-      {/* Difficulty */}
+      {/* Difficulty.
+          Wizard's Sense is the recommendation and the default, and a wall of
+          five fixed tiers underneath it invites picking one at random. So the
+          fixed levels are folded away behind a toggle — still one tap for a
+          parent who wants to pin the level, out of the way for everyone else.
+          Opened automatically if a fixed level is already in use, so nobody
+          lands on this card unable to see what they chose. */}
       <div style={panel({ padding: '14px 16px', marginBottom: 14 })}>
         <div style={label()}>HOW BRAVE ARE YOU?</div>
         <div style={{ display: 'grid', gap: 7 }}>
-          {DIFFS.map(d => {
+          {DIFFS.filter(d => d.adaptive || showFixed).map(d => {
             const on = d.key === diff
             return (
               <button key={d.key} className="bh" onClick={() => onSetDiff(d.key)} style={{
@@ -117,10 +143,12 @@ export default function Hub({ profile, ops, diff, onToggleOp, onSetDiff, onStart
               }}>
                 <span style={{ fontSize: 18 }}>{d.icon}</span>
                 <span style={{ flex: 1 }}>
-                  <span style={{ display: 'block', fontWeight: 900, fontSize: 14 }}>
-                    {d.label}
-                    {d.adaptive && <span style={{ color: C.gold, fontSize: 9, marginLeft: 6, letterSpacing: 1 }}>RECOMMENDED</span>}
-                  </span>
+                  <span style={{ display: 'block', fontWeight: 900, fontSize: 14 }}>{d.label}</span>
+                  {d.adaptive && (
+                    <span style={{ display: 'block', color: C.gold, fontSize: 9, letterSpacing: 1, fontWeight: 900, margin: '1px 0' }}>
+                      ADAPTIVE MODE — RECOMMENDED
+                    </span>
+                  )}
                   <span style={{ display: 'block', fontSize: 10, color: on ? C.dim : C.faint }}>{d.desc}</span>
                 </span>
                 {!d.adaptive && <span style={{ color: d.color, fontSize: 10, fontWeight: 900 }}>×{d.mult}</span>}
@@ -134,15 +162,37 @@ export default function Hub({ profile, ops, diff, onToggleOp, onSetDiff, onStart
             struggle and they ease back. Points scale with the difficulty it picks.
           </p>
         )}
+
+        <label style={{
+          display: 'flex', alignItems: 'center', gap: 9, marginTop: 11,
+          cursor: 'pointer', userSelect: 'none',
+        }}>
+          <input
+            type="checkbox"
+            checked={showFixed}
+            onChange={e => setShowFixed(e.target.checked)}
+            style={{ width: 17, height: 17, accentColor: C.gold, cursor: 'pointer', flex: 'none' }}
+          />
+          <span style={{ color: C.faint, fontSize: 11, fontWeight: 800, letterSpacing: 0.3 }}>
+            Show fixed skill level modes
+          </span>
+        </label>
       </div>
 
-      <button className="bh" onClick={onReport} style={btn('ghost', { width: '100%', fontSize: 13 })}>
-        📊 My Progress
-      </button>
+      {/* Switching wizard is something a household with two children does every
+          session, so it's a card like the rest rather than fine print. The
+          Wizard Scroll stays a link — it's a once-in-a-while thing. */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8 }}>
+        <button className="bh" onClick={onReport} style={btn('ghost', { fontSize: 13 })}>
+          📊 My Progress
+        </button>
+        <button className="bh" onClick={onLogout} style={btn('ghost', { fontSize: 13 })}>
+          ↩ Switch Wizard
+        </button>
+      </div>
 
       <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginTop: 16 }}>
         <button onClick={onScroll} style={linkStyle}>📜 Wizard Scroll</button>
-        <button onClick={onLogout} style={linkStyle}>↩ Switch wizard</button>
       </div>
     </div>
   )

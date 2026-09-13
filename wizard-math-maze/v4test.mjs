@@ -2,6 +2,7 @@ import { chromium } from 'playwright'
 import http from 'http'
 import fs from 'fs'
 import path from 'path'
+import { takeNest } from './harness.mjs'
 
 const ROOT = '/home/claude/wmm/dist'
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.webmanifest': 'application/manifest+json' }
@@ -63,6 +64,7 @@ const page = await open('main', 430, 900)
 await page.fill('input[type=text]', 'Camille')
 await page.fill('input[type=password]', '1234')
 await page.locator('button', { hasText: 'Begin the Journey' }).click()
+await takeNest(page)
 await page.waitForSelector('text=WHAT SHALL WE PRACTICE', { timeout: 15000 })
 await snap(page, '40-hub-v4')
 const senseDefault = (await prof(page)).diff
@@ -110,7 +112,7 @@ for (let i = 0; i < 2600 && !choosing; i++) {
     await answerDoor(page, true); doors++; continue
   }
   // The rank-up choice takes priority over everything else.
-  if (await page.locator('text=Choose the form you will take').count()) { choosing = true; break }
+  if (await page.locator('text=Choose the robes you will wear').count()) { choosing = true; break }
   // An encounter swallows the arrow keys. Its intro needs a click, then the
   // duel takes 1-4; without this the walk stalls at the first creature.
   if (await page.locator('text=SOMETHING BLOCKS THE WAY').count()) {
@@ -132,7 +134,7 @@ for (let i = 0; i < 2600 && !choosing; i++) {
   if (await page.locator('text=Maze Conquered').count()) {
     mazes++
     if (mazes === 1) await snap(page, '44-win-screen')
-    await page.locator('button', { hasText: /Choose my new form|Another Maze/ }).click()
+    await page.locator('button', { hasText: /Choose my new robes|Another Maze/ }).click()
     await page.waitForTimeout(900)
     continue
   }

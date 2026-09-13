@@ -2,6 +2,7 @@ import { chromium } from 'playwright'
 import http from 'http'
 import fs from 'fs'
 import path from 'path'
+import { takeNest } from './harness.mjs'
 
 const ROOT = '/home/claude/wmm/dist'
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.webmanifest': 'application/manifest+json' }
@@ -94,6 +95,7 @@ const A = await device('A')
 await A.page.fill('input[type=text]', 'Camille')
 await A.page.fill('input[type=password]', '1234')
 await A.page.locator('button', { hasText: 'Begin the Journey' }).click()
+await takeNest(A.page)
 await A.page.waitForSelector('text=WHAT SHALL WE PRACTICE', { timeout: 10000 })
 console.log('A: created new wizard')
 
@@ -115,6 +117,7 @@ await B.page.locator('button', { hasText: 'New Wizard' }).click().catch(() => {}
 await B.page.fill('input[type=text]', 'Camille')
 await B.page.fill('input[type=password]', '1234')
 await B.page.locator('button', { hasText: 'Begin the Journey' }).click()
+await takeNest(B.page)
 await B.page.waitForSelector('text=WHAT SHALL WE PRACTICE', { timeout: 20000 })
 const bAfter = await localState(B.page)
 console.log('B: local after login =', JSON.stringify(bAfter))
@@ -144,6 +147,7 @@ await C.page.locator('button', { hasText: 'New Wizard' }).click().catch(() => {}
 await C.page.fill('input[type=text]', 'Camille')
 await C.page.fill('input[type=password]', '9999')
 await C.page.locator('button', { hasText: 'Begin the Journey' }).click()
+await takeNest(C.page)
 await C.page.waitForSelector('text=WHAT SHALL WE PRACTICE', { timeout: 20000 })
 const cState = await localState(C.page)
 console.log('C (wrong passcode): local =', JSON.stringify(cState))

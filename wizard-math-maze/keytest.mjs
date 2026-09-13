@@ -2,6 +2,7 @@
 // walking into the door, from a held key, or from a button that still had focus.
 import { chromium } from 'playwright'
 import http from 'http'; import fs from 'fs'; import path from 'path'
+import { takeNest } from './harness.mjs'
 const ROOT = '/home/claude/wmm/dist'
 const M = { '.html': 'text/html', '.js': 'text/javascript', '.webmanifest': 'application/manifest+json' }
 const srv = http.createServer((q, r) => {
@@ -23,6 +24,7 @@ await page.goto('http://localhost:4231/', { waitUntil: 'networkidle' })
 await page.fill('input[type=text]', 'Camille')
 await page.fill('input[type=password]', '1234')
 await page.locator('button', { hasText: 'Begin the Journey' }).click()
+await takeNest(page)
 await page.waitForSelector('text=WHAT SHALL WE PRACTICE', { timeout: 15000 })
 await page.locator('button', { hasText: 'Enter the Maze' }).click()
 await page.waitForTimeout(1200)

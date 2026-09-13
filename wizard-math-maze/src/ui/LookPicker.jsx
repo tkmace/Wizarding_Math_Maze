@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
   SKIN_TONES, HAIR_COLORS, HAIR_STYLES, blankAppearance,
-  FACE_SHAPES, EYE_SHAPES, EYE_COLORS, BROW_SHAPES, NOSE_SHAPES, MOUTH_SHAPES,
+  EYE_SHAPES, EYE_COLORS,
 } from '../game/appearance.js'
 import { formById } from '../game/skins.js'
 import { C, sans, serif, btn, panel, label } from './theme.js'
@@ -28,7 +28,7 @@ export default function LookPicker({ profile, onSave, onClose }) {
         textShadow: `0 0 18px ${C.gold}77`,
       }}>My Look</h2>
       <p style={{ color: C.dim, fontSize: 13, textAlign: 'center', margin: '0 0 14px', fontFamily: serif, letterSpacing: 1 }}>
-        This stays with you through every form
+        This stays with you whatever robes you wear
       </p>
 
       <div style={{ textAlign: 'center', marginBottom: 12 }}>
@@ -84,27 +84,18 @@ export default function LookPicker({ profile, onSave, onClose }) {
         </div>
       </div>
 
-      {/* The face itself. Each of these is one swappable part in the face rig —
-          a row of numbers in appearance.js, not a special case in the renderer —
-          so the list grows by adding entries rather than by adding drawing
-          code. Kept as compact name chips: this is a wizard, not a police
-          sketch, and a child should be able to try all of them in a minute. */}
-      <div style={panel({ padding: '14px 16px', marginBottom: 10 })}>
+      {/* The face.
+          Face shape, eyebrows, nose and mouth are all still parts in the rig
+          (appearance.js, and the renderer draws whichever it is handed) — they
+          are simply not offered here. Four more rows of chips turned a quick,
+          fun screen into a police sketch, and the parts that actually read at
+          the size a wizard is drawn are the skin, the hair and the eyes. The
+          tables stay so a row can come back by adding one Chips line. */}
+      <div style={panel({ padding: '14px 16px', marginBottom: 14 })}>
         <div style={label()}>EYES</div>
         <Chips items={EYE_SHAPES} selected={look.eyes} onPick={i => set('eyes', i)} />
         <div style={{ ...label(), marginTop: 12 }}>EYE COLOUR</div>
         <Swatches items={EYE_COLORS} selected={look.eyeColor} onPick={i => set('eyeColor', i)} colorOf={s => s.hex} size={40} />
-      </div>
-
-      <div style={panel({ padding: '14px 16px', marginBottom: 14 })}>
-        <div style={label()}>FACE SHAPE</div>
-        <Chips items={FACE_SHAPES} selected={look.face} onPick={i => set('face', i)} />
-        <div style={{ ...label(), marginTop: 12 }}>EYEBROWS</div>
-        <Chips items={BROW_SHAPES} selected={look.brows} onPick={i => set('brows', i)} />
-        <div style={{ ...label(), marginTop: 12 }}>NOSE</div>
-        <Chips items={NOSE_SHAPES} selected={look.nose} onPick={i => set('nose', i)} />
-        <div style={{ ...label(), marginTop: 12 }}>SMILE</div>
-        <Chips items={MOUTH_SHAPES} selected={look.mouth} onPick={i => set('mouth', i)} />
       </div>
 
       <button className="bh" onClick={() => setLook(l => ({ ...l, ...surprise() }))}
@@ -122,12 +113,13 @@ export default function LookPicker({ profile, onSave, onClose }) {
   )
 }
 
-/** Roll every face part but keep the skin and hair she chose. */
+/** Roll the parts this screen offers — never the ones it doesn't, or the dice
+ *  would change things she has no way to change back. */
 function surprise() {
   const r = list => list[Math.floor(Math.random() * list.length)].id
   return {
-    face: r(FACE_SHAPES), eyes: r(EYE_SHAPES), eyeColor: r(EYE_COLORS),
-    brows: r(BROW_SHAPES), nose: r(NOSE_SHAPES), mouth: r(MOUTH_SHAPES),
+    skin: r(SKIN_TONES), hairColor: r(HAIR_COLORS), hairStyle: r(HAIR_STYLES),
+    eyes: r(EYE_SHAPES), eyeColor: r(EYE_COLORS),
   }
 }
 

@@ -1,0 +1,27 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Nests</title>
+<style>body{margin:0;background:#0b0a22;color:#c8a4ff;font:11px system-ui;padding:10px}
+.row{display:flex;gap:14px;align-items:flex-end;margin-bottom:14px}
+.c{text-align:center}</style></head>
+<body><div id="out"></div>
+<script type="module">
+import { NESTS } from '/src/game/nests.js'
+import { drawCrest } from '/src/engine/nestCrest.js'
+const out = document.getElementById('out')
+function row(w, label){
+  const h=document.createElement('div'); h.textContent=label+' — '+w+'px'; out.append(h)
+  const r=document.createElement('div'); r.className='row'; out.append(r)
+  NESTS.forEach(n=>{
+    const d=document.createElement('div'); d.className='c'
+    const cv=document.createElement('canvas')
+    const H=Math.round(w*1.22)+8
+    cv.width=(w+10)*2; cv.height=H*2; cv.style.width=(w+10)+'px'; cv.style.height=H+'px'
+    const ctx=cv.getContext('2d'); ctx.scale(2,2)
+    drawCrest(ctx,{x:(w+10)/2,y:4,w,nest:n,t:2000})
+    d.append(cv)
+    const t=document.createElement('div'); t.textContent=n.name; d.append(t)
+    r.append(d)
+  })
+}
+row(150,'large'); row(76,'medium'); row(44,'badge')
+window.__done=true
+</script></body></html>

@@ -3,6 +3,7 @@
 // that the purchase actually debits, and that it survives a reload.
 import { chromium } from 'playwright'
 import http from 'http'; import fs from 'fs'; import path from 'path'
+import { takeNest } from './harness.mjs'
 const ROOT = '/home/claude/wmm/dist'
 const M = { '.html': 'text/html', '.js': 'text/javascript', '.webmanifest': 'application/manifest+json' }
 const srv = http.createServer((q, r) => {
@@ -38,6 +39,7 @@ const login = async () => {
   await page.locator('button', { hasText: 'Camille' }).click(); await page.waitForTimeout(250)
   await page.locator('input[type=password]').fill('1234')
   await page.locator('button', { hasText: 'Enter the Realm' }).click(); await page.waitForTimeout(700)
+  await takeNest(page)
   await page.locator('button', { hasText: 'Wardrobe' }).click(); await page.waitForTimeout(700)
 }
 

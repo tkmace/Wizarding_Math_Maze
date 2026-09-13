@@ -1,0 +1,32 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Looks</title>
+<style>body{margin:0;background:#0b0a22;color:#c8a4ff;font:11px system-ui}
+h3{margin:10px 0 2px 10px;font-size:12px;letter-spacing:1px;color:#f9ca74}</style></head>
+<body><div id="out"></div>
+<script type="module">
+import { drawWizard } from '/src/engine/wizardSprite.js'
+import { formById } from '/src/game/skins.js'
+import { SKIN_TONES, HAIR_COLORS, HAIR_STYLES } from '/src/game/appearance.js'
+const out=document.getElementById('out')
+function sheet(title, view, rows) {
+  const h=document.createElement('h3'); h.textContent=title; out.append(h)
+  const cv=document.createElement('canvas')
+  const cell=120, cols=Math.max(...rows.map(r=>r.length))
+  cv.width=cols*cell*2; cv.height=rows.length*cell*2
+  cv.style.width=(cols*cell)+'px'; cv.style.height=(rows.length*cell)+'px'
+  out.append(cv)
+  const ctx=cv.getContext('2d'); ctx.scale(2,2)
+  rows.forEach((row,ri)=>row.forEach((look,ci)=>{
+    drawWizard(ctx,{x:ci*cell+cell/2,yBase:(ri+1)*cell-16,h:cell*0.8,
+      form:formById('apprentice'),appearance:look,t:1200,moving:false,view})
+    ctx.fillStyle='#6b6b9e'; ctx.font='600 8px sans-serif'; ctx.textAlign='center'
+    ctx.fillText(HAIR_STYLES[look.hairStyle].name+' · '+HAIR_COLORS[look.hairColor].name, ci*cell+cell/2, (ri+1)*cell-4)
+  }))
+}
+// Every hair length against every hair colour, front then back.
+const rows = HAIR_STYLES.map(st => HAIR_COLORS.map(hc => ({skin:1,hairColor:hc.id,hairStyle:st.id})))
+sheet('FRONT — hair length (rows) x colour (columns)','front',rows)
+sheet('BACK — same grid','back',rows)
+sheet('SKIN TONES (front, shoulder-length chestnut)','front',
+  [SKIN_TONES.map(s=>({skin:s.id,hairColor:1,hairStyle:2}))])
+window.__done=true
+</script></body></html>

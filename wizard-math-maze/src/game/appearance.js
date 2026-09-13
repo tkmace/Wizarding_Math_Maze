@@ -126,17 +126,20 @@ export function resolveLook(appearance) {
 
 const rnd = n => Math.floor(Math.random() * n)
 
-/** A random look, for a brand new wizard so she isn't always the same face. */
+/**
+ * A random look, for a brand new wizard so she isn't always the same face.
+ *
+ * Only the parts the look picker offers are rolled. Randomising a part she
+ * can't then change — a square jaw, bushy brows — hands her a face she's stuck
+ * with, which is worse than a pleasant default she chose nothing about.
+ */
 export function randomAppearance() {
   return {
+    ...blankAppearance(),
     skin: rnd(SKIN_TONES.length),
     hairColor: rnd(HAIR_COLORS.length),
     hairStyle: rnd(HAIR_STYLES.length),
-    face: rnd(FACE_SHAPES.length),
     eyes: rnd(EYE_SHAPES.length),
     eyeColor: rnd(EYE_COLORS.length),
-    brows: rnd(BROW_SHAPES.length),
-    nose: rnd(NOSE_SHAPES.length),
-    mouth: rnd(MOUTH_SHAPES.length),
   }
 }

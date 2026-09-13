@@ -2,6 +2,7 @@ import { chromium } from 'playwright'
 import http from 'http'
 import fs from 'fs'
 import path from 'path'
+import { takeNest } from './harness.mjs'
 
 const ROOT = '/home/claude/wmm/dist'
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.webmanifest': 'application/manifest+json' }
@@ -102,6 +103,7 @@ async function newWizard(page, name, code) {
   await page.fill('input[type=text]', name)
   await page.fill('input[type=password]', code)
   await page.locator('button', { hasText: 'Begin the Journey' }).click()
+  await takeNest(page)
 }
 
 /**
@@ -109,9 +111,10 @@ async function newWizard(page, name, code) {
  * points have reached, collected before the hub opens. Take them all.
  */
 async function takePicks(page, max = 8) {
+  await takeNest(page)          // the nest screen stands in front of the picks
   let taken = 0
   for (let i = 0; i < max; i++) {
-    if (!(await page.locator('text=Choose the form you will take').count())) break
+    if (!(await page.locator('text=Choose the robes you will wear').count())) break
     await page.locator('button').filter({ hasText: /points|failure|bonus|rune stone|sight|gate/ }).first().click()
     await page.waitForTimeout(250)
     await page.locator('button', { hasText: /^Become the/ }).click()
@@ -133,6 +136,7 @@ console.log('1. claim prompt shown with 245 pts:', shown > 0 ? 'PASS' : 'FAIL')
 await page.locator('button', { hasText: 'claim it' }).click()
 await page.waitForTimeout(1200)
 console.log('   form picks her old points bought:', await takePicks(page))
+await takeNest(page)
 await page.waitForSelector('text=WHAT SHALL WE PRACTICE', { timeout: 20000 })
 console.log('   local after claim:', JSON.stringify(await state(page, 'linden')))
 await page.screenshot({ path: `${OUT}/31-claimed-hub.png`, fullPage: true })
@@ -140,6 +144,7 @@ await page.screenshot({ path: `${OUT}/31-claimed-hub.png`, fullPage: true })
 // ── 2. Someone else tries the same name — already claimed ───────────────────
 page = await freshDevice('linden2')
 await newWizard(page, 'Linden', '1111')
+await takeNest(page)
 await page.waitForSelector('text=WHAT SHALL WE PRACTICE', { timeout: 20000 })
 const second = await state(page, 'linden')
 console.log('2. second claimant gets blank profile:', second.pts === 0 ? 'PASS' : `FAIL (${second.pts})`)
@@ -151,6 +156,7 @@ await page.waitForSelector('text=AN OLD SCROLL BEARS YOUR NAME', { timeout: 2000
 await page.locator('button', { hasText: 'claim it' }).click()
 await page.waitForTimeout(1200)
 console.log('   form picks her old points bought:', await takePicks(page))
+await takeNest(page)
 await page.waitForSelector('text=WHAT SHALL WE PRACTICE', { timeout: 20000 })
 const tk = await state(page, 'tkmace')
 // His old 'enchanter' robe is a v3 id; v4 maps it to the Frost Scribe and banks
@@ -164,6 +170,7 @@ page = await freshDevice('camille-decline')
 await newWizard(page, 'Camille', '7777')
 await page.waitForSelector('text=AN OLD SCROLL BEARS YOUR NAME', { timeout: 20000 })
 await page.locator('button', { hasText: 'start fresh' }).click()
+await takeNest(page)
 await page.waitForSelector('text=WHAT SHALL WE PRACTICE', { timeout: 20000 })
 const dec = await state(page, 'camille')
 console.log('4. declined -> blank profile:', dec.pts === 0 ? 'PASS' : 'FAIL',
@@ -172,6 +179,7 @@ console.log('4. declined -> blank profile:', dec.pts === 0 ? 'PASS' : 'FAIL',
 // ── 5. A genuinely new name skips the claim panel entirely ──────────────────
 page = await freshDevice('newkid')
 await newWizard(page, 'Rowan', '2468')
+await takeNest(page)
 await page.waitForSelector('text=WHAT SHALL WE PRACTICE', { timeout: 20000 })
 const nk = await state(page, 'rowan')
 console.log('5. brand new name goes straight in:', nk && nk.pts === 0 ? 'PASS' : 'FAIL')
@@ -179,6 +187,7 @@ console.log('5. brand new name goes straight in:', nk && nk.pts === 0 ? 'PASS' :
 // ── 6. A claimed profile now round-trips as a normal cloud profile ──────────
 page = await freshDevice('linden-newdevice')
 await newWizard(page, 'Linden', '5678')
+await takeNest(page)
 await page.waitForSelector('text=WHAT SHALL WE PRACTICE', { timeout: 20000 })
 const rt = await state(page, 'linden')
 console.log('6. claimed profile syncs to a new device:', rt.pts === 245 ? 'PASS' : `FAIL (${rt.pts})`)

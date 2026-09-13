@@ -1,0 +1,38 @@
+<!doctype html><html><head><meta charset="utf-8"><title>FOV</title>
+<style>body{margin:0;background:#0b0a22;color:#c8a4ff;font:12px system-ui}
+figure{margin:0 0 6px}figcaption{padding:4px 8px;font-weight:700;letter-spacing:1px}</style></head>
+<body><div id="out"></div>
+<script type="module">
+import { renderFrame } from '/src/engine/renderer.js'
+import { formById } from '/src/game/skins.js'
+// A fixed scene: standing in a corridor with an opening immediately LEFT and a
+// door immediately RIGHT — exactly the case a forward view cannot show.
+const W=0,P=1,D=2;
+const grid=[
+ [W,W,W,W,W,W,W],
+ [W,P,P,P,P,P,W],
+ [W,W,P,W,W,P,W],
+ [W,P,P,D,W,P,W],   // row 3: player at col 2; left(col1)=P open, right(col3)=DOOR
+ [W,W,P,W,W,P,W],
+ [W,P,P,P,P,P,W],
+ [W,W,W,W,W,W,W],
+]
+const dq={'3,3':{disp:'12 × 8',ans:96,rune:'×',color:'#f78fb3',curPts:40,wrongs:0}}
+const out=document.getElementById('out')
+for (const deg of [90,95,100,110]) {
+  const fig=document.createElement('figure')
+  const cap=document.createElement('figcaption'); cap.textContent=deg+'° field of view'
+  const cv=document.createElement('canvas'); cv.width=1600; cv.height=520
+  cv.style.width='800px'; cv.style.height='260px'
+  fig.append(cap,cv); out.append(fig)
+  renderFrame(cv.getContext('2d'), {
+    grid, dq, stones:{},
+    px:2.5, py:3.5, angle:-Math.PI/2,        // facing north, up the corridor
+    playerRow:3, playerCol:2, facing:3,
+    doorAhead:null, time:1200, form:formById('apprentice'), moving:false,
+    effects:[], gateMet:true, lean:0,
+    fov: deg*Math.PI/180,
+  })
+}
+window.__done = true
+</script></body></html>

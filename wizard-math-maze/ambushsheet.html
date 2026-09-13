@@ -1,0 +1,38 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Ambush</title>
+<style>body{margin:0;background:#0b0a22;color:#c8a4ff;font:11px system-ui}
+h3{margin:10px 0 3px 10px;font-size:12px;letter-spacing:1px;color:#f9ca74}
+canvas{display:block;margin:0 0 6px 10px;border:1px solid #2a2a55}</style></head>
+<body><div id="out"></div>
+<script type="module">
+import { renderFrame } from '/src/engine/renderer.js'
+import { WALL, PATH } from '/src/game/maze.js'
+import { formById } from '/src/game/skins.js'
+import { CREATURES } from '/src/engine/creatureSprite.js'
+import { blankAppearance } from '/src/game/appearance.js'
+
+const W = 9, Hh = 5
+const grid = Array.from({ length: Hh }, () => Array(W).fill(WALL))
+for (let c = 1; c < W - 1; c++) grid[2][c] = PATH
+
+const out = document.getElementById('out')
+const DUR = 760
+function shot(title, creature, p) {
+  const h = document.createElement('h3'); h.textContent = title; out.append(h)
+  const cv = document.createElement('canvas')
+  cv.width = 760; cv.height = 400
+  cv.style.width = '380px'; cv.style.height = '200px'
+  out.append(cv)
+  const time = 5000
+  renderFrame(cv.getContext('2d'), {
+    grid, dq: {}, stones: {}, px: 2.5, py: 2.5, angle: 0,
+    playerRow: 2, playerCol: 2, facing: 0,
+    doorAhead: null, time, form: formById('apprentice'),
+    appearance: blankAppearance(), moving: false, gateMet: true, lean: 0,
+    effects: [{ kind: 'ambush', creature, start: time - p * DUR, dur: DUR }],
+  })
+}
+const imp = CREATURES[0]
+;[0.05, 0.3, 0.55, 0.65, 0.85, 1].forEach(p => shot(`imp — ${Math.round(p*100)}%`, imp, p))
+CREATURES.slice(1).forEach(c => shot(`${c.name} — landed`, c, 0.7))
+window.__done = true
+</script></body></html>

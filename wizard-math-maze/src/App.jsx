@@ -4,6 +4,7 @@ import { recordAnswer } from './game/curriculum.js'
 import { roundPts, SENSE } from './game/math.js'
 import { formById, rankFor, pendingRanks, activePerks, buyState, STARTER } from './game/skins.js'
 import { rollEncounter, encounterReward } from './game/encounters.js'
+import { hasNest } from './game/nests.js'
 import { saveProfile } from './store/storage.js'
 import { syncEnabled, push as cloudPush } from './store/sync.js'
 import { CSS, C, sans, serif } from './ui/theme.js'
@@ -18,14 +19,18 @@ import ParentReport from './ui/ParentReport.jsx'
 import ScrollPanel from './ui/ScrollPanel.jsx'
 import SkinChoice from './ui/SkinChoice.jsx'
 import LookPicker from './ui/LookPicker.jsx'
+import NestPicker from './ui/NestPicker.jsx'
 import Encounter from './ui/Encounter.jsx'
 
 const DISSOLVE_MS = 620
+const AMBUSH_MS = 760       // the creature lands in the corridor before the pop-up
 const blankRun = () => ({ points: 0, doors: 0, answered: 0, correct: 0, fast: 0, startedAt: Date.now() })
 
 export default function App() {
   const [profile, setProfile] = useState(null)
   const [screen, setScreen] = useState('login')
+  const screenRef = useRef(screen)
+  screenRef.current = screen
   const [ops, setOps] = useState(new Set(['addition']))
   const [diff, setDiff] = useState(SENSE)
 
@@ -105,8 +110,12 @@ export default function App() {
   // A rank she's reached but not chosen a form for is owed a pick. Collect it
   // the moment she's back in the castle rather than interrupting a maze.
   useEffect(() => {
-    if (screen === 'hub' && pending.length) setScreen('pick')
-  }, [screen, pending.length])
+    if (screen !== 'hub') return
+    // A nest first — it's the shortest of the three screens and it's the one
+    // that makes the castle feel like hers before she picks anything else.
+    if (profile && !hasNest(profile)) { setScreen('nest'); return }
+    if (pending.length) setScreen('pick')
+  }, [screen, pending.length, profile])
 
   // --- Start a maze ----------------------------------------------------------
   const startGame = useCallback(() => {
@@ -136,6 +145,11 @@ export default function App() {
 
   // --- Movement --------------------------------------------------------------
   const act = useCallback(action => {
+    // Nothing moves unless the maze is actually on screen. Belt and braces
+    // against a stuck repeat: the pad already cancels itself on unmount, and a
+    // move that arrives anyway is dropped here rather than walking her through
+    // a maze she is no longer looking at.
+    if (screenRef.current !== 'game') return
     if (doorQ || encounter || encPending.current || !maze) return
     const cur = posRef.current
     const { row, col, facing } = cur
@@ -181,8 +195,16 @@ export default function App() {
     steps.current += 1
     const enc = rollEncounter(encState.current, steps.current)
     if (enc) {
+      // Show it arriving before the pop-up covers the maze, so the interruption
+      // has a visible cause. Movement is already blocked by encPending.
       encPending.current = true
-      setTimeout(() => { encPending.current = false; setEncounter(enc) }, 180)
+      const start = performance.now()
+      setEffects(e => [...e, { kind: 'ambush', creature: enc.creature, start, dur: AMBUSH_MS }])
+      setTimeout(() => {
+        encPending.current = false
+        setEncounter(enc)
+        setEffects(e => e.filter(x => x.start !== start))
+      }, AMBUSH_MS)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doorQ, encounter, maze, profile, commit, say])
@@ -370,6 +392,11 @@ export default function App() {
     syncUp()
   }, [profile, commit, syncUp])
 
+  const saveNest = useCallback(id => {
+    commit({ ...profile, nest: id })
+    setScreen('hub')
+  }, [profile, commit])
+
   const saveLook = useCallback(look => {
     commit({ ...profile, appearance: look })
     setScreen('hub')
@@ -418,6 +445,7 @@ export default function App() {
           onReport={() => setScreen('report')}
           onScroll={() => setScreen('scroll')}
           onLook={() => setScreen('look')}
+          onNest={() => setScreen('nest')}
           onLogout={() => { setProfile(null); setScreen('login') }}
         />
       )}
@@ -450,6 +478,13 @@ export default function App() {
       )}
       {screen === 'scroll' && profile && (
         <ScrollPanel profile={profile} onClose={() => setScreen('hub')} />
+      )}
+      {screen === 'nest' && profile && (
+        <NestPicker
+          current={profile.nest}
+          onChoose={saveNest}
+          onClose={hasNest(profile) ? () => setScreen('hub') : null}
+        />
       )}
       {screen === 'look' && profile && (
         <LookPicker profile={profile} onSave={saveLook} onClose={() => setScreen('hub')} />
