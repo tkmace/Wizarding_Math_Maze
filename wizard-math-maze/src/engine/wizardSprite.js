@@ -361,34 +361,17 @@ export function drawWizard(ctx, o) {
   // An egg rather than a circle: wide at the temples, narrowing to a soft chin.
   // A perfect circle reads as a ball with a face drawn on it; the taper is what
   // makes it a head.
-  // The head, built from the morphology in appearance.js rather than from one
-  // width: crown, temples, cheekbones, jaw corner, chin. Which of those is
-  // widest, and how fast it falls away to the next, is what makes one face read
-  // as angular and another as soft — a single `w` could only ever make the same
-  // face bigger or smaller.
+  // Face shape comes from the appearance record: width at the temples, how far
+  // the jaw tapers in, and how low the chin sits. A perfect circle reads as a
+  // ball with a face drawn on it; the taper is what makes it a head.
   const fs = look.face
-  const tilt = look.asym?.tilt || 0
   const headPath = () => {
-    const T  = headY - headR * fs.top                 // crown
-    const B  = headY + headR * fs.chinY               // chin
-    const bw = headR * fs.brow,  by = headY - headR * 0.42
-    const cw = headR * fs.cheek, cy = headY + headR * fs.cheekY
-    const jw = headR * fs.jaw,   jy = headY + headR * (fs.chinY * 0.56)
-    const nw = headR * fs.chin
-    // A hair's worth of lean, different for every wizard. Nothing alive is
-    // plumb, and a head drawn dead square is the quietest tell that a drawing
-    // was generated rather than drawn.
-    const L = 1 + tilt, R = 1 - tilt
+    const W = headR * fs.w, J = headR * fs.jaw, C = headR * fs.chin
     ctx.beginPath()
-    ctx.moveTo(0, T)
-    ctx.bezierCurveTo(bw * 0.92 * R, T + headR * 0.04, bw * R, by - headR * 0.22, bw * R, by)
-    ctx.bezierCurveTo(cw * R, cy - headR * 0.18, cw * R, cy, cw * 0.99 * R, cy + headR * 0.04)
-    ctx.bezierCurveTo(jw * 1.02 * R, jy - headR * 0.10, jw * R, jy, nw * 1.28 * R, B - headR * 0.16)
-    ctx.quadraticCurveTo(nw * R, B, 0, B)
-    ctx.quadraticCurveTo(-nw * L, B, -nw * 1.28 * L, B - headR * 0.16)
-    ctx.bezierCurveTo(-jw * L, jy, -jw * 1.02 * L, jy - headR * 0.10, -cw * 0.99 * L, cy + headR * 0.04)
-    ctx.bezierCurveTo(-cw * L, cy, -cw * L, cy - headR * 0.18, -bw * L, by)
-    ctx.bezierCurveTo(-bw * L, by - headR * 0.22, -bw * 0.92 * L, T + headR * 0.04, 0, T)
+    ctx.moveTo(0, headY - headR)
+    ctx.bezierCurveTo(W * 1.05, headY - headR * 0.96, W * 1.04, headY + headR * 0.26, J, headY + headR * 0.79)
+    ctx.bezierCurveTo(J * 0.48, headY + C, -J * 0.48, headY + C, -J, headY + headR * 0.79)
+    ctx.bezierCurveTo(-W * 1.04, headY + headR * 0.26, -W * 1.05, headY - headR * 0.96, 0, headY - headR)
     ctx.closePath()
   }
   headPath()
@@ -402,12 +385,11 @@ export function drawWizard(ctx, o) {
   // resting on the collar; with it there is something underneath it.
   ctx.save()
   headPath(); ctx.clip()
-  const chinY = headY + headR * look.face.chinY
-  const jg = ctx.createLinearGradient(0, chinY - headR * 0.62, 0, chinY + headR * 0.05)
+  const jg = ctx.createLinearGradient(0, headY + headR * 0.55, 0, headY + headR * 1.25)
   jg.addColorStop(0, 'rgba(60,34,26,0)')
   jg.addColorStop(1, 'rgba(60,34,26,0.30)')
   ctx.fillStyle = jg
-  ctx.fillRect(-headR * 1.3, chinY - headR * 0.62, headR * 2.6, headR * 0.7)
+  ctx.fillRect(-headR * 1.2, headY + headR * 0.55, headR * 2.4, headR * 0.8)
   ctx.restore()
 
   if (view === 'front') drawFace(ctx, h, headY, headR, look, form)
@@ -439,27 +421,14 @@ export function drawWizard(ctx, o) {
  * arc are the only two values a "delighted" or "worried" face would change.
  */
 function drawFace(ctx, h, headY, headR, look, form) {
-  // Where the features go is derived from the face's own geometry rather than
-  // from fixed offsets off the head's centre. On a real head the eyes sit at
-  // about the halfway line between crown and chin, the base of the nose at
-  // roughly seven tenths and the mouth at eight — so a long face gets a long
-  // face's spacing automatically, instead of a short face's features slid down
-  // inside a taller oval.
-  const fs = look.face
-  const top = headY - headR * fs.top
-  const chinY = headY + headR * fs.chinY
-  const span = chinY - top
-  const a = look.asym || { eye: 0, eyeY: 0, brow: 0, mouth: 0, tilt: 0 }
-
+  // Geometry shared by every part, so they stay in register with each other
+  // however the parts are swapped.
   const f = {
-    h, headY, headR, span, top, chinY, a,
-    cheek: headR * fs.cheek,
-    eo: headR * fs.cheek * 0.40 * (look.eyes.set || 1),   // eyes follow the cheekbones
-    ey: top + span * 0.50,                                 // the eye line
-    noseY: top + span * 0.705,
-    mouthY: top + span * 0.815,
+    h, headY, headR,
+    eo: headR * 0.36,                 // eye centre, out from the midline
+    ey: headY + headR * 0.02,         // eye line
   }
-  drawPlanes(ctx, f, look)
+  drawCheeks(ctx, f, look)
   drawEyes(ctx, f, look)
   drawBrows(ctx, f, look)
   drawNose(ctx, f, look)
@@ -470,47 +439,21 @@ function drawFace(ctx, h, headY, headR, look, form) {
   ctx.lineCap = 'butt'
 }
 
-/**
- * The planes of the face.
- *
- * Not blush. A face is not a flat disc of skin: the cheekbones catch the light,
- * the temples and the hollow under the bone fall away from it, and the jaw
- * turns under. Four almost-invisible gradients — nobody should be able to point
- * at any of them — are what stop the head reading as a coloured shape with
- * features drawn on the front of it.
- */
-function drawPlanes(ctx, f, look) {
-  const { headR, ey, cheek, chinY } = f
+/** Warmth across the cheekbones. Not makeup — the flush of a child outdoors. */
+function drawCheeks(ctx, f, look) {
+  const { headY, headR } = f
   ctx.save()
-
-  // The bone itself, lit.
   for (const s of [-1, 1]) {
-    const cx = s * cheek * 0.66, cy = ey + headR * 0.34
-    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, headR * 0.40)
-    g.addColorStop(0, 'rgba(214,124,104,0.17)')
+    const cx = s * headR * 0.62, cy = headY + headR * 0.34
+    // Barely there. At 0.42 this was rouge on a doll; what a real cheek does at
+    // this size is catch a little more warmth than the jaw around it.
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, headR * 0.34)
+    g.addColorStop(0, 'rgba(214,124,104,0.19)')
     g.addColorStop(1, 'rgba(214,124,104,0)')
     ctx.fillStyle = g
     ctx.beginPath()
-    ctx.ellipse(cx, cy, headR * 0.40, headR * 0.24, s * 0.18, 0, TAU)
+    ctx.ellipse(cx, cy, headR * 0.34, headR * 0.22, 0, 0, TAU)
     ctx.fill()
-  }
-
-  // The hollow under it, and the temples above — both are shadow, both barely
-  // there. Together they are what gives the middle of the face any depth.
-  for (const s of [-1, 1]) {
-    const hx = s * cheek * 0.74, hy = ey + headR * 0.74
-    const g = ctx.createRadialGradient(hx, hy, 0, hx, hy, headR * 0.36)
-    g.addColorStop(0, 'rgba(84,48,36,0.13)')
-    g.addColorStop(1, 'rgba(84,48,36,0)')
-    ctx.fillStyle = g
-    ctx.beginPath(); ctx.ellipse(hx, hy, headR * 0.36, headR * 0.30, 0, 0, TAU); ctx.fill()
-
-    const tx = s * cheek * 0.86, ty = ey - headR * 0.46
-    const tg = ctx.createRadialGradient(tx, ty, 0, tx, ty, headR * 0.32)
-    tg.addColorStop(0, 'rgba(84,48,36,0.10)')
-    tg.addColorStop(1, 'rgba(84,48,36,0)')
-    ctx.fillStyle = tg
-    ctx.beginPath(); ctx.ellipse(tx, ty, headR * 0.32, headR * 0.34, 0, 0, TAU); ctx.fill()
   }
   ctx.restore()
 }
@@ -529,31 +472,27 @@ function drawPlanes(ctx, f, look) {
  * so a different eye is a different row of numbers rather than different code.
  */
 function drawEyes(ctx, f, look) {
-  const { headR, eo, ey, a } = f
+  const { headR, eo, ey } = f
   const sp = look.eyes
+  const rx = headR * sp.r, ry = headR * sp.r * sp.sq
+  const lookX = 0
 
   for (const s of [-1, 1]) {
-    // One eye a few percent larger than the other, and a hair higher. It is far
-    // too small to notice and it is most of why the face stops looking stamped.
-    const k = 1 + (s < 0 ? a.eye : -a.eye)
-    const rx = headR * sp.r * k, ry = headR * sp.r * sp.sq * k
     const cx = s * eo
-    const eyY = ey + headR * (s < 0 ? a.eyeY : -a.eyeY)
     const tilt = s * sp.tilt
-    const lookX = 0
 
     // Socket: a soft shadow so the eye sits IN the face.
     ctx.save()
-    const sg = ctx.createRadialGradient(cx, eyY, rx * 0.4, cx, eyY, rx * 1.7)
+    const sg = ctx.createRadialGradient(cx, ey, rx * 0.4, cx, ey, rx * 1.7)
     sg.addColorStop(0, 'rgba(120,74,58,0.16)')
     sg.addColorStop(1, 'rgba(120,74,58,0)')
     ctx.fillStyle = sg
-    ctx.beginPath(); ctx.ellipse(cx, eyY, rx * 1.7, ry * 1.8, 0, 0, TAU); ctx.fill()
+    ctx.beginPath(); ctx.ellipse(cx, ey, rx * 1.7, ry * 1.8, 0, 0, TAU); ctx.fill()
     ctx.restore()
 
     const eyePath = () => {
       ctx.beginPath()
-      ctx.ellipse(cx, eyY, rx, ry, tilt, 0, TAU)
+      ctx.ellipse(cx, ey, rx, ry, tilt, 0, TAU)
       ctx.closePath()
     }
 
@@ -564,16 +503,16 @@ function drawEyes(ctx, f, look) {
     // Shadow cast by the upper lid onto the white.
     ctx.save()
     eyePath(); ctx.clip()
-    const lg = ctx.createLinearGradient(0, eyY - ry, 0, eyY + ry * 0.3)
+    const lg = ctx.createLinearGradient(0, ey - ry, 0, ey + ry * 0.3)
     lg.addColorStop(0, 'rgba(120,90,80,0.4)')
     lg.addColorStop(1, 'rgba(120,90,80,0)')
     ctx.fillStyle = lg
-    ctx.fillRect(cx - rx, eyY - ry, rx * 2, ry * 2)
+    ctx.fillRect(cx - rx, ey - ry, rx * 2, ry * 2)
     ctx.restore()
 
     // Iris, pupil, and the ring that keeps the colour from going flat.
     const ir = Math.min(rx, ry) * 0.86
-    const ix = cx + lookX, iy = eyY + ry * 0.08
+    const ix = cx + lookX, iy = ey + ry * 0.08
     ctx.save()
     eyePath(); ctx.clip()
     const ig = ctx.createRadialGradient(ix, iy - ir * 0.3, ir * 0.1, ix, iy, ir)
@@ -606,73 +545,35 @@ function drawEyes(ctx, f, look) {
     ctx.lineCap = 'round'
     ctx.lineWidth = Math.max(0.9, ry * 0.26)
     ctx.beginPath()
-    ctx.ellipse(cx, eyY, rx * 1.01, ry * 1.01, tilt, Math.PI * 1.04, Math.PI * 1.96)
+    ctx.ellipse(cx, ey, rx * 1.01, ry * 1.01, tilt, Math.PI * 1.04, Math.PI * 1.96)
     ctx.stroke()
     ctx.lineWidth = Math.max(0.9, ry * 0.36)
     ctx.beginPath()
-    ctx.ellipse(cx, eyY, rx * 1.01, ry * 1.01, tilt, Math.PI * (s < 0 ? 1.04 : 1.52), Math.PI * (s < 0 ? 1.46 : 1.96))
+    ctx.ellipse(cx, ey, rx * 1.01, ry * 1.01, tilt, Math.PI * (s < 0 ? 1.04 : 1.52), Math.PI * (s < 0 ? 1.46 : 1.96))
     ctx.stroke()
     // Lower lid, a whisper only.
     ctx.globalAlpha = 0.4
     ctx.lineWidth = Math.max(0.8, ry * 0.16)
     ctx.beginPath()
-    ctx.ellipse(cx, eyY, rx * 0.98, ry * 0.98, tilt, Math.PI * 0.12, Math.PI * 0.88)
+    ctx.ellipse(cx, ey, rx * 0.98, ry * 0.98, tilt, Math.PI * 0.12, Math.PI * 0.88)
     ctx.stroke()
     ctx.restore()
-
-    // The upper lid itself: skin, coming down over the top of the eye, with the
-    // crease above it. A lash line alone gives you a drawn outline; this gives
-    // the eye something to be set INTO, which is the difference between a face
-    // and a mask with holes in it.
-    const hood = sp.hood || 0
-    if (hood > 0.02) {
-      ctx.save()
-      ctx.beginPath()
-      ctx.ellipse(cx, eyY, rx * 1.06, ry * 1.06, tilt, Math.PI, TAU)
-      ctx.closePath()
-      ctx.clip()
-      ctx.fillStyle = shade(look.skinHex, -0.10)
-      ctx.beginPath()
-      ctx.moveTo(cx - rx * 1.1, eyY - ry * 1.1)
-      ctx.lineTo(cx + rx * 1.1, eyY - ry * 1.1)
-      ctx.lineTo(cx + rx * 1.1, eyY - ry * (1 - hood * 1.9))
-      ctx.quadraticCurveTo(cx, eyY - ry * (1 - hood * 2.5), cx - rx * 1.1, eyY - ry * (1 - hood * 1.7))
-      ctx.closePath()
-      ctx.fill()
-      ctx.restore()
-      // The crease, a shade darker than the lid.
-      ctx.save()
-      ctx.globalAlpha = 0.42
-      ctx.strokeStyle = shade(look.skinHex, -0.36)
-      ctx.lineWidth = Math.max(0.7, ry * 0.13)
-      ctx.lineCap = 'round'
-      ctx.beginPath()
-      ctx.moveTo(cx - rx * 1.02, eyY - ry * (1.02 - hood * 1.5))
-      ctx.quadraticCurveTo(cx, eyY - ry * (1.28 + hood * 0.4), cx + rx * 1.02, eyY - ry * (1.06 - hood * 1.2))
-      ctx.stroke()
-      ctx.restore()
-    }
   }
 }
 
 /** Brows. High and open is friendly; low and flat is stern. */
 function drawBrows(ctx, f, look) {
-  const { headR, eo, ey, a } = f
+  const { headR, eo, ey } = f
   const b = look.brows
   ctx.save()
   ctx.strokeStyle = shade(look.hairHex, -0.32)
+  ctx.lineWidth = Math.max(1, headR * b.w)
   ctx.lineCap = 'round'
   for (const s of [-1, 1]) {
-    // Brows are never level on a real face, and of all the asymmetries this is
-    // the one that does the most work — a face with one brow a shade higher is
-    // reacting to something, and a face with two matched brows is a printed one.
-    const off = (s < 0 ? a.brow : -a.brow)
-    const y = ey - headR * (b.lift + off * 0.5)
-    ctx.lineWidth = Math.max(1, headR * b.w * (1 + off * 0.6))
+    const y = ey - headR * b.lift
     ctx.beginPath()
-    ctx.moveTo(s * (eo - headR * 0.27), y + headR * b.tilt)
-    ctx.quadraticCurveTo(s * eo, y - headR * (b.arch + off * 0.3),
-                         s * (eo + headR * 0.27), y - headR * b.tilt * 0.4)
+    ctx.moveTo(s * (eo - headR * 0.26), y + headR * b.tilt)
+    ctx.quadraticCurveTo(s * eo, y - headR * b.arch, s * (eo + headR * 0.26), y - headR * b.tilt * 0.4)
     ctx.stroke()
   }
   ctx.restore()
@@ -680,122 +581,68 @@ function drawBrows(ctx, f, look) {
 
 /** Nose — a bridge shadow and a lit tip, rather than a drawn-on line. */
 function drawNose(ctx, f, look) {
-  const { headR, noseY, ey } = f
+  const { headY, headR } = f
   const n = look.nose
-  const ty = noseY + headR * n.len            // base of the nose
-  const w = headR * n.w
+  const ty = headY + headR * n.len         // tip
   ctx.save()
-
-  // The ridge: light down one side of the bridge, shadow down the other. This
-  // is the whole trick — a nose at 120px is not a shape you draw, it is the two
-  // planes either side of it catching different amounts of light.
-  const bh = headR * n.bridge
-  if (bh > 0.02) {
-    ctx.globalAlpha = 0.5
-    ctx.strokeStyle = shade(look.skinHex, -0.26)
-    ctx.lineWidth = Math.max(0.8, w * 0.42)
+  if (n.bridge > 0) {
+    ctx.strokeStyle = shade(look.skinHex, -0.24)
+    ctx.globalAlpha = 0.55
+    ctx.lineWidth = Math.max(0.8, headR * 0.035)
     ctx.lineCap = 'round'
     ctx.beginPath()
-    ctx.moveTo(w * 0.34, ty - bh * 0.92)
-    ctx.quadraticCurveTo(w * 0.46, ty - bh * 0.35, w * 0.40, ty - w * 0.15)
-    ctx.stroke()
-    ctx.globalAlpha = 0.38
-    ctx.strokeStyle = shade(look.skinHex, 0.30)
-    ctx.lineWidth = Math.max(0.7, w * 0.3)
-    ctx.beginPath()
-    ctx.moveTo(-w * 0.26, ty - bh * 0.88)
-    ctx.quadraticCurveTo(-w * 0.34, ty - bh * 0.3, -w * 0.28, ty - w * 0.2)
+    ctx.moveTo(-headR * 0.02, ty - headR * n.bridge)
+    ctx.lineTo(-headR * 0.035, ty - headR * 0.04)
     ctx.stroke()
     ctx.globalAlpha = 1
   }
-
-  // The shadow the tip casts under itself, then the lit ball on top of it.
-  // Drawn in this order so the nose has an underside rather than an outline.
-  ctx.fillStyle = shade(look.skinHex, -0.32)
+  // Underside shadow, then the lit tip on top of it.
+  ctx.fillStyle = shade(look.skinHex, -0.3)
   ctx.beginPath()
-  ctx.ellipse(0, ty + w * 0.10, w * 1.02, w * 0.66, 0, 0, TAU)
+  ctx.ellipse(0, ty, headR * n.w, headR * n.w * 0.8, 0, 0, TAU)
   ctx.fill()
-  ctx.fillStyle = shade(look.skinHex, 0.18)
+  ctx.fillStyle = shade(look.skinHex, 0.2)
   ctx.beginPath()
-  ctx.ellipse(-w * 0.16, ty - w * 0.22, w * 0.62, w * 0.46, 0, 0, TAU)
+  ctx.ellipse(-headR * n.w * 0.18, ty - headR * n.w * 0.28, headR * n.w * 0.6, headR * n.w * 0.45, 0, 0, TAU)
   ctx.fill()
-
-  // Nostril wings — two dots, and only at a size where they can land.
-  if (w > 1.6) {
-    ctx.globalAlpha = 0.30
-    ctx.fillStyle = shade(look.skinHex, -0.5)
-    for (const s of [-1, 1]) {
-      ctx.beginPath()
-      ctx.ellipse(s * w * 0.66, ty + w * 0.18, w * 0.20, w * 0.15, 0, 0, TAU)
-      ctx.fill()
-    }
-  }
   ctx.restore()
 }
 
 /** Mouth. `open` decides whether the jaw drops, `curve` how big the smile is. */
 function drawMouth(ctx, f, look) {
-  const { h, headR, mouthY, cheek, a } = f
+  const { h, headY, headR } = f
   const m = look.mouth
-  const my = mouthY
-  const mw = cheek * m.w
+  const my = headY + headR * 0.62
+  const mw = headR * m.w
   const drop = headR * m.open
   const lift = headR * m.curve * 0.5
-  // One corner lifts more than the other. A perfectly mirrored smile is the
-  // single most emoji thing a face can do, and the fix costs one number.
-  const lL = lift * (1 + a.mouth), lR = lift * (1 - a.mouth)
 
   if (drop < headR * 0.05) {
+    // Closed smile: a tapered curve with a hint of a lower lip under it.
     ctx.save()
-    // The line where the lips meet, tapered — heavier in the middle, lighter
-    // into the corners, which is what a mouth does and what a stroke doesn't.
     ctx.strokeStyle = '#7a4034'
     ctx.lineCap = 'round'
     ctx.lineWidth = Math.max(0.9, headR * 0.062)
     ctx.beginPath()
-    ctx.moveTo(-mw, my - lL * 0.5)
-    ctx.quadraticCurveTo(0, my + lift, mw, my - lR * 0.5)
+    ctx.moveTo(-mw, my - lift * 0.5)
+    ctx.quadraticCurveTo(0, my + lift, mw, my - lift * 0.5)
     ctx.stroke()
-
-    // The upper lip: a shadow above the line, so there is something casting it.
-    ctx.globalAlpha = 0.26
-    ctx.strokeStyle = shade(look.skinHex, -0.42)
-    ctx.lineWidth = Math.max(0.7, headR * 0.038)
+    ctx.globalAlpha = 0.35
+    ctx.strokeStyle = shade(look.skinHex, -0.3)
+    ctx.lineWidth = Math.max(0.8, headR * 0.035)
     ctx.beginPath()
-    ctx.moveTo(-mw * 0.82, my - lL * 0.62 - headR * 0.035)
-    ctx.quadraticCurveTo(-mw * 0.22, my + lift * 0.35 - headR * 0.075, 0, my + lift * 0.2 - headR * 0.06)
-    ctx.quadraticCurveTo(mw * 0.22, my + lift * 0.35 - headR * 0.075, mw * 0.82, my - lR * 0.62 - headR * 0.035)
+    ctx.moveTo(-mw * 0.55, my + lift * 0.55)
+    ctx.quadraticCurveTo(0, my + lift * 1.25, mw * 0.55, my + lift * 0.55)
     ctx.stroke()
-
-    // The lower lip: a lit form under the line, and its own small shadow below.
-    // This is what stops the mouth being a stroke on a flat surface.
-    const lo = headR * 0.085 * m.lower
-    if (lo > 0.4) {
-      ctx.globalAlpha = 0.5
-      ctx.fillStyle = shade(look.skinHex, 0.22)
-      ctx.beginPath()
-      ctx.moveTo(-mw * 0.62, my + lift * 0.45)
-      ctx.quadraticCurveTo(0, my + lift * 0.9 + lo, mw * 0.62, my + lift * 0.45)
-      ctx.quadraticCurveTo(0, my + lift * 0.85, -mw * 0.62, my + lift * 0.45)
-      ctx.closePath()
-      ctx.fill()
-      ctx.globalAlpha = 0.30
-      ctx.strokeStyle = shade(look.skinHex, -0.38)
-      ctx.lineWidth = Math.max(0.6, headR * 0.03)
-      ctx.beginPath()
-      ctx.moveTo(-mw * 0.5, my + lift * 0.62 + lo * 0.9)
-      ctx.quadraticCurveTo(0, my + lift * 1.0 + lo * 1.5, mw * 0.5, my + lift * 0.62 + lo * 0.9)
-      ctx.stroke()
-    }
     ctx.restore()
     return
   }
 
   const mouth = () => {
     ctx.beginPath()
-    ctx.moveTo(-mw, my - lL * 0.45)
-    ctx.quadraticCurveTo(0, my + lift * 0.25, mw, my - lR * 0.45)
-    ctx.quadraticCurveTo(0, my + drop * 1.5, -mw, my - lL * 0.45)
+    ctx.moveTo(-mw, my - lift * 0.45)
+    ctx.quadraticCurveTo(0, my + lift * 0.25, mw, my - lift * 0.45)
+    ctx.quadraticCurveTo(0, my + drop * 1.5, -mw, my - lift * 0.45)
     ctx.closePath()
   }
   ctx.save()
@@ -839,14 +686,16 @@ function drawMouth(ctx, f, look) {
  * can't smile is a wizard with no expression.
  */
 function drawBeard(ctx, f, look) {
-  const { h, headR, cheek, chinY, mouthY, ey } = f
+  const { h, headY, headR } = f
   const style = look.beard || { reach: 1, tash: true }
   const reach = style.reach
-  // Hung off the face's own landmarks — the cheekbones, the chin, the mouth —
-  // rather than off fixed multiples of the head radius, so it still fits when
-  // the chin is long and narrow instead of short and wide.
-  const dn = v => chinY + headR * v * reach
-
+  // Below the jaw everything scales with `reach`, so one path gives a cropped
+  // beard and an elder's waterfall without a second set of numbers. Above the
+  // jaw — sideburns, the upper edge, the moustache — nothing moves, because
+  // that's where the beard joins the face and it has to join it the same way.
+  const dn = v => headY + headR * (0.78 + (v - 0.78) * reach)
+  // Silvered hair, not white paper: a dark-haired elder greys, a fair one goes
+  // white, and either way the beard belongs to the head it's attached to.
   // Silvering goes with LENGTH, not with the wearer. A long beard is an
   // elder's and greys almost white; a moustache on a young wizard should be
   // the colour of the hair above it, or it reads as a smudge rather than hair.
@@ -857,38 +706,37 @@ function drawBeard(ctx, f, look) {
   ctx.fillStyle = col
   for (const s of [-1, 1]) {
     const drop = reach > 0 ? 1 : 0.62        // a moustache still gets short sideburns
-    const topY = ey - headR * 0.18
-    const botY = ey + (chinY - ey) * 0.78 * drop
     ctx.beginPath()
-    ctx.moveTo(s * cheek * 1.00, topY)
-    ctx.quadraticCurveTo(s * cheek * 1.04, (topY + botY) / 2, s * cheek * 0.68, botY)
-    ctx.quadraticCurveTo(s * cheek * 0.86, (topY + botY) / 2, s * cheek * 0.80, topY)
+    ctx.moveTo(s * headR * 0.94, headY - headR * 0.12)
+    ctx.quadraticCurveTo(s * headR * 1.0, headY + headR * 0.5 * drop, s * headR * 0.66, headY + headR * 0.86 * drop)
+    ctx.quadraticCurveTo(s * headR * 0.82, headY + headR * 0.36 * drop, s * headR * 0.74, headY - headR * 0.1)
     ctx.closePath()
     ctx.fill()
   }
 
   // The mass below the mouth: jaw, chin, and a waved hem. Skipped entirely for
   // a moustache, which is the whole point of having one.
-  const up = ey + headR * 0.30                 // where it meets the sideburns
+  const jawY = dn(0.78)
+  const tipY = dn(2.0)
   const beard = () => {
     ctx.beginPath()
-    ctx.moveTo(-cheek * 0.84, up)
-    ctx.quadraticCurveTo(-cheek * 0.90, chinY - headR * 0.30, -cheek * 0.62, dn(0.30))
+    ctx.moveTo(-headR * 0.8, headY + headR * 0.28)
+    ctx.quadraticCurveTo(-headR * 0.86, jawY, -headR * 0.6, dn(1.35))
     // Three lobes along the bottom, so the hem is hair rather than a hem.
-    ctx.quadraticCurveTo(-cheek * 0.52, dn(0.62), -cheek * 0.28, dn(0.74))
-    ctx.quadraticCurveTo(-cheek * 0.13, dn(0.92), 0, dn(0.98))
-    ctx.quadraticCurveTo(cheek * 0.13, dn(0.92), cheek * 0.28, dn(0.74))
-    ctx.quadraticCurveTo(cheek * 0.52, dn(0.62), cheek * 0.62, dn(0.30))
-    ctx.quadraticCurveTo(cheek * 0.90, chinY - headR * 0.30, cheek * 0.84, up)
+    ctx.quadraticCurveTo(-headR * 0.5, tipY * 0.55 + headY * 0.45, -headR * 0.26, dn(1.78))
+    ctx.quadraticCurveTo(-headR * 0.12, tipY, 0, dn(1.92))
+    ctx.quadraticCurveTo(headR * 0.12, tipY, headR * 0.26, dn(1.78))
+    ctx.quadraticCurveTo(headR * 0.5, tipY * 0.55 + headY * 0.45, headR * 0.6, dn(1.35))
+    ctx.quadraticCurveTo(headR * 0.86, jawY, headR * 0.8, headY + headR * 0.28)
     // Upper edge, dipping below the mouth so the smile stays visible.
-    ctx.quadraticCurveTo(0, mouthY + headR * 0.16, -cheek * 0.84, up)
+    ctx.quadraticCurveTo(0, headY + headR * 1.02, -headR * 0.8, headY + headR * 0.28)
     ctx.closePath()
   }
   if (reach > 0) {
     beard()
     ctx.fillStyle = col
     ctx.fill()
-    volume(ctx, beard, { x: -cheek, y: up, w: cheek * 2, h: dn(1.0) - up }, 0.6)
+    volume(ctx, beard, { x: -headR, y: headY, w: headR * 2, h: headR * 2.1 }, 0.6)
 
     // Strands, so it has grain.
     ctx.save()
@@ -899,8 +747,8 @@ function drawBeard(ctx, f, look) {
     ctx.lineCap = 'round'
     for (const sx of [-0.44, -0.16, 0.16, 0.44]) {
       ctx.beginPath()
-      ctx.moveTo(cheek * sx * 1.2, chinY - headR * 0.1)
-      ctx.quadraticCurveTo(cheek * sx, dn(0.45), cheek * sx * 0.8, dn(0.88))
+      ctx.moveTo(headR * sx * 1.5, dn(0.95))
+      ctx.quadraticCurveTo(headR * sx * 1.2, dn(1.45), headR * sx, dn(1.85))
       ctx.stroke()
     }
     ctx.restore()
@@ -912,23 +760,22 @@ function drawBeard(ctx, f, look) {
   drawMouth(ctx, f, look)
 
   // Moustache last, over the top lip: two lobes with a dip in the middle.
-  const mY = mouthY - headR * 0.10
-  const mw = cheek * 0.60
+  const mY = headY + headR * 0.42
   const tash = () => {
     ctx.beginPath()
-    ctx.moveTo(-mw, mY - headR * 0.06)
-    ctx.quadraticCurveTo(-mw * 0.58, mY - headR * 0.24, -mw * 0.10, mY - headR * 0.02)
-    ctx.quadraticCurveTo(0, mY + headR * 0.04, mw * 0.10, mY - headR * 0.02)
-    ctx.quadraticCurveTo(mw * 0.58, mY - headR * 0.24, mw, mY - headR * 0.06)
-    ctx.quadraticCurveTo(mw * 0.72, mY + headR * 0.32, 0, mY + headR * 0.22)
-    ctx.quadraticCurveTo(-mw * 0.72, mY + headR * 0.32, -mw, mY - headR * 0.06)
+    ctx.moveTo(-headR * 0.58, mY - headR * 0.06)
+    ctx.quadraticCurveTo(-headR * 0.34, mY - headR * 0.24, -headR * 0.06, mY - headR * 0.02)
+    ctx.quadraticCurveTo(0, mY + headR * 0.04, headR * 0.06, mY - headR * 0.02)
+    ctx.quadraticCurveTo(headR * 0.34, mY - headR * 0.24, headR * 0.58, mY - headR * 0.06)
+    ctx.quadraticCurveTo(headR * 0.42, mY + headR * 0.32, 0, mY + headR * 0.22)
+    ctx.quadraticCurveTo(-headR * 0.42, mY + headR * 0.32, -headR * 0.58, mY - headR * 0.06)
     ctx.closePath()
   }
   if (style.tash) {
     tash()
     ctx.fillStyle = shade(col, 0.08)
     ctx.fill()
-    volume(ctx, tash, { x: -mw, y: mY - headR * 0.3, w: mw * 2, h: headR * 0.7 }, 0.5)
+    volume(ctx, tash, { x: -headR * 0.6, y: mY - headR * 0.3, w: headR * 1.2, h: headR * 0.7 }, 0.5)
     tash()
     outline(ctx, h, col, 0.6)
   }
@@ -943,12 +790,6 @@ function drawBeard(ctx, f, look) {
  */
 function drawHair(ctx, h, headY, headR, look, view, pass) {
   const { hairHex: col, hairStyle: style } = look
-  // Hair follows the face it's on. The fringe and the side locks used to be
-  // hung off the head RADIUS, which is a circle's measurement — on a narrow
-  // face that put the locks out past the cheeks like a pair of rails, and on a
-  // broad one it cut into them. bw is the temples, cw the cheekbones.
-  const fsh = look.face || { brow: 0.9, cheek: 1, chinY: 1.15 }
-  const bw = headR * fsh.brow, cw = headR * fsh.cheek
   // How far past the jaw the hair falls, by length. Shortened when the head
   // dropped and grew: measured from the head's centre, the old numbers put
   // "Long" somewhere around the ankles.
@@ -1018,9 +859,9 @@ function drawHair(ctx, h, headY, headR, look, view, pass) {
     // rather than as hair tucked neatly under the hat.
     {
       ctx.beginPath()
-      ctx.moveTo(-bw * 1.06, headY - headR * 0.28)
-      ctx.quadraticCurveTo(0, headY - headR * 1.02, bw * 1.06, headY - headR * 0.28)
-      ctx.quadraticCurveTo(0, headY - headR * 0.66, -bw * 1.06, headY - headR * 0.28)
+      ctx.moveTo(-headR * 0.95, headY - headR * 0.28)
+      ctx.quadraticCurveTo(0, headY - headR * 1.02, headR * 0.95, headY - headR * 0.28)
+      ctx.quadraticCurveTo(0, headY - headR * 0.66, -headR * 0.95, headY - headR * 0.28)
       ctx.closePath()
       ctx.fill()
     }
@@ -1030,19 +871,19 @@ function drawHair(ctx, h, headY, headR, look, view, pass) {
   if (view === 'front') {
     // A fringe across the brow.
     ctx.beginPath()
-    ctx.moveTo(-bw * 1.10, headY - headR * 0.1)
-    ctx.quadraticCurveTo(-bw * 0.56, headY - headR * 0.95, bw * 0.22, headY - headR * 0.72)
-    ctx.quadraticCurveTo(bw * 0.96, headY - headR * 0.6, bw * 1.10, headY - headR * 0.05)
-    ctx.quadraticCurveTo(bw * 0.45, headY - headR * 0.5, -bw * 1.10, headY - headR * 0.1)
+    ctx.moveTo(-headR * 0.98, headY - headR * 0.1)
+    ctx.quadraticCurveTo(-headR * 0.5, headY - headR * 0.95, headR * 0.2, headY - headR * 0.72)
+    ctx.quadraticCurveTo(headR * 0.85, headY - headR * 0.6, headR * 0.98, headY - headR * 0.05)
+    ctx.quadraticCurveTo(headR * 0.4, headY - headR * 0.5, -headR * 0.98, headY - headR * 0.1)
     ctx.closePath()
     ctx.fill()
     // Side locks, length-dependent.
     if (style >= 1) {
       for (const sgn of [-1, 1]) {
         ctx.beginPath()
-        ctx.moveTo(sgn * bw * 1.08, headY - headR * 0.36)
-        ctx.quadraticCurveTo(sgn * cw * 1.16, headY + fall * 0.5, sgn * cw * 0.94, headY + fall * 0.95)
-        ctx.quadraticCurveTo(sgn * cw * 0.80, headY + fall * 0.42, sgn * bw * 0.82, headY - headR * 0.26)
+        ctx.moveTo(sgn * headR * 0.96, headY - headR * 0.36)
+        ctx.quadraticCurveTo(sgn * headR * 1.16, headY + fall * 0.5, sgn * headR * 0.92, headY + fall * 0.95)
+        ctx.quadraticCurveTo(sgn * headR * 0.78, headY + fall * 0.42, sgn * headR * 0.74, headY - headR * 0.26)
         ctx.closePath()
         ctx.fill()
       }

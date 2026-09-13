@@ -6,7 +6,7 @@ canvas{display:block;border:1px solid #2a2a55;background:#12122e}</style></head>
 <body><div id="out"></div>
 <script type="module">
 import { drawWizard } from '/src/engine/wizardSprite.js'
-import { SKIN_TONES, HAIR_COLORS, EYE_SHAPES, FACE_SHAPES, MOUTH_SHAPES, BROW_SHAPES, NOSE_SHAPES } from '/src/game/appearance.js'
+import { SKIN_TONES, HAIR_COLORS, EYE_SHAPES } from '/src/game/appearance.js'
 import { FORMS, formById } from '/src/game/skins.js'
 const out=document.getElementById('out')
 function row(title,items,size){
@@ -28,10 +28,6 @@ row('Hub portrait (168px)',[{form:formById('apprentice'),look:base},
 row('Every skin tone (120px)', SKIN_TONES.map(s=>({form:formById('frost'),look:{...base,skin:s.id},name:s.name})),120)
 row('Every eye shape (120px)', EYE_SHAPES.map(e=>({form:formById('apprentice'),look:{...base,eyes:e.id},name:e.name})),120)
 row('Hair colours + beards (120px)', HAIR_COLORS.map(hc=>({form:formById('storm'),look:{...base,hairColor:hc.id,beard:hc.id%2?2:0},name:hc.name})),120)
-row('Every face shape (120px)', FACE_SHAPES.map(f=>({form:formById('apprentice'),look:{...base,face:f.id},name:f.name})),120)
-row('Mixed characters (120px)', [0,1,2,3,4,5].map(i=>({form:formById('apprentice'),
-  look:{skin:i%5,hairColor:(i*2)%5,hairStyle:i%4,face:i,eyes:(i+2)%6,eyeColor:i%6,
-        brows:(i*3)%6,nose:i%4,mouth:(i+1)%6,beard:0},name:'#'+i})),120)
 row('Wardrobe tiles (86px)', FORMS.slice(0,9).map(f=>({form:f,look:base})),86)
 row('Choice-screen thumbs (58px)', FORMS.slice(0,9).map(f=>({form:f,look:base})),58)
 window.__done=true
