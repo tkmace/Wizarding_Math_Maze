@@ -2,7 +2,7 @@ import { chromium } from 'playwright'
 import http from 'http'
 import fs from 'fs'
 import path from 'path'
-import { takeNest } from './harness.mjs'
+import { takeNest, clearCoach } from './harness.mjs'
 
 const ROOT = '/home/claude/wmm/dist'
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.webmanifest': 'application/manifest+json' }
@@ -37,6 +37,7 @@ async function fresh(label, w = 430, h = 940) {
   await page.fill('input[type=password]', '1234')
   await page.locator('button', { hasText: 'Begin the Journey' }).click()
   await takeNest(page)
+  await clearCoach(page)
   await page.waitForSelector('text=WHAT SHALL WE PRACTICE', { timeout: 15000 })
   await page.locator('button', { hasText: 'Multiplication' }).click()
   await page.locator('button', { hasText: 'Enter the Maze' }).click()
@@ -52,6 +53,9 @@ const pts = page => page.evaluate(() => {
 /** Walk until an encounter's intro card appears. */
 async function walkToEncounter(page, limit = 500) {
   for (let i = 0; i < limit; i++) {
+    // A first-run card covers whatever it explains — clear it first, or every
+    // click below lands on the card instead of the thing underneath.
+    if (await clearCoach(page)) continue
     if (await page.locator('text=SOMETHING BLOCKS THE WAY').count()) return true
     if (await page.locator('text=/SPELL DUEL|RUNE CATCH/').count()) return true
     // Clearing the maze parks us on the win screen, where the arrow keys do
@@ -153,6 +157,9 @@ page = await fresh('lose')
 let banked = 0
 // Bank some points at a door first, so there is something that could be lost.
 for (let i = 0; i < 400 && banked < 1; i++) {
+  // A first-run card covers whatever it explains — clear it first, or every
+  // click below lands on the card instead of the thing underneath.
+  if (await clearCoach(page)) continue
   if (await page.locator('text=SOMETHING BLOCKS THE WAY').count()) {
     await page.locator('button', { hasText: 'Sneak past' }).click(); await page.waitForTimeout(400); continue
   }

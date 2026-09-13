@@ -17,3 +17,22 @@ export async function takeNest(page, nest = 'Bald Eagles') {
   await page.waitForTimeout(250)
   return true
 }
+
+/**
+ * Dismiss a first-run explanation if one is up.
+ *
+ * The tips freeze movement by design, so any harness that walks has to be able
+ * to clear them — a test is not a first-time player. Matches on the BUTTON:
+ * the tips quote each other's subjects, so their prose is not unique.
+ */
+// One locator, not six — this gets called inside walking loops that run
+// hundreds of iterations, and six round trips per step is a minute of nothing.
+const TIP_BTN = /^(Let's go!|I can do this|Back to the doors|Raise my wand|Mine now|Let me look)$/
+
+export async function clearCoach(page) {
+  const b = page.locator('button', { hasText: TIP_BTN })
+  if (!(await b.count())) return false
+  await b.first().click().catch(() => {})
+  await page.waitForTimeout(150)
+  return true
+}

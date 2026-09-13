@@ -2,7 +2,7 @@ import { chromium } from 'playwright'
 import http from 'http'
 import fs from 'fs'
 import path from 'path'
-import { takeNest } from './harness.mjs'
+import { takeNest, clearCoach } from './harness.mjs'
 
 const ROOT = '/home/claude/wmm/dist'
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.webmanifest': 'application/manifest+json' }
@@ -65,6 +65,7 @@ await page.fill('input[type=text]', 'Camille')
 await page.fill('input[type=password]', '1234')
 await page.locator('button', { hasText: 'Begin the Journey' }).click()
 await takeNest(page)
+await clearCoach(page)
 await page.waitForSelector('text=WHAT SHALL WE PRACTICE', { timeout: 15000 })
 await snap(page, '40-hub-v4')
 const senseDefault = (await prof(page)).diff
@@ -75,6 +76,8 @@ console.log('   marked recommended:', await page.locator('text=RECOMMENDED').cou
 // ── 2. Into a maze: third-person wizard, side tabs, gate bar ───────────────
 await page.locator('button', { hasText: 'Multiplication' }).click()
 await page.locator('button', { hasText: 'Enter the Maze' }).click()
+await page.waitForTimeout(500)
+await clearCoach(page)                         // the "into the maze" card
 await page.waitForTimeout(1400)
 await snap(page, '41-game-thirdperson')
 console.log('2. exit gate bar shown:', await page.locator('text=/EXIT SEALED|EXIT UNSEALED/').count() > 0 ? 'PASS' : 'FAIL')
@@ -84,6 +87,9 @@ console.log('   gate says:', gateTxt.trim())
 // Walk around and catch a frame where a side turn is signposted.
 let sawSide = false
 for (let i = 0; i < 60 && !sawSide; i++) {
+  // A first-run card covers whatever it explains — clear it first, or every
+  // click below lands on the card instead of the thing underneath.
+  if (await clearCoach(page)) continue
   if (await page.locator('text=PATH').count() || await page.locator('div', { hasText: /^DOOR$/ }).count()) sawSide = true
   else { await page.keyboard.press(Math.random() < 0.5 ? 'ArrowUp' : 'ArrowRight'); await page.waitForTimeout(120) }
 }
@@ -93,6 +99,9 @@ if (sawSide) await snap(page, '42-side-signposts')
 // ── 3. Door prompt must not reveal the numbers ──────────────────────────────
 let atDoor = false
 for (let i = 0; i < 140 && !atDoor; i++) {
+  // A first-run card covers whatever it explains — clear it first, or every
+  // click below lands on the card instead of the thing underneath.
+  if (await clearCoach(page)) continue
   if (await page.locator('text=PRESS ▲ TO UNLOCK').count()) atDoor = true
   else { const r = Math.random(); await page.keyboard.press(r < 0.6 ? 'ArrowUp' : r < 0.8 ? 'ArrowLeft' : 'ArrowRight'); await page.waitForTimeout(110) }
 }
@@ -107,8 +116,13 @@ if (atDoor) {
 // ── 4. Play until rank 1 (100 pts), across as many mazes as it takes ───────
 let doors = 0, mazes = 0, choosing = false
 for (let i = 0; i < 2600 && !choosing; i++) {
-  // A door puzzle is open whenever the keypad's tick button exists.
-  if (await page.locator('button', { hasText: '✓' }).count()) {
+  // A first-run card covers whatever it explains — clear it first, or every
+  // click below lands on the card instead of the thing underneath.
+  if (await clearCoach(page)) continue
+  // A door puzzle is open whenever the door modal is up. Checking for the
+  // keypad's ✓ alone was wrong: the hub's operation buttons carry a ✓ too, so a
+  // loop that ended up back at the castle sat there trying to type an answer.
+  if (await page.locator('text=/^◆ (SEALED DOOR|RUNE OF RETURN)$/').count()) {
     await answerDoor(page, true); doors++; continue
   }
   // The rank-up choice takes priority over everything else.
@@ -116,6 +130,7 @@ for (let i = 0; i < 2600 && !choosing; i++) {
   // An encounter swallows the arrow keys. Its intro needs a click, then the
   // duel takes 1-4; without this the walk stalls at the first creature.
   if (await page.locator('text=SOMETHING BLOCKS THE WAY').count()) {
+    await clearCoach(page)
     await page.locator('button', { hasText: /Raise your wand|Catch the runes/ }).click()
     await page.waitForTimeout(400)
     continue

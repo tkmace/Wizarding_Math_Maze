@@ -1,4 +1,5 @@
-import { blankSkill, SENSE } from '../game/math.js'
+import { blankSkill, SENSE, parseFactKey } from '../game/math.js'
+import { allSeen } from '../game/tips.js'
 import { blankAppearance, randomAppearance } from '../game/appearance.js'
 import { mapLegacySkin, formById, STARTER } from '../game/skins.js'
 
@@ -40,6 +41,9 @@ export function blankProfile(name, passcode) {
     appearance: randomAppearance(),// face and hair — hers, kept across every form
     nest: null,                    // one of the four nests, chosen on first run
     skill: blankSkill(),           // per-operation 0..1, drives Wizard's Sense
+    opPlays: {},                   // answers per operation — holds the adaptive
+                                   // climb down while it has nothing to read yet
+    seen: {},                      // first-run explanations already shown
     stones: 0,
     plays: 0,
     facts: {},
@@ -71,6 +75,25 @@ export function migrate(p) {
     bought: Array.isArray(p.bought) ? [...p.bought] : [],
     skill: { ...blankSkill(), ...(p.skill || {}) },
     appearance: { ...blankAppearance(), ...(p.appearance || {}) },
+    opPlays: { ...(p.opPlays || {}) },
+    seen: { ...(p.seen || {}) },
+  }
+
+  // Someone with a real history behind her does not need to be told what a door
+  // is. Anyone from before these existed who has played more than a handful of
+  // questions starts with the lot marked as read.
+  if (!p.seen && (p.plays || 0) >= 15) out.seen = allSeen()
+
+  // A wizard from before opPlays existed has a real history in her fact table.
+  // Count it, so the beginner's ceiling on Wizard's Sense doesn't apply to
+  // someone who is plainly not a beginner.
+  if (!p.opPlays) {
+    const counted = {}
+    for (const [key, f] of Object.entries(out.facts)) {
+      const { op } = parseFactKey(key)          // the key stores 'add', not 'addition'
+      counted[op] = (counted[op] || 0) + (f?.n || 0)
+    }
+    out.opPlays = counted
   }
 
   if (!Array.isArray(out.settings.ops) || !out.settings.ops.length) out.settings.ops = ['addition']

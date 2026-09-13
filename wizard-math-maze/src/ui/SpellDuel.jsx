@@ -27,6 +27,12 @@ export default function SpellDuel({ creature, ops, diff, profile, form, appearan
   const [phase, setPhase] = useState('fight')     // fight | won | lost
   const [shake, setShake] = useState(false)
   const [dud, setDud] = useState(null)            // an option already ruled out
+  // The answer just tapped correctly. The bolt takes a moment to cross the
+  // screen and the creature might die when it lands, so the next question can't
+  // be dealt until we know — otherwise a fresh question flashes up for a
+  // quarter of a second after the final blow and is snatched away unanswered,
+  // which is exactly what Tom saw as "answers with no question".
+  const [good, setGood] = useState(null)
   const askedAt = useRef(performance.now())
   const choices = useMemo(() => answerChoices(q), [q])
 
@@ -52,11 +58,12 @@ export default function SpellDuel({ creature, ops, diff, profile, form, appearan
   const nextQuestion = useCallback(() => {
     setQ(encounterQuestion(ops, diff, profile))
     setDud(null)
+    setGood(null)
     askedAt.current = performance.now()
   }, [ops, diff, profile])
 
   const pick = useCallback(value => {
-    if (d.over || value === dud) return
+    if (d.over || good != null || value === dud) return
     const ms = performance.now() - askedAt.current
     const correct = value === q.ans
     d.answers.push({ q, correct, ms })
@@ -65,20 +72,21 @@ export default function SpellDuel({ creature, ops, diff, profile, form, appearan
       d.earned += q.curPts
       d.bolt = { p: 0 }
       d.charge = Math.max(0, d.charge - plan.hitRelief)
-      nextQuestion()
+      setGood(value)              // hold this question up, ticked, until the bolt lands
     } else {
       d.charge = Math.min(1, d.charge + plan.missCost)
       setDud(value)                 // grey it out rather than just rejecting the tap
       setShake(true)
       setTimeout(() => setShake(false), 420)
     }
-  }, [q, d, dud, plan, nextQuestion])
+  }, [q, d, dud, good, plan])
 
   // Keys 1-4 pick the options, for whoever is on a laptop.
   useEffect(() => {
     const h = e => {
       const i = ['1', '2', '3', '4'].indexOf(e.key)
       if (i >= 0 && choices[i] != null) { e.preventDefault(); pick(choices[i]) }
+      if (e.key === 'Enter' || e.key === ' ') e.preventDefault()
     }
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
@@ -119,6 +127,7 @@ export default function SpellDuel({ creature, ops, diff, profile, form, appearan
           d.hit = 1
           d.hp -= 1
           if (d.hp <= 0) finish('won')
+          else nextQuestion()      // only now, once we know there IS a next one
         }
       }
       d.hit = Math.max(0, d.hit - dt / 320)
@@ -228,17 +237,22 @@ export default function SpellDuel({ creature, ops, diff, profile, form, appearan
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9, marginTop: 12 }}>
               {choices.map(v => {
                 const out = v === dud
+                const hit = v === good
+                const held = good != null && !hit         // the others, while it lands
                 return (
-                  <button key={v} className="bh" onClick={() => pick(v)} disabled={out} style={{
-                    minHeight: 66, borderRadius: 16, cursor: out ? 'default' : 'pointer',
-                    border: `2px solid ${out ? C.line : q.color}`,
-                    background: out ? '#0d0d22' : `${q.color}1f`,
-                    color: out ? C.faint : '#fff',
+                  <button key={v} className="bh" onClick={() => pick(v)}
+                    disabled={out || good != null} style={{
+                    minHeight: 66, borderRadius: 16,
+                    cursor: out || good != null ? 'default' : 'pointer',
+                    border: `2px solid ${hit ? C.good : out ? C.line : q.color}`,
+                    background: hit ? `${C.good}33` : out ? '#0d0d22' : `${q.color}1f`,
+                    color: hit ? C.good : out ? C.faint : '#fff',
                     fontSize: 28, fontWeight: 900, fontFamily: sans,
-                    opacity: out ? 0.4 : 1,
+                    opacity: out ? 0.4 : held ? 0.35 : 1,
                     textDecoration: out ? 'line-through' : 'none',
+                    transition: 'opacity .12s ease, background .12s ease',
                     WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
-                  }}>{v}</button>
+                  }}>{hit ? `✓ ${v}` : v}</button>
                 )
               })}
             </div>

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { buildHint, opByKey } from '../game/math.js'
 import { C, sans, serif, btn } from './theme.js'
 import Keypad from './Keypad.jsx'
+import ScratchPad from './ScratchPad.jsx'
 import Hint from './Hint.jsx'
 
 /**
@@ -12,6 +13,20 @@ import Hint from './Hint.jsx'
  *  - no dead end — she can always step back and try another corridor.
  */
 export default function MathDoor({ q, stones, swiftMs = 0, bigKeypad, onCorrect, onWrong, onSpendStone, onStepBack }) {
+  // Two panels side by side need roughly 840px. That's an iPad in either
+  // orientation and any laptop; a phone keeps the single panel it had.
+  const [roomy, setRoomy] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth >= 840)
+  useEffect(() => {
+    const on = () => setRoomy(window.innerWidth >= 840)
+    window.addEventListener('resize', on)
+    window.addEventListener('orientationchange', on)
+    return () => {
+      window.removeEventListener('resize', on)
+      window.removeEventListener('orientationchange', on)
+    }
+  }, [])
+
   const [ans, setAns] = useState('')
   const [shake, setShake] = useState(false)
   const [showHint, setShowHint] = useState(false)
@@ -103,7 +118,7 @@ export default function MathDoor({ q, stones, swiftMs = 0, bigKeypad, onCorrect,
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 60, display: 'flex',
-      alignItems: 'center', justifyContent: 'center', padding: 12,
+      alignItems: 'center', justifyContent: 'center', padding: 12, gap: 12,
       background: 'rgba(4,3,18,.82)', backdropFilter: 'blur(5px)',
     }}>
       <div className={`appear scroll ${shake ? 'shake' : ''}`} style={{
@@ -204,6 +219,20 @@ export default function MathDoor({ q, stones, swiftMs = 0, bigKeypad, onCorrect,
           </button>
         </div>
       </div>
+
+      {/* Scratch paper, on anything with room beside the keypad. A phone has
+          no such room and doesn't get it — squeezing a writing surface into
+          150px would be worse than not offering one. */}
+      {roomy && (
+        <div className="appear" style={{
+          width: '100%', maxWidth: 400, maxHeight: '96vh',
+          background: C.panel, border: `3px solid ${C.line}`, borderRadius: 24,
+          boxShadow: 'inset 0 0 70px #00000066',
+          padding: '16px 16px 18px',
+        }}>
+          <ScratchPad height={Math.min(430, Math.round(window.innerHeight * 0.52))} tint={q.color} />
+        </div>
+      )}
     </div>
   )
 }

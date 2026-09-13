@@ -32,6 +32,17 @@ const SKILL_DOWN     = 0.052
 const SKILL_MIN      = 0.02
 const SPEED_BONUS    = 0.25   // up to +25% for answering well inside the window
 
+// How high the adaptive skill is allowed to climb in the first few questions of
+// an operation. Wizard's Sense reads a child from how she answers, and at the
+// very start it has almost nothing to read: a beginner who gets three lucky
+// ones in a row was being handed Sorcerer-sized numbers before she had really
+// begun, which is how an encounter ends up too hard for a younger sister. The
+// ceiling lifts by about a tier every six questions and stops mattering after
+// twenty-odd. It only ever limits a RISE — it can never drag anyone back below
+// where they already are, so a returning wizard keeps her level.
+const WARM_BASE = 0.16
+const WARM_STEP = 0.042
+
 export const blankFact = () => ({ n: 0, right: 0, wrong: 0, box: 0, due: 0, bestMs: null, lastMs: null, streak: 0 })
 
 /**
@@ -104,6 +115,8 @@ export function recordAnswer(profile, q, correct, ms, swiftBonusMs = 0) {
 
   // --- Wizard's Sense ---
   const skill = { ...blankSkill(), ...(profile?.skill || {}) }
+  const opPlays = { ...(profile?.opPlays || {}) }
+  opPlays[q.op] = (opPlays[q.op] || 0) + 1
   const cur = skillOf(profile, q.op)
   let delta
   if (!correct)      delta = -SKILL_DOWN
@@ -118,9 +131,13 @@ export function recordAnswer(profile, q, correct, ms, swiftBonusMs = 0) {
   }
   // Ease off as it approaches the ceiling so the top tier has to be earned.
   const scaled = delta > 0 ? delta * (1 - cur * 0.50) : delta
-  skill[q.op] = Math.min(1, Math.max(SKILL_MIN, cur + scaled))
+  const warmCap = WARM_BASE + WARM_STEP * opPlays[q.op]
+  const next = Math.min(1, Math.max(SKILL_MIN, cur + scaled))
+  // The cap holds back a climb, never a wizard: `Math.max(cur, warmCap)` means
+  // it can only ever slow someone down, not send them backwards.
+  skill[q.op] = Math.min(next, Math.max(cur, warmCap))
 
-  return { facts, skill, plays, fast, bonus: fast ? roundPts(q.curPts * 0.25) : 0 }
+  return { facts, skill, opPlays, plays, fast, bonus: fast ? roundPts(q.curPts * 0.25) : 0 }
 }
 
 // --- Mastery classification ---------------------------------------------------

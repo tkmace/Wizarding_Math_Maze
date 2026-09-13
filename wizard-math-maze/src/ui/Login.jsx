@@ -4,6 +4,7 @@ import { syncEnabled, pull as cloudPull, mergeProfiles, findLegacy, claimLegacy 
 import { formById, rankFor, mapLegacySkin } from '../game/skins.js'
 import WizardPreview from './WizardPreview.jsx'
 import NestCrest from './NestCrest.jsx'
+import Keypad from './Keypad.jsx'
 import { C, sans, serif, btn, panel, label } from './theme.js'
 
 /**
@@ -123,6 +124,24 @@ export default function Login({ onEnter }) {
 
   const lastName = getLastPlayer()
 
+  // On a tablet the system keyboard slides up over the button you're trying to
+  // press, and there's no way to put a "go" key on it. So on a touch device the
+  // passcode box doesn't summon it — inputMode="none" keeps it down — and the
+  // app draws its own pad with the enter key built in. The field itself stays
+  // editable, so a Bluetooth keyboard (or an iPad in a case) still types, and
+  // nobody is ever locked out by a wrong guess about what kind of device this is.
+  const touch = typeof window !== 'undefined'
+    && window.matchMedia?.('(pointer: coarse)').matches
+  const codeKeypad = (submit, label) => touch && (
+    <Keypad
+      onDigit={dd => { setCode(c => (c + dd).slice(0, 6)); setErr('') }}
+      onBack={() => { setCode(c => c.slice(0, -1)); setErr('') }}
+      onSubmit={submit}
+      canSubmit={code.length >= 4 && !busy}
+      submitLabel={label}
+    />
+  )
+
   return (
     <div className="appear" style={{ textAlign: 'center', zIndex: 10, maxWidth: 440, width: '100%', padding: '0 14px' }}>
       <div style={{ fontSize: 66, marginBottom: 4 }} className="wf">🧙‍♂️</div>
@@ -179,12 +198,14 @@ export default function Login({ onEnter }) {
             <div style={{ color: '#fff', fontWeight: 900, fontSize: 20, marginBottom: 14, fontFamily: sans }}>{target.name}</div>
             <label style={label({ textAlign: 'left' })}>SECRET PASSCODE</label>
             <input
-              ref={codeRef} type="password" inputMode="numeric" pattern="[0-9]*" maxLength={6}
+              ref={codeRef} type="password" inputMode={touch ? 'none' : 'numeric'}
+              enterKeyHint="go" pattern="[0-9]*" maxLength={6}
               value={code} placeholder="••••"
               onChange={e => { setCode(e.target.value.replace(/\D/g, '').slice(0, 6)); setErr('') }}
               onKeyDown={e => e.key === 'Enter' && unlock()}
               style={inputStyle({ textAlign: 'center', fontSize: 24, letterSpacing: 8 })}
             />
+            {codeKeypad(unlock, 'ENTER ›')}
             {err && <Err>{err}</Err>}
             <button className="bh" onClick={unlock} disabled={busy}
               style={btn('gold', { width: '100%', marginTop: 4, opacity: busy ? 0.7 : 1 })}>
@@ -208,12 +229,14 @@ export default function Login({ onEnter }) {
               SECRET PASSCODE <span style={{ color: C.faint, fontSize: 9 }}>(4–6 numbers)</span>
             </label>
             <input
-              type="password" inputMode="numeric" pattern="[0-9]*" maxLength={6}
+              type="password" inputMode={touch ? 'none' : 'numeric'}
+              enterKeyHint="go" pattern="[0-9]*" maxLength={6}
               value={code} placeholder="••••"
               onChange={e => { setCode(e.target.value.replace(/\D/g, '').slice(0, 6)); setErr('') }}
               onKeyDown={e => e.key === 'Enter' && make()}
               style={inputStyle({ textAlign: 'center', fontSize: 22, letterSpacing: 8 })}
             />
+            {codeKeypad(make, 'BEGIN ›')}
             {err && <Err>{err}</Err>}
             <button className="bh" onClick={make} disabled={busy}
               style={btn('gold', { width: '100%', marginTop: 4, opacity: busy ? 0.7 : 1 })}>

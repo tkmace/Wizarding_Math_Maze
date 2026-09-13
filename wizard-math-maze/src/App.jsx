@@ -5,6 +5,7 @@ import { roundPts, SENSE } from './game/math.js'
 import { formById, rankFor, pendingRanks, activePerks, buyState, STARTER } from './game/skins.js'
 import { rollEncounter, encounterReward } from './game/encounters.js'
 import { hasNest } from './game/nests.js'
+import { seenTip } from './game/tips.js'
 import { saveProfile } from './store/storage.js'
 import { syncEnabled, push as cloudPush } from './store/sync.js'
 import { CSS, C, sans, serif } from './ui/theme.js'
@@ -21,6 +22,7 @@ import SkinChoice from './ui/SkinChoice.jsx'
 import LookPicker from './ui/LookPicker.jsx'
 import NestPicker from './ui/NestPicker.jsx'
 import Encounter from './ui/Encounter.jsx'
+import Coach from './ui/Coach.jsx'
 
 const DISSOLVE_MS = 620
 const AMBUSH_MS = 760       // the creature lands in the corridor before the pop-up
@@ -49,6 +51,12 @@ export default function App() {
   const [flare, setFlare] = useState(0)
   const [newRank, setNewRank] = useState(null)
   const [encounter, setEncounter] = useState(null)
+  // The first-run explanations. `tip` is the one on screen; the ref lets the
+  // movement handler refuse to walk while one is up, since the card covers the
+  // maze and a held arrow key would otherwise carry on behind it.
+  const [tip, setTip] = useState(null)
+  const tipRef = useRef(null)
+  tipRef.current = tip
   // An encounter is queued with a short delay so the step finishes animating.
   // Without this flag, a door bumped inside that window opened BOTH overlays.
   const encPending = useRef(false)
@@ -77,6 +85,19 @@ export default function App() {
     const p = profileRef.current
     if (p && syncEnabled()) cloudPush(p)
   }, [])
+
+  // Show an explanation the first time its moment arrives, and never again.
+  const teach = useCallback(id => {
+    const p = profileRef.current
+    if (p && !seenTip(p, id)) setTip(id)
+  }, [])
+
+  const learned = useCallback(() => {
+    const id = tipRef.current
+    setTip(null)
+    const p = profileRef.current
+    if (id && p) commit({ ...p, seen: { ...(p.seen || {}), [id]: true } })
+  }, [commit])
 
   const enter = useCallback(p => {
     setProfile(p)
@@ -130,7 +151,8 @@ export default function App() {
     encState.current = { count: 0, lastAt: -99 }
     steps.current = 0
     setScreen('game')
-  }, [ops, diff, profile, perks])
+    teach('maze')
+  }, [ops, diff, profile, perks, teach])
 
   const toggleOp = useCallback(k => setOps(prev => {
     const n = new Set(prev)
@@ -138,8 +160,11 @@ export default function App() {
     return n
   }), [])
 
+  // A message over the maze. Anything asked to stay up for longer than a beat
+  // gets the holding animation as well as the longer timeout — otherwise the
+  // CSS faded it out on its own schedule and the extra time bought nothing.
   const say = useCallback((text, ms = 1500) => {
-    setPopup({ text, k: Date.now() })
+    setPopup({ text, k: Date.now(), long: ms >= 2200 })
     setTimeout(() => setPopup(null), ms)
   }, [])
 
@@ -150,6 +175,7 @@ export default function App() {
     // move that arrives anyway is dropped here rather than walking her through
     // a maze she is no longer looking at.
     if (screenRef.current !== 'game') return
+    if (tipRef.current) return
     if (doorQ || encounter || encPending.current || !maze) return
     const cur = posRef.current
     const { row, col, facing } = cur
@@ -164,7 +190,7 @@ export default function App() {
 
     if (cell === DOOR) {
       const q = maze.dq[cellKey(nr, nc)]
-      if (q) { setDoorQ(q); setDoorCell({ row: nr, col: nc }) }
+      if (q) { setDoorQ(q); setDoorCell({ row: nr, col: nc }); teach('door') }
       return
     }
 
@@ -173,7 +199,8 @@ export default function App() {
     if (cell === END) {
       const needed = (maze.pointsRequired || 0) - runRef.current.points
       if (needed > 0) {
-        say(`🔒 Sealed — ${needed} more points`, 1800)
+        say(`🔒 The way out is sealed —\nearn ${needed} more points to open it`, 3600)
+        teach('gate')
         return
       }
     }
@@ -186,6 +213,7 @@ export default function App() {
       delete maze.stones[k]
       commit({ ...profile, stones: (profile.stones || 0) + 1 })
       say('🔮 +1 Rune Stone')
+      teach('rune')
     }
 
     if (cell === END) { setTimeout(() => finishMaze(), 280); return }
@@ -203,11 +231,12 @@ export default function App() {
       setTimeout(() => {
         encPending.current = false
         setEncounter(enc)
+        teach('encounter')
         setEffects(e => e.filter(x => x.start !== start))
       }, AMBUSH_MS)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [doorQ, encounter, maze, profile, commit, say])
+  }, [doorQ, encounter, maze, profile, commit, say, teach])
 
   // The movement pad repeats on hold, so it must not capture `act` from the
   // render where the hold began — the maze can change underneath it.
@@ -249,6 +278,7 @@ export default function App() {
       totalPoints: total,
       facts: rec.facts,
       skill: rec.skill,
+      opPlays: rec.opPlays,
       plays: rec.plays,
       stats: {
         ...profile.stats,
@@ -309,6 +339,7 @@ export default function App() {
         ...prev,
         facts: rec.facts,
         skill: rec.skill,
+        opPlays: rec.opPlays,
         plays: rec.plays,
         stats: { ...prev.stats, wrong: (prev.stats?.wrong || 0) + 1 },
       }
@@ -334,7 +365,7 @@ export default function App() {
     for (const a of answers || []) {
       const rec = recordAnswer(next, a.q, a.correct, a.ms, perks.swift)
       if (rec.fast) fastCount += 1
-      next = { ...next, facts: rec.facts, skill: rec.skill, plays: rec.plays }
+      next = { ...next, facts: rec.facts, skill: rec.skill, opPlays: rec.opPlays, plays: rec.plays }
     }
 
     const reward = outcome === 'won' ? encounterReward(earned, perks) : { points: 0, stone: 0 }
@@ -441,7 +472,7 @@ export default function App() {
           profile={profile} ops={ops} diff={diff} pendingPicks={pending.length}
           onToggleOp={toggleOp} onSetDiff={setDiff}
           onStart={startGame}
-          onWardrobe={() => setScreen('wardrobe')}
+          onWardrobe={() => { setScreen('wardrobe'); teach('wardrobe') }}
           onReport={() => setScreen('report')}
           onScroll={() => setScreen('scroll')}
           onLook={() => setScreen('look')}
@@ -487,7 +518,12 @@ export default function App() {
         />
       )}
       {screen === 'look' && profile && (
-        <LookPicker profile={profile} onSave={saveLook} onClose={() => setScreen('hub')} />
+        <LookPicker
+          profile={profile}
+          onSave={saveLook}
+          onClose={() => setScreen('hub')}
+          onNest={look => { if (look) commit({ ...profile, appearance: look }); setScreen('nest') }}
+        />
       )}
 
       {encounter && profile && (
@@ -515,11 +551,19 @@ export default function App() {
       )}
 
       {flare > 0 && <div key={flare} className="flare" />}
+      {tip && <Coach id={tip} onClose={learned} />}
+
       {popup && screen === 'game' && (
-        <div key={popup.k} className="pop" style={{
-          position: 'fixed', left: '50%', top: '44%', transform: 'translateX(-50%)',
+        <div key={popup.k} className={popup.long ? 'popLong' : 'pop'} style={{
+          position: 'fixed', left: '50%', top: '42%', transform: 'translateX(-50%)',
           zIndex: 70, color: C.goldHi, fontFamily: serif, fontWeight: 900,
-          fontSize: 28, textShadow: `0 0 22px ${C.gold}`, whiteSpace: 'nowrap',
+          fontSize: popup.long ? 21 : 28, lineHeight: 1.35, textAlign: 'center',
+          textShadow: `0 0 22px ${C.gold}`,
+          whiteSpace: 'pre-line', maxWidth: '86vw',
+          background: popup.long ? 'rgba(8,6,28,.78)' : 'none',
+          borderRadius: popup.long ? 14 : 0,
+          padding: popup.long ? '10px 16px' : 0,
+          border: popup.long ? `1.5px solid ${C.gold}66` : 'none',
         }}>{popup.text}</div>
       )}
     </div>

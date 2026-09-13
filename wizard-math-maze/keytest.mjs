@@ -2,7 +2,7 @@
 // walking into the door, from a held key, or from a button that still had focus.
 import { chromium } from 'playwright'
 import http from 'http'; import fs from 'fs'; import path from 'path'
-import { takeNest } from './harness.mjs'
+import { takeNest, clearCoach } from './harness.mjs'
 const ROOT = '/home/claude/wmm/dist'
 const M = { '.html': 'text/html', '.js': 'text/javascript', '.webmanifest': 'application/manifest+json' }
 const srv = http.createServer((q, r) => {
@@ -25,6 +25,7 @@ await page.fill('input[type=text]', 'Camille')
 await page.fill('input[type=password]', '1234')
 await page.locator('button', { hasText: 'Begin the Journey' }).click()
 await takeNest(page)
+await clearCoach(page)
 await page.waitForSelector('text=WHAT SHALL WE PRACTICE', { timeout: 15000 })
 await page.locator('button', { hasText: 'Enter the Maze' }).click()
 await page.waitForTimeout(1200)
@@ -36,6 +37,9 @@ const boxText = () => page.evaluate(() => {
 })
 const doorOpen = () => page.locator('button', { hasText: '✓' }).count().then(n => n > 0)
 const clearEncounter = async i => {
+  // A first-run explanation sits on top of everything it explains, so it has to
+  // go before anything underneath it can be clicked.
+  if (await clearCoach(page)) return true
   if (await page.locator('text=SOMETHING BLOCKS THE WAY').count()) {
     await page.locator('button', { hasText: /Raise your wand|Catch the runes/ }).click()
     await page.waitForTimeout(350); return true
@@ -53,6 +57,9 @@ const clearEncounter = async i => {
 /** Walk until a door puzzle is open. Holds ▲ down, which is how a child walks. */
 async function walkToDoor(hold) {
   for (let i = 0; i < 300; i++) {
+    // A first-run card covers whatever it explains — clear it first, or every
+    // click below lands on the card instead of the thing underneath.
+    if (await clearCoach(page)) continue
     if (await doorOpen()) return true
     if (await clearEncounter(i)) continue
     if (hold && await page.locator('text=PRESS ▲ TO UNLOCK').count()) {

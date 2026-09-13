@@ -1,5 +1,6 @@
 import { chromium } from 'playwright'
 import http from 'http'; import fs from 'fs'; import path from 'path'
+import { clearCoach } from './harness.mjs'
 const ROOT='/home/claude/wmm/dist'
 const M={'.html':'text/html','.js':'text/javascript','.webmanifest':'application/manifest+json'}
 const srv=http.createServer((q,r)=>{const u=new URL(q.url,'http://x')
@@ -21,11 +22,15 @@ await page.locator('button',{hasText:'Enter the Maze'}).click()
 await page.waitForTimeout(1500)
 await page.screenshot({path:`${OUT}/52-wall-masonry.png`})
 // walk a few steps down a corridor for a depth shot
+await clearCoach(page)                       // the "into the maze" card
 for (let i=0;i<6;i++){ await page.keyboard.press('ArrowUp'); await page.waitForTimeout(260) }
 await page.screenshot({path:`${OUT}/53-corridor-depth.png`})
 // Hunt for a frame with a door signposted to the side — that's the geometry
 // worth looking at, and a door straight ahead never exercises it.
 for (let i=0;i<260;i++){
+  // A first-run card covers whatever it explains — clear it first, or every
+  // click below lands on the card instead of the thing underneath.
+  if (await clearCoach(page)) continue
   const side = await page.locator('span', {hasText: /^DOOR$/}).count()
   if (side){ await page.waitForTimeout(400); await page.screenshot({path:`${OUT}/54-side-door.png`}); break }
   if (await page.locator('text=SOMETHING BLOCKS THE WAY').count()){

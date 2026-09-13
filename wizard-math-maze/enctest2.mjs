@@ -1,6 +1,6 @@
 import { chromium } from 'playwright'
 import http from 'http'; import fs from 'fs'; import path from 'path'
-import { takeNest } from './harness.mjs'
+import { takeNest, clearCoach } from './harness.mjs'
 const ROOT='/home/claude/wmm/dist'
 const MIME={'.html':'text/html','.js':'text/javascript','.webmanifest':'application/manifest+json'}
 const srv=http.createServer((q,r)=>{const u=new URL(q.url,'http://x')
@@ -21,6 +21,7 @@ async function fresh(label){
   await page.fill('input[type=text]','Cam'); await page.fill('input[type=password]','1234')
   await page.locator('button',{hasText:'Begin the Journey'}).click()
   await takeNest(page)
+  await clearCoach(page)
   await page.waitForSelector('text=WHAT SHALL WE PRACTICE',{timeout:15000})
   await page.locator('button',{hasText:'Multiplication'}).click()
   await page.locator('button',{hasText:'Enter the Maze'}).click(); await page.waitForTimeout(1200)
@@ -28,6 +29,9 @@ async function fresh(label){
 }
 async function walk(page,limit=500){
   for(let i=0;i<limit;i++){
+    // A first-run card covers whatever it explains — clear it first, or every
+    // click below lands on the card instead of the thing underneath.
+    if (await clearCoach(page)) continue
     if(await page.locator('text=SOMETHING BLOCKS THE WAY').count()) return true
     if(await page.locator('button',{hasText:'Step back'}).count()){
       await page.locator('button',{hasText:'Step back'}).click({timeout:3000}).catch(()=>{}); await page.waitForTimeout(130); continue }

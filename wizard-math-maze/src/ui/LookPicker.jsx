@@ -4,29 +4,39 @@ import {
   EYE_SHAPES, EYE_COLORS, BEARD_STYLES,
 } from '../game/appearance.js'
 import { formById } from '../game/skins.js'
+import { nestById } from '../game/nests.js'
 import { C, sans, serif, btn, panel, label } from './theme.js'
 import WizardPreview from './WizardPreview.jsx'
+import NestCrest from './NestCrest.jsx'
 
 /**
- * Choose the wizard's face and hair.
+ * Everything about the wizard herself, as opposed to the robe she's earned.
  *
- * This is the half of the character that persists: the form she earns is a
- * costume, this is her. Changes preview live on the currently worn form so she
- * can see the combination she'll actually be playing.
+ * Called "My Wizard" rather than "My Look" because it isn't only a look any
+ * more: her face, her hair, her beard and the nest she belongs to all live
+ * here, and a child looking for where to change her house was never going to
+ * find it behind the word "look". Changes preview live on the robe she's
+ * actually wearing.
  */
-export default function LookPicker({ profile, onSave, onClose }) {
+export default function LookPicker({ profile, onSave, onClose, onNest }) {
   const [look, setLook] = useState(() => ({ ...blankAppearance(), ...(profile.appearance || {}) }))
   const form = formById(profile.equippedSkin)
 
+  const nest = nestById(profile.nest)
   const set = (key, value) => setLook(l => ({ ...l, [key]: value }))
 
   return (
     <div className="appear scroll" style={{ zIndex: 10, width: '100%', maxWidth: 470, padding: '8px 14px 24px' }}>
+      {/* The way out lives at the top as well as the bottom — this page is long
+          and scrolling to the end to get home is a chore on a tablet. */}
+      <button className="bh" onClick={onClose} style={btn('gold', { width: '100%', marginBottom: 12 })}>
+        Back to the Castle 🏰
+      </button>
       <h2 style={{
         fontFamily: serif, fontSize: 26, fontWeight: 900, color: C.gold,
         letterSpacing: 1.5, textAlign: 'center', margin: '6px 0 2px',
         textShadow: `0 0 18px ${C.gold}77`,
-      }}>My Look</h2>
+      }}>My Wizard</h2>
       <p style={{ color: C.dim, fontSize: 13, textAlign: 'center', margin: '0 0 14px', fontFamily: serif, letterSpacing: 1 }}>
         This stays with you whatever robes you wear
       </p>
@@ -38,6 +48,36 @@ export default function LookPicker({ profile, onSave, onClose }) {
         <div style={{ color: form.trim, fontFamily: serif, fontSize: 13, letterSpacing: 2, fontWeight: 900, marginTop: -6 }}>
           {form.title.toUpperCase()}
         </div>
+      </div>
+
+      {/* Your nest belongs on the page about who you are, not tucked behind a
+          crest in the corner of the castle. */}
+      <div style={panel({ padding: '12px 14px', marginBottom: 10 })}>
+        <div style={label()}>MY NEST</div>
+        {/* Keeps whatever she's changed here before jumping to the nests, so a
+            trip to change house doesn't quietly discard a new hair colour. */}
+        <button className="bh" onClick={() => onNest(look)} style={{
+          display: 'flex', alignItems: 'center', gap: 12, width: '100%',
+          padding: '8px 10px', borderRadius: 13, cursor: 'pointer', textAlign: 'left',
+          border: `2px solid ${nest ? nest.shield : C.lineHi}`,
+          background: nest ? `${nest.shield}1f` : C.panelHi,
+          WebkitTapHighlightColor: 'transparent',
+        }}>
+          {nest
+            ? <NestCrest nest={nest} size={44} />
+            : <span style={{ fontSize: 30, width: 44, textAlign: 'center' }}>🪶</span>}
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ display: 'block', color: '#fff', fontWeight: 900, fontSize: 15, fontFamily: sans }}>
+              {nest ? nest.name : 'Choose a nest'}
+            </span>
+            <span style={{ display: 'block', color: C.dim, fontSize: 11, fontStyle: 'italic' }}>
+              {nest ? nest.motto : 'Every wizard belongs to one of the four'}
+            </span>
+          </span>
+          <span style={{ color: C.gold, fontSize: 12, fontWeight: 900, fontFamily: serif, letterSpacing: 1 }}>
+            CHANGE ›
+          </span>
+        </button>
       </div>
 
       <div style={panel({ padding: '14px 16px', marginBottom: 10 })}>
@@ -113,7 +153,7 @@ export default function LookPicker({ profile, onSave, onClose }) {
         That's me! ✨
       </button>
       <button className="bh" onClick={onClose} style={btn('ghost', { width: '100%', marginTop: 9, fontSize: 13 })}>
-        Cancel
+        🏰 Back to the Castle — don't save
       </button>
     </div>
   )

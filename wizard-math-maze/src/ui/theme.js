@@ -68,6 +68,11 @@ export const CSS = `
 html,body{margin:0;background:${C.bg};color:${C.ink};font-family:${sans};
   -webkit-text-size-adjust:100%;overscroll-behavior:none}
 button{font-family:${sans}}
+/* iPadOS treats a long press on a button as a text selection and throws up its
+   own callout, which lands right on top of the movement pad when a child holds
+   ▲ to walk down a corridor. Nothing in this game is text you'd want to select. */
+button,canvas{-webkit-touch-callout:none;-webkit-user-select:none;
+  -moz-user-select:none;-ms-user-select:none;user-select:none}
 input,button{font-size:16px}                /* stops iOS zooming on focus */
 .star{position:absolute;border-radius:50%;background:#fff;opacity:.55;
   animation:tw var(--dr) ease-in-out var(--dl) infinite alternate;pointer-events:none}
@@ -83,6 +88,14 @@ input,button{font-size:16px}                /* stops iOS zooming on focus */
 .bh:hover{filter:brightness(1.08)}
 .pop{animation:pp 1.4s ease-out forwards;pointer-events:none}
 @keyframes pp{0%{opacity:0;transform:translateY(6px) scale(.7)}18%{opacity:1;transform:translateY(-10px) scale(1.18)}100%{opacity:0;transform:translateY(-64px) scale(1)}}
+/* The same pop, but it HOLDS. "The exit is sealed" is an instruction, not a
+   flourish: it has to stay up long enough to be read by someone who is still
+   learning to read. */
+.popLong{animation:ppl 3.6s ease-out forwards;pointer-events:none}
+@keyframes ppl{0%{opacity:0;transform:translateY(8px) scale(.75)}
+  9%{opacity:1;transform:translateY(-8px) scale(1.1)}
+  16%,74%{opacity:1;transform:translateY(-8px) scale(1)}
+  100%{opacity:0;transform:translateY(-40px) scale(1)}}
 .spark{position:absolute;pointer-events:none;animation:sp 1s ease-out forwards}
 @keyframes sp{0%{opacity:0;transform:translate(0,0) scale(.4)}25%{opacity:1}100%{opacity:0;transform:translate(var(--tx),var(--ty)) scale(1.5)}}
 .flare{position:fixed;inset:0;pointer-events:none;animation:fl .6s ease-out forwards;

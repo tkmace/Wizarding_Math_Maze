@@ -54,6 +54,7 @@ export default function Controls({ onAction, disabled }) {
       onPointerUp={stop}
       onPointerLeave={stop}
       onPointerCancel={stop}
+      onContextMenu={e => e.preventDefault()}
       style={{
         width: '100%', height: 62, borderRadius: 16,
         border: `2px solid ${C.lineHi}`,
@@ -62,7 +63,10 @@ export default function Controls({ onAction, disabled }) {
         fontSize: 26, fontWeight: 900, fontFamily: serif,
         cursor: disabled ? 'default' : 'pointer',
         boxShadow: '0 3px 0 #0a0a24',
-        WebkitTapHighlightColor: 'transparent', touchAction: 'none', userSelect: 'none',
+        WebkitTapHighlightColor: 'transparent', touchAction: 'none',
+        // iPadOS pops a selection callout over a long-pressed button, which is
+        // exactly what walking down a corridor looks like to it.
+        userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none',
       }}
     >{glyph}</button>
   )

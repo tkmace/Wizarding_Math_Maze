@@ -1,11 +1,11 @@
-import { C, sans } from './theme.js'
+import { C, sans, serif } from './theme.js'
 
 /**
  * On-screen number pad. The original game was arrow-keys-and-keyboard only,
  * which made it unplayable on a tablet — this is the answer-entry half of the
  * fix. Keys are 56px minimum so they work under a child's finger.
  */
-export default function Keypad({ onDigit, onBack, onSubmit, disabled, canSubmit }) {
+export default function Keypad({ onDigit, onBack, onSubmit, disabled, canSubmit, submitLabel = '✓' }) {
   const key = (content, handler, tone) => (
     <button
       className="bh"
@@ -44,11 +44,13 @@ export default function Keypad({ onDigit, onBack, onSubmit, disabled, canSubmit 
           minHeight: 56, borderRadius: 14, border: 'none',
           background: canSubmit ? `linear-gradient(135deg,${C.good},#3fbf75)` : '#1a1a3e',
           color: canSubmit ? '#052013' : C.faint,
-          fontSize: 24, fontWeight: 900,
+          fontSize: String(submitLabel).length > 2 ? 15 : 24, fontWeight: 900,
+          fontFamily: String(submitLabel).length > 2 ? serif : sans,
+          letterSpacing: String(submitLabel).length > 2 ? 1 : 0,
           cursor: canSubmit && !disabled ? 'pointer' : 'default',
           WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
         }}
-      >✓</button>
+      >{submitLabel}</button>
     </div>
   )
 }

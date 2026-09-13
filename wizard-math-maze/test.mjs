@@ -2,7 +2,7 @@ import { chromium } from 'playwright'
 import http from 'http'
 import fs from 'fs'
 import path from 'path'
-import { takeNest } from './harness.mjs'
+import { takeNest, clearCoach } from './harness.mjs'
 
 const ROOT = '/home/claude/wmm/dist'
 const MIME = { '.html':'text/html', '.js':'text/javascript', '.css':'text/css', '.webmanifest':'application/manifest+json', '.svg':'image/svg+xml' }
@@ -34,6 +34,7 @@ async function run(label, width, height) {
   await page.fill('input[type=password]', '1234')
   await page.click('text=Begin the Journey')
   await takeNest(page)
+  await clearCoach(page)
   await page.waitForTimeout(700)
   await page.screenshot({ path:`${OUT}/02-hub-${label}.png`, fullPage:true })
 
@@ -45,6 +46,8 @@ async function run(label, width, height) {
   await page.click('text=Sorcerer')
   await page.waitForTimeout(250)
   await page.click('text=Enter the Maze')
+  await page.waitForTimeout(500)
+  await clearCoach(page)                       // the "into the maze" card
   await page.waitForTimeout(1200)
   await page.screenshot({ path:`${OUT}/03-game-${label}.png` })
 
@@ -52,6 +55,8 @@ async function run(label, width, height) {
   // or it burns the whole loop pressing ▲ at a creature. Answering with 1-4
   // works in the duel; the rune catch resolves on its own timer either way.
   const clearEncounter = async () => {
+    // A first-run card sits over whatever it explains, so it goes first.
+    if (await clearCoach(page)) return true
     if (await page.locator('text=SOMETHING BLOCKS THE WAY').count()) {
       await page.locator('button', { hasText: /Raise your wand|Catch the runes/ }).click().catch(() => {})
       await page.waitForTimeout(400)
@@ -73,6 +78,9 @@ async function run(label, width, height) {
   // Walk until a door puzzle opens
   let opened = false, doorSeen = false
   for (let i=0; i<240 && !opened; i++) {
+    // A first-run card covers whatever it explains — clear it first, or every
+    // click below lands on the card instead of the thing underneath.
+    if (await clearCoach(page)) continue
     if (await clearEncounter()) continue
     const prompt = await page.locator('text=PRESS ▲ TO UNLOCK').count()
     if (prompt && !doorSeen) { doorSeen = true; await page.waitForTimeout(500); await page.screenshot({ path:`${OUT}/04-door-ahead-${label}.png` }) }
@@ -85,6 +93,8 @@ async function run(label, width, height) {
   if (!opened) { console.log(`[${label}] never reached a door`); await ctx.close(); return }
 
   await page.waitForTimeout(400)
+  // The first door in a new wizard's life comes with an explanation over it.
+  await clearCoach(page)
   await page.screenshot({ path:`${OUT}/05-modal-${label}.png` })
 
   // Read the problem and answer it correctly via the on-screen keypad
@@ -108,6 +118,9 @@ async function run(label, width, height) {
   // Wrong answer path on the next door: check the hint appears
   let found = false
   for (let i=0;i<240 && !found;i++){
+    // A first-run card covers whatever it explains — clear it first, or every
+    // click below lands on the card instead of the thing underneath.
+    if (await clearCoach(page)) continue
     if (await clearEncounter()) continue
     const prompt = await page.locator('text=PRESS ▲ TO UNLOCK').count()
     await page.keyboard.press(prompt ? 'ArrowUp' : (Math.random()<0.62?'ArrowUp':(Math.random()<0.5?'ArrowLeft':'ArrowRight')))
@@ -133,11 +146,13 @@ async function run(label, width, height) {
   await clearEncounter()
   for (let i = 0; i < 3; i++) {
     if (!(await page.locator('button', { hasText: 'Step back' }).count())) break
-    await page.locator('button', { hasText: 'Step back' }).first().click({ timeout: 4000 }).catch(() => {})
+    await clearCoach(page)
+      await page.locator('button', { hasText: 'Step back' }).first().click({ timeout: 4000 }).catch(() => {})
     await page.waitForTimeout(300)
   }
   await page.waitForTimeout(300)
-  await page.locator('button', { hasText: '🏰' }).first().click()
+  await clearCoach(page)
+      await page.locator('button', { hasText: '🏰' }).first().click()
   await page.waitForTimeout(500)
   // Banking points can rank her up, and a rank-up owes a pick before the hub
   // comes back. Take it, or the report click lands on the choice screen.
@@ -150,7 +165,8 @@ async function run(label, width, height) {
     await page.waitForTimeout(700)
     console.log(`[${label}] took an owed rank pick on the way out`)
   }
-  await page.locator('button', { hasText: 'My Progress' }).click()
+  await clearCoach(page)
+      await page.locator('button', { hasText: 'My Progress' }).click()
   await page.waitForTimeout(600)
   await page.screenshot({ path:`${OUT}/09-report-${label}.png`, fullPage:true })
   await ctx.close()

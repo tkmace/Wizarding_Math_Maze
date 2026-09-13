@@ -113,7 +113,7 @@ export default function Hub({ profile, ops, diff, onToggleOp, onSetDiff, onStart
             fontSize: 10, fontWeight: 900, lineHeight: '13px',
           }}>{pendingPicks}</span>}
         </button>
-        <button className="bh" onClick={onLook} style={btn('ghost', { fontSize: 13 })}>🪞 My Look</button>
+        <button className="bh" onClick={onLook} style={btn('ghost', { fontSize: 13 })}>🪞 My Wizard</button>
       </div>
 
       {/* Operations */}

@@ -555,6 +555,16 @@ function drawStones(ctx, s, W, H, horizonY, zbuf, fov) {
   }
 }
 
+/**
+ * The way out.
+ *
+ * This used to be a coloured glow with a ★ floating in it, which reads as
+ * "something nice here" rather than "this is the door out" — and the sealed
+ * version was the same glow with a padlock, which reads as another maths door.
+ * It's an actual doorway now: a tall stone arch with a keystone, either barred
+ * and chained or standing open with daylight coming through it. A child should
+ * be able to point at it and say that's the exit, without being told.
+ */
 function drawExitGlow(ctx, s, W, H, horizonY, zbuf, gateMet, fov) {
   const grid = s.grid
   let er = -1, ec = -1
@@ -567,24 +577,111 @@ function drawExitGlow(ctx, s, W, H, horizonY, zbuf, gateMet, fov) {
     if (p.perp < (zbuf[Math.floor(x / RAY_STEP)] ?? Infinity)) cols.push(x)
   if (!cols.length) return
 
-  // Sealed exits glow amber and wear a padlock; open ones are green with a star.
   const tint = gateMet ? '138,255,212' : '249,202,116'
+  const floorY = horizonY + p.size * 0.48          // where the wall meets the floor
+  const dh = p.size * 0.88                         // door height
+  const dw = p.size * 0.46                         // door width
+  const cx = p.x
+  const springY = floorY - dh * 0.60               // where the arch starts to curve
+
   ctx.save()
   clipColumns(ctx, cols, horizonY - p.size, horizonY + p.size)
-  const g = ctx.createRadialGradient(p.x, horizonY + p.size * 0.1, 0, p.x, horizonY + p.size * 0.1, p.size * 0.5)
-  g.addColorStop(0, `rgba(${tint},0.75)`)
-  g.addColorStop(0.5, `rgba(${tint},0.22)`)
+
+  // Halo, so it's visible from the far end of a corridor.
+  const g = ctx.createRadialGradient(cx, floorY - dh * 0.45, 0, cx, floorY - dh * 0.45, p.size * 0.62)
+  g.addColorStop(0, `rgba(${tint},0.55)`)
+  g.addColorStop(0.55, `rgba(${tint},0.18)`)
   g.addColorStop(1, `rgba(${tint},0)`)
   ctx.fillStyle = g
-  ctx.fillRect(p.x - p.size * 0.5, horizonY - p.size * 0.4, p.size, p.size)
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.font = `900 ${clamp(p.size * 0.22, 10, 46)}px Nunito, sans-serif`
+  ctx.fillRect(cx - p.size * 0.7, horizonY - p.size * 0.8, p.size * 1.4, p.size * 1.5)
+
+  /** The archway opening, as a path. `inset` shrinks it for the inner leaf. */
+  const arch = (inset = 0) => {
+    const w = dw - inset * 2, y0 = floorY - inset
+    ctx.beginPath()
+    ctx.moveTo(cx - w, y0)
+    ctx.lineTo(cx - w, springY + inset * 0.6)
+    ctx.quadraticCurveTo(cx - w, floorY - dh + inset, cx, floorY - dh + inset)
+    ctx.quadraticCurveTo(cx + w, floorY - dh + inset, cx + w, springY + inset * 0.6)
+    ctx.lineTo(cx + w, y0)
+    ctx.closePath()
+  }
+
+  // Stone surround.
+  arch()
+  const stone = ctx.createLinearGradient(cx - dw, 0, cx + dw, 0)
+  stone.addColorStop(0, '#6b5fa8')
+  stone.addColorStop(0.5, '#8a7cc8')
+  stone.addColorStop(1, '#5a4f92')
+  ctx.fillStyle = stone
+  ctx.fill()
+  ctx.strokeStyle = gateMet ? PAL.exit : PAL.gold
+  ctx.lineWidth = Math.max(1, p.size * 0.022)
+  ctx.stroke()
+
+  // The opening itself.
+  const jamb = p.size * 0.055
+  arch(jamb)
+  if (gateMet) {
+    // Open: light pouring in from somewhere else entirely.
+    const lit = ctx.createLinearGradient(0, floorY - dh, 0, floorY)
+    lit.addColorStop(0, '#ffffff')
+    lit.addColorStop(0.45, '#d8fff0')
+    lit.addColorStop(1, `rgba(${tint},0.65)`)
+    ctx.fillStyle = lit
+    ctx.fill()
+  } else {
+    ctx.fillStyle = '#120d2c'
+    ctx.fill()
+    // Barred, with a crossed chain and a lock on it.
+    ctx.save()
+    arch(jamb); ctx.clip()
+    ctx.strokeStyle = '#4a4270'
+    ctx.lineWidth = Math.max(1, p.size * 0.02)
+    for (let i = 1; i <= 3; i++) {
+      const bx = cx - dw + (dw * 2) * (i / 4)
+      ctx.beginPath(); ctx.moveTo(bx, floorY); ctx.lineTo(bx, floorY - dh * 0.92); ctx.stroke()
+    }
+    ctx.strokeStyle = PAL.goldDark
+    ctx.lineWidth = Math.max(1.5, p.size * 0.035)
+    ctx.beginPath()
+    ctx.moveTo(cx - dw, floorY - dh * 0.46)
+    ctx.lineTo(cx + dw, floorY - dh * 0.34)
+    ctx.moveTo(cx - dw, floorY - dh * 0.34)
+    ctx.lineTo(cx + dw, floorY - dh * 0.46)
+    ctx.stroke()
+    ctx.restore()
+  }
+
+  // Keystone at the crown — the one detail that says "arch" at any distance.
+  ctx.beginPath()
+  ctx.moveTo(cx - dw * 0.22, floorY - dh + p.size * 0.015)
+  ctx.lineTo(cx + dw * 0.22, floorY - dh + p.size * 0.015)
+  ctx.lineTo(cx + dw * 0.15, floorY - dh - p.size * 0.075)
+  ctx.lineTo(cx - dw * 0.15, floorY - dh - p.size * 0.075)
+  ctx.closePath()
   ctx.fillStyle = gateMet ? PAL.exit : PAL.gold
-  ctx.globalAlpha = 0.95
-  ctx.fillText(gateMet ? '★' : '🔒', p.x, horizonY + p.size * 0.1)
-  ctx.textAlign = 'left'
-  ctx.textBaseline = 'alphabetic'
+  ctx.globalAlpha = 0.9
+  ctx.fill()
+  ctx.globalAlpha = 1
+
+  // Close enough to read? Then say it in words as well as in stone. The label
+  // goes INSIDE the arch, under the keystone — above it would need headroom the
+  // corridor doesn't always have, and it would be the first thing clipped.
+  if (p.size > H * 0.26) {
+    const ty = floorY - dh * 0.76
+    const label = gateMet ? 'WAY OUT' : 'SEALED'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.font = `900 ${clamp(p.size * 0.095, 8, 24)}px Nunito, sans-serif`
+    const tw = ctx.measureText(label).width
+    ctx.fillStyle = gateMet ? 'rgba(6,30,24,.55)' : 'rgba(0,0,0,.45)'
+    ctx.fillRect(cx - tw * 0.62, ty - p.size * 0.075, tw * 1.24, p.size * 0.15)
+    ctx.fillStyle = gateMet ? '#eafff7' : PAL.goldHi
+    ctx.fillText(label, cx, ty)
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'alphabetic'
+  }
   ctx.restore()
 }
 
