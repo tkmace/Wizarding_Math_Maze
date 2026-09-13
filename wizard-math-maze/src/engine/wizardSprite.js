@@ -31,6 +31,77 @@ function outline(ctx, h, col, weight = 1) {
   ctx.stroke()
 }
 
+// --- Shading ------------------------------------------------------------------
+// One light, high and to the upper left, used by everything. Consistency is what
+// makes a set of flat shapes read as one solid object rather than a collage — so
+// the hat, the head, the robe and the sleeves are all lit from the same place.
+
+/**
+ * Give the path just drawn some volume: a soft highlight where the light falls
+ * and a shadow away from it, both clipped inside the shape.
+ *
+ * `bb` is a bounding box {x, y, w, h} for the gradients to span. It doesn't have
+ * to be tight — it only sets where the falloff happens.
+ */
+function volume(ctx, drawPath, bb, strength = 1) {
+  ctx.save()
+  drawPath()
+  ctx.clip()
+  const lx = bb.x + bb.w * 0.3, ly = bb.y + bb.h * 0.2
+  const hl = ctx.createRadialGradient(lx, ly, 0, lx, ly, Math.max(bb.w, bb.h) * 0.8)
+  hl.addColorStop(0, `rgba(255,255,255,${0.25 * strength})`)
+  hl.addColorStop(0.55, `rgba(255,255,255,${0.07 * strength})`)
+  hl.addColorStop(1, 'rgba(255,255,255,0)')
+  ctx.fillStyle = hl
+  ctx.fillRect(bb.x, bb.y, bb.w, bb.h)
+
+  const sh = ctx.createLinearGradient(bb.x + bb.w * 0.42, bb.y + bb.h * 0.25, bb.x + bb.w, bb.y + bb.h)
+  sh.addColorStop(0, 'rgba(10,5,26,0)')
+  sh.addColorStop(1, `rgba(10,5,26,${0.4 * strength})`)
+  ctx.fillStyle = sh
+  ctx.fillRect(bb.x, bb.y, bb.w, bb.h)
+  ctx.restore()
+}
+
+/** Deterministic 0..1 noise — textures must not shimmer from frame to frame. */
+function noise(a, b) {
+  const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453
+  return x - Math.floor(x)
+}
+
+/**
+ * Woven cloth, as a scatter of short strokes inside the given path.
+ *
+ * Nothing here is legible as a thread — that's the point. What it does is stop
+ * a large flat fill reading as plastic, which is most of the difference between
+ * "a shape coloured in" and "cloth".
+ */
+function weave(ctx, drawPath, bb, seed, col) {
+  ctx.save()
+  drawPath()
+  ctx.clip()
+  ctx.strokeStyle = shade(col, -0.5)
+  ctx.lineWidth = Math.max(0.5, bb.h * 0.006)
+  ctx.globalAlpha = 0.075
+  const step = Math.max(4, bb.h * 0.06)
+  let i = 0
+  for (let y = bb.y; y < bb.y + bb.h; y += step) {
+    for (let x = bb.x; x < bb.x + bb.w; x += step) {
+      i++
+      const n = noise(i, seed)
+      if (n < 0.45) continue
+      const len = step * (0.3 + n * 0.4)
+      const ox = (noise(i, seed + 1) - 0.5) * step
+      const oy = (noise(i, seed + 2) - 0.5) * step
+      ctx.beginPath()
+      ctx.moveTo(x + ox, y + oy)
+      ctx.lineTo(x + ox + len * 0.55, y + oy + len)
+      ctx.stroke()
+    }
+  }
+  ctx.restore()
+}
+
 /**
  * @param ctx     canvas 2D context
  * @param o.x     horizontal centre
@@ -60,42 +131,84 @@ export function drawWizard(ctx, o) {
 
   drawAura(ctx, h, form.aura, t, trim, 'under')
 
-  // Proportions. A single tapered cone reads as a traffic cone rather than a
-  // person, so the silhouette is built from a waist, shoulders, sleeves and a
-  // head large enough to carry a face — roughly a five-heads-tall cartoon
-  // figure, which is what makes it read as a small wizard rather than a shape.
-  const hem = h * 0.215, waist = h * 0.145, shoulder = h * 0.175
-  const yWaist = -h * 0.34, yShoulder = -h * 0.52
-  const headY = -h * 0.665, headR = h * 0.105
+  // Proportions.
+  //
+  // Deliberately chibi: about three and a half heads tall rather than five. A
+  // big head and a small round body is the single biggest lever on "cute" —
+  // it's what every emoji, every mascot and every toy does, and it beats any
+  // amount of rendering detail. The body is built from a waist, shoulders,
+  // stubby sleeves and a bell hem so it still reads as a person in a robe
+  // rather than a cone with a face on top.
+  const hem = h * 0.235, waist = h * 0.155, shoulder = h * 0.185
+  const yWaist = -h * 0.29, yShoulder = -h * 0.45
+  const headY = -h * 0.605, headR = h * 0.142
+  const seed = (form.robe || '').length + (form.title || '').length * 7
+
+  // ── Contact shadow, so the figure stands on something ──
+  ctx.save()
+  const gs = ctx.createRadialGradient(0, 0, 0, 0, 0, hem * 1.1)
+  gs.addColorStop(0, 'rgba(0,0,0,0.38)')
+  gs.addColorStop(1, 'rgba(0,0,0,0)')
+  ctx.fillStyle = gs
+  ctx.beginPath()
+  ctx.ellipse(0, h * 0.005, hem * 1.05, h * 0.028, 0, 0, TAU)
+  ctx.fill()
+  ctx.restore()
 
   // ── Shoes peeking under the hem ──
   ctx.fillStyle = shade(robe, -0.7)
   for (const sgn of [-1, 1]) {
     ctx.beginPath()
-    ctx.ellipse(sgn * h * 0.075 + sway * 0.5, -h * 0.012, h * 0.045, h * 0.022, 0, 0, TAU)
+    ctx.ellipse(sgn * h * 0.08 + sway * 0.5, -h * 0.012, h * 0.05, h * 0.024, 0, 0, TAU)
     ctx.fill()
   }
 
   // ── Robe ──
-  ctx.beginPath()
-  ctx.moveTo(-hem + sway, 0)
-  ctx.quadraticCurveTo(-hem * 0.92, yWaist * 0.62, -waist, yWaist)
-  ctx.lineTo(-shoulder, yShoulder)
-  ctx.quadraticCurveTo(0, yShoulder - h * 0.03, shoulder, yShoulder)
-  ctx.lineTo(waist, yWaist)
-  ctx.quadraticCurveTo(hem * 0.92, yWaist * 0.62, hem + sway, 0)
-  ctx.closePath()
-  const rg = ctx.createLinearGradient(-hem, 0, hem, 0)
-  rg.addColorStop(0, shade(robe, -0.3))
-  rg.addColorStop(0.34, robe)
-  rg.addColorStop(0.6, shade(robe, 0.14))
-  rg.addColorStop(1, shade(robe, -0.34))
-  ctx.fillStyle = rg
+  const robePath = () => {
+    ctx.beginPath()
+    ctx.moveTo(-hem + sway, 0)
+    ctx.bezierCurveTo(-hem * 0.99, -h * 0.14, -waist * 1.04, -h * 0.22, -waist, yWaist)
+    ctx.bezierCurveTo(-waist * 0.99, yWaist - h * 0.06, -shoulder, yShoulder + h * 0.05, -shoulder, yShoulder)
+    ctx.quadraticCurveTo(0, yShoulder - h * 0.038, shoulder, yShoulder)
+    ctx.bezierCurveTo(shoulder, yShoulder + h * 0.05, waist * 0.99, yWaist - h * 0.06, waist, yWaist)
+    ctx.bezierCurveTo(waist * 1.04, -h * 0.22, hem * 0.99, -h * 0.14, hem + sway, 0)
+    ctx.closePath()
+  }
+  robePath()
+  ctx.fillStyle = robe
   ctx.fill()
+  volume(ctx, robePath, { x: -hem * 1.1, y: yShoulder - h * 0.05, w: hem * 2.2, h: -yShoulder + h * 0.06 })
+  weave(ctx, robePath, { x: -hem, y: yShoulder, w: hem * 2, h: -yShoulder }, seed, robe)
+
+  // Folds. Three creases fanning from the waist to the hem, each with a lighter
+  // ridge beside it — the cheapest way to say "cloth" rather than "surface".
+  ctx.save()
+  robePath()
+  ctx.clip()
+  ctx.lineCap = 'round'
+  for (const f of [-0.62, -0.12, 0.44]) {
+    const x0 = waist * f, x1 = hem * (f * 1.25 + 0.04)
+    ctx.beginPath()
+    ctx.moveTo(x0, yWaist + h * 0.01)
+    ctx.quadraticCurveTo(x0 * 0.9 + x1 * 0.1, yWaist * 0.45, x1 + sway, -h * 0.012)
+    ctx.strokeStyle = shade(robe, -0.42)
+    ctx.globalAlpha = 0.5
+    ctx.lineWidth = Math.max(1, h * 0.009)
+    ctx.stroke()
+    ctx.translate(h * 0.012, 0)
+    ctx.strokeStyle = shade(robe, 0.3)
+    ctx.globalAlpha = 0.22
+    ctx.lineWidth = Math.max(1, h * 0.007)
+    ctx.stroke()
+    ctx.translate(-h * 0.012, 0)
+  }
+  ctx.restore()
+
   // A drawn line around the silhouette. Flat shapes butted against each other
   // read as assembled; the same shapes inside an outline read as drawn. The
   // line is a dark version of the robe rather than black, so it stays part of
   // the character instead of looking like a sticker edge.
+  robePath()
   outline(ctx, h, robe)
 
   // Hem band, and a front placket (or back seam) for a sense of fabric.
@@ -119,42 +232,53 @@ export function drawWizard(ctx, o) {
   ctx.globalAlpha = 1
 
   // ── Sleeves and hands ──
-  // The arms swing OUTSIDE the robe silhouette and carry an outline. Tucked
-  // against the body they just read as two beige buttons stuck on a bell.
-  const armSwing = stride * h * 0.022
+  // Short and stubby, to match the head. The arms swing OUTSIDE the robe
+  // silhouette and carry an outline — tucked against the body they just read as
+  // two beige buttons stuck on a bell.
+  const armSwing = stride * h * 0.02
   for (const sgn of [-1, 1]) {
-    const handY = -h * 0.185 + sgn * armSwing
-    const outer = shoulder + h * 0.085
-    ctx.beginPath()
-    ctx.moveTo(sgn * shoulder * 0.92, yShoulder + h * 0.005)
-    ctx.quadraticCurveTo(sgn * (outer + h * 0.02), yWaist + h * 0.02, sgn * outer, handY)
-    ctx.lineTo(sgn * (outer - h * 0.055), handY + h * 0.008)
-    ctx.quadraticCurveTo(sgn * (shoulder - h * 0.01), yWaist, sgn * shoulder * 0.5, yShoulder + h * 0.025)
-    ctx.closePath()
-    ctx.fillStyle = sgn < 0 ? shade(robe, -0.28) : shade(robe, 0.08)
+    const handY = -h * 0.225 + sgn * armSwing
+    const outer = shoulder + h * 0.08
+    const sleeve = () => {
+      ctx.beginPath()
+      ctx.moveTo(sgn * shoulder * 0.9, yShoulder + h * 0.008)
+      ctx.quadraticCurveTo(sgn * (outer + h * 0.025), yWaist + h * 0.03, sgn * outer, handY)
+      ctx.lineTo(sgn * (outer - h * 0.058), handY + h * 0.008)
+      ctx.quadraticCurveTo(sgn * (shoulder - h * 0.012), yWaist + h * 0.01, sgn * shoulder * 0.48, yShoulder + h * 0.03)
+      ctx.closePath()
+    }
+    sleeve()
+    ctx.fillStyle = sgn < 0 ? shade(robe, -0.2) : shade(robe, 0.06)
     ctx.fill()
+    volume(ctx, sleeve, { x: sgn < 0 ? -outer * 1.1 : shoulder * 0.4, y: yShoulder, w: outer * 0.8, h: -yShoulder * 0.55 }, 0.8)
+    sleeve()
     outline(ctx, h, robe, 0.8)
     // Cuff, then the hand clear of the sleeve.
     ctx.fillStyle = trim
-    ctx.globalAlpha = 0.8
+    ctx.globalAlpha = 0.85
     ctx.beginPath()
-    ctx.ellipse(sgn * (outer - h * 0.024), handY + h * 0.004, h * 0.028, h * 0.013, sgn * 0.3, 0, TAU)
+    ctx.ellipse(sgn * (outer - h * 0.026), handY + h * 0.004, h * 0.03, h * 0.014, sgn * 0.3, 0, TAU)
     ctx.fill()
     ctx.globalAlpha = 1
     ctx.beginPath()
-    ctx.arc(sgn * (outer - h * 0.012), handY + h * 0.028, h * 0.025, 0, TAU)
+    ctx.arc(sgn * (outer - h * 0.012), handY + h * 0.03, h * 0.028, 0, TAU)
     ctx.fillStyle = look.skinHex
     ctx.fill()
   }
 
   // ── Shoulder cape / collar ──
-  ctx.beginPath()
-  ctx.moveTo(-shoulder - h * 0.035, yShoulder + h * 0.03)
-  ctx.quadraticCurveTo(0, yShoulder - h * 0.075, shoulder + h * 0.035, yShoulder + h * 0.03)
-  ctx.quadraticCurveTo(0, yShoulder + h * 0.075, -shoulder - h * 0.035, yShoulder + h * 0.03)
-  ctx.closePath()
-  ctx.fillStyle = shade(robe, 0.2)
+  const cape = () => {
+    ctx.beginPath()
+    ctx.moveTo(-shoulder - h * 0.042, yShoulder + h * 0.032)
+    ctx.quadraticCurveTo(0, yShoulder - h * 0.08, shoulder + h * 0.042, yShoulder + h * 0.032)
+    ctx.quadraticCurveTo(0, yShoulder + h * 0.082, -shoulder - h * 0.042, yShoulder + h * 0.032)
+    ctx.closePath()
+  }
+  cape()
+  ctx.fillStyle = shade(robe, 0.22)
   ctx.fill()
+  volume(ctx, cape, { x: -shoulder * 1.3, y: yShoulder - h * 0.08, w: shoulder * 2.6, h: h * 0.17 }, 0.9)
+  cape()
   outline(ctx, h, robe, 0.8)
   ctx.strokeStyle = trim
   ctx.lineWidth = Math.max(1, h * 0.008)
@@ -168,10 +292,39 @@ export function drawWizard(ctx, o) {
   // ── Hair behind the head, so long styles fall over the shoulders ──
   drawHair(ctx, h, headY, headR, look, view, 'back')
 
+  // ── Ears, before the head so they tuck behind it ──
+  if (view === 'front') {
+    for (const sgn of [-1, 1]) {
+      ctx.beginPath()
+      ctx.ellipse(sgn * headR * 0.97, headY + headR * 0.14, headR * 0.17, headR * 0.24, 0, 0, TAU)
+      ctx.fillStyle = shade(look.skinHex, -0.1)
+      ctx.fill()
+      outline(ctx, h, look.skinHex, 0.6)
+    }
+  }
+
   // ── Head ──
-  ctx.beginPath(); ctx.arc(0, headY, headR, 0, TAU)
+  // An egg rather than a circle: wide at the temples, narrowing to a soft chin.
+  // A perfect circle reads as a ball with a face drawn on it; the taper is what
+  // makes it a head.
+  // Face shape comes from the appearance record: width at the temples, how far
+  // the jaw tapers in, and how low the chin sits. A perfect circle reads as a
+  // ball with a face drawn on it; the taper is what makes it a head.
+  const fs = look.face
+  const headPath = () => {
+    const W = headR * fs.w, J = headR * fs.jaw, C = headR * fs.chin
+    ctx.beginPath()
+    ctx.moveTo(0, headY - headR)
+    ctx.bezierCurveTo(W * 1.05, headY - headR * 0.96, W * 1.04, headY + headR * 0.26, J, headY + headR * 0.79)
+    ctx.bezierCurveTo(J * 0.48, headY + C, -J * 0.48, headY + C, -J, headY + headR * 0.79)
+    ctx.bezierCurveTo(-W * 1.04, headY + headR * 0.26, -W * 1.05, headY - headR * 0.96, 0, headY - headR)
+    ctx.closePath()
+  }
+  headPath()
   ctx.fillStyle = view === 'front' ? look.skinHex : shade(look.skinHex, -0.12)
   ctx.fill()
+  volume(ctx, headPath, { x: -headR * 1.1, y: headY - headR * 1.1, w: headR * 2.2, h: headR * 2.3 }, 0.85)
+  headPath()
   outline(ctx, h, look.skinHex, 0.85)
 
   if (view === 'front') drawFace(ctx, h, headY, headR, look, form)
@@ -203,82 +356,273 @@ export function drawWizard(ctx, o) {
  * arc are the only two values a "delighted" or "worried" face would change.
  */
 function drawFace(ctx, h, headY, headR, look, form) {
-  const eo = headR * 0.36               // eye offset from centre
-  const ey = headY - headR * 0.06
-  const eR = headR * 0.17
-  const ink = '#2a1c16'
+  // Geometry shared by every part, so they stay in register with each other
+  // however the parts are swapped.
+  const f = {
+    h, headY, headR,
+    eo: headR * 0.40,                 // eye centre, out from the midline
+    ey: headY + headR * 0.02,         // eye line
+  }
+  drawCheeks(ctx, f, look)
+  drawEyes(ctx, f, look)
+  drawBrows(ctx, f, look)
+  drawNose(ctx, f, look)
+  if (form.rank >= 5) drawBeard(ctx, f, look)
+  else drawMouth(ctx, f, look)
+  ctx.lineCap = 'butt'
+}
 
-  // Cheeks first, under everything — warmth, not makeup.
+/** Warmth across the cheekbones. Not makeup — the flush of a child outdoors. */
+function drawCheeks(ctx, f, look) {
+  const { headY, headR } = f
   ctx.save()
-  ctx.globalAlpha = 0.3
-  ctx.fillStyle = '#e2725b'
   for (const s of [-1, 1]) {
+    const cx = s * headR * 0.62, cy = headY + headR * 0.34
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, headR * 0.3)
+    g.addColorStop(0, 'rgba(230,116,98,0.42)')
+    g.addColorStop(1, 'rgba(230,116,98,0)')
+    ctx.fillStyle = g
     ctx.beginPath()
-    ctx.ellipse(s * headR * 0.56, headY + headR * 0.22, headR * 0.2, headR * 0.13, 0, 0, TAU)
+    ctx.ellipse(cx, cy, headR * 0.3, headR * 0.2, 0, 0, TAU)
     ctx.fill()
   }
   ctx.restore()
+}
 
-  // Eyes: a dark almond with a lid line across the top and a catchlight.
+/**
+ * Eyes.
+ *
+ * The previous pass made these big and solid black, which is emoji-legible but
+ * reads as a doll. A human eye has parts: a white with a shadow under the lid,
+ * a COLOURED iris, a pupil inside it, a bright catchlight up towards the light
+ * and a dim bounce light opposite, and a lash line that is heavier at the outer
+ * corner. Drawing those parts — and letting the shape squash into an almond —
+ * is what moves a face from doll to person while staying cartoon.
+ *
+ * The shape, the size and the iris colour all come from the appearance record,
+ * so a different eye is a different row of numbers rather than different code.
+ */
+function drawEyes(ctx, f, look) {
+  const { headR, eo, ey } = f
+  const sp = look.eyes
+  const rx = headR * sp.r, ry = headR * sp.r * sp.sq
+  const lookX = 0
+
   for (const s of [-1, 1]) {
-    ctx.beginPath()
-    ctx.ellipse(s * eo, ey, eR * 0.82, eR, 0, 0, TAU)
-    ctx.fillStyle = ink
-    ctx.fill()
-    // Lid — a heavier stroke across the top third, which is what stops an eye
-    // reading as a bead.
-    ctx.beginPath()
-    ctx.arc(s * eo, ey, eR * 0.94, Math.PI * 1.08, Math.PI * 1.92)
-    ctx.strokeStyle = ink
-    ctx.lineWidth = Math.max(1, eR * 0.44)
-    ctx.lineCap = 'round'
-    ctx.stroke()
-    // Catchlight
-    ctx.beginPath()
-    ctx.arc(s * eo + eR * 0.3, ey - eR * 0.3, eR * 0.3, 0, TAU)
-    ctx.fillStyle = '#ffffff'
-    ctx.fill()
-  }
+    const cx = s * eo
+    const tilt = s * sp.tilt
 
-  // Brows, in the hair colour, tilted up at the outside for an open look.
-  ctx.strokeStyle = shade(look.hairHex, -0.25)
-  ctx.lineWidth = Math.max(1, headR * 0.095)
+    // Socket: a soft shadow so the eye sits IN the face.
+    ctx.save()
+    const sg = ctx.createRadialGradient(cx, ey, rx * 0.4, cx, ey, rx * 1.7)
+    sg.addColorStop(0, 'rgba(120,74,58,0.16)')
+    sg.addColorStop(1, 'rgba(120,74,58,0)')
+    ctx.fillStyle = sg
+    ctx.beginPath(); ctx.ellipse(cx, ey, rx * 1.7, ry * 1.8, 0, 0, TAU); ctx.fill()
+    ctx.restore()
+
+    const eyePath = () => {
+      ctx.beginPath()
+      ctx.ellipse(cx, ey, rx, ry, tilt, 0, TAU)
+      ctx.closePath()
+    }
+
+    // The white.
+    eyePath()
+    ctx.fillStyle = '#fdf8f0'
+    ctx.fill()
+    // Shadow cast by the upper lid onto the white.
+    ctx.save()
+    eyePath(); ctx.clip()
+    const lg = ctx.createLinearGradient(0, ey - ry, 0, ey + ry * 0.3)
+    lg.addColorStop(0, 'rgba(120,90,80,0.4)')
+    lg.addColorStop(1, 'rgba(120,90,80,0)')
+    ctx.fillStyle = lg
+    ctx.fillRect(cx - rx, ey - ry, rx * 2, ry * 2)
+    ctx.restore()
+
+    // Iris, pupil, and the ring that keeps the colour from going flat.
+    const ir = Math.min(rx, ry) * 0.84
+    const ix = cx + lookX, iy = ey + ry * 0.08
+    ctx.save()
+    eyePath(); ctx.clip()
+    const ig = ctx.createRadialGradient(ix, iy - ir * 0.3, ir * 0.1, ix, iy, ir)
+    ig.addColorStop(0, shade(look.eyeHex, 0.35))
+    ig.addColorStop(0.6, look.eyeHex)
+    ig.addColorStop(1, shade(look.eyeHex, -0.45))
+    ctx.fillStyle = ig
+    ctx.beginPath(); ctx.arc(ix, iy, ir, 0, TAU); ctx.fill()
+    ctx.strokeStyle = shade(look.eyeHex, -0.6)
+    ctx.lineWidth = Math.max(0.6, ir * 0.14)
+    ctx.beginPath(); ctx.arc(ix, iy, ir * 0.94, 0, TAU); ctx.stroke()
+    ctx.fillStyle = '#160c08'
+    ctx.beginPath(); ctx.arc(ix, iy, ir * 0.46, 0, TAU); ctx.fill()
+    ctx.restore()
+
+    // Catchlight up towards the light, and a dim bounce opposite. The pair is
+    // what makes an eye look wet rather than painted.
+    ctx.fillStyle = '#ffffff'
+    ctx.beginPath()
+    ctx.ellipse(ix - ir * 0.36, iy - ir * 0.44, ir * 0.3, ir * 0.24, -0.5, 0, TAU)
+    ctx.fill()
+    ctx.globalAlpha = 0.5
+    ctx.beginPath(); ctx.arc(ix + ir * 0.4, iy + ir * 0.4, ir * 0.16, 0, TAU); ctx.fill()
+    ctx.globalAlpha = 1
+
+    // Lash line: heavier at the outer corner, which is most of what separates a
+    // human eye from a circle.
+    ctx.save()
+    ctx.strokeStyle = '#33211a'
+    ctx.lineCap = 'round'
+    ctx.lineWidth = Math.max(1, ry * 0.3)
+    ctx.beginPath()
+    ctx.ellipse(cx, ey, rx * 1.01, ry * 1.01, tilt, Math.PI * 1.04, Math.PI * 1.96)
+    ctx.stroke()
+    ctx.lineWidth = Math.max(1, ry * 0.42)
+    ctx.beginPath()
+    ctx.ellipse(cx, ey, rx * 1.01, ry * 1.01, tilt, Math.PI * (s < 0 ? 1.04 : 1.52), Math.PI * (s < 0 ? 1.46 : 1.96))
+    ctx.stroke()
+    // Lower lid, a whisper only.
+    ctx.globalAlpha = 0.4
+    ctx.lineWidth = Math.max(0.8, ry * 0.16)
+    ctx.beginPath()
+    ctx.ellipse(cx, ey, rx * 0.98, ry * 0.98, tilt, Math.PI * 0.12, Math.PI * 0.88)
+    ctx.stroke()
+    ctx.restore()
+  }
+}
+
+/** Brows. High and open is friendly; low and flat is stern. */
+function drawBrows(ctx, f, look) {
+  const { headR, eo, ey } = f
+  const b = look.brows
+  ctx.save()
+  ctx.strokeStyle = shade(look.hairHex, -0.32)
+  ctx.lineWidth = Math.max(1, headR * b.w)
   ctx.lineCap = 'round'
   for (const s of [-1, 1]) {
+    const y = ey - headR * b.lift
     ctx.beginPath()
-    ctx.moveTo(s * (eo - headR * 0.22), ey - headR * 0.36)
-    ctx.quadraticCurveTo(s * eo, ey - headR * 0.5, s * (eo + headR * 0.24), ey - headR * 0.33)
+    ctx.moveTo(s * (eo - headR * 0.26), y + headR * b.tilt)
+    ctx.quadraticCurveTo(s * eo, y - headR * b.arch, s * (eo + headR * 0.26), y - headR * b.tilt * 0.4)
     ctx.stroke()
   }
+  ctx.restore()
+}
 
-  // Nose — barely there, but a face without a middle looks flat.
-  ctx.strokeStyle = shade(look.skinHex, -0.42)
-  ctx.lineWidth = Math.max(1, headR * 0.075)
-  ctx.beginPath()
-  ctx.moveTo(0, headY + headR * 0.02)
-  ctx.lineTo(0, headY + headR * 0.17)
-  ctx.stroke()
-
-  // Mouth. A beard hides it, so elders get the beard instead.
-  if (form.rank >= 5) {
-    ctx.beginPath()
-    ctx.moveTo(-headR * 0.8, headY + headR * 0.18)
-    ctx.quadraticCurveTo(-headR * 0.5, headY + headR * 3.1, 0, headY + headR * 3.3)
-    ctx.quadraticCurveTo(headR * 0.5, headY + headR * 3.1, headR * 0.8, headY + headR * 0.18)
-    ctx.quadraticCurveTo(0, headY + headR * 1.1, -headR * 0.8, headY + headR * 0.18)
-    ctx.closePath()
-    ctx.fillStyle = '#f4f4ff'
-    ctx.fill()
-    outline(ctx, h, '#c8c8e0', 0.7)
-  } else {
-    ctx.strokeStyle = '#7a4a38'
-    ctx.lineWidth = Math.max(1, headR * 0.11)
+/** Nose — a bridge shadow and a lit tip, rather than a drawn-on line. */
+function drawNose(ctx, f, look) {
+  const { headY, headR } = f
+  const n = look.nose
+  const ty = headY + headR * n.len         // tip
+  ctx.save()
+  if (n.bridge > 0) {
+    ctx.strokeStyle = shade(look.skinHex, -0.24)
+    ctx.globalAlpha = 0.55
+    ctx.lineWidth = Math.max(0.8, headR * 0.035)
     ctx.lineCap = 'round'
     ctx.beginPath()
-    ctx.arc(0, headY + headR * 0.14, headR * 0.34, 0.22 * Math.PI, 0.78 * Math.PI)
+    ctx.moveTo(-headR * 0.02, ty - headR * n.bridge)
+    ctx.lineTo(-headR * 0.035, ty - headR * 0.04)
     ctx.stroke()
+    ctx.globalAlpha = 1
   }
-  ctx.lineCap = 'butt'
+  // Underside shadow, then the lit tip on top of it.
+  ctx.fillStyle = shade(look.skinHex, -0.3)
+  ctx.beginPath()
+  ctx.ellipse(0, ty, headR * n.w, headR * n.w * 0.8, 0, 0, TAU)
+  ctx.fill()
+  ctx.fillStyle = shade(look.skinHex, 0.2)
+  ctx.beginPath()
+  ctx.ellipse(-headR * n.w * 0.18, ty - headR * n.w * 0.28, headR * n.w * 0.6, headR * n.w * 0.45, 0, 0, TAU)
+  ctx.fill()
+  ctx.restore()
+}
+
+/** Mouth. `open` decides whether the jaw drops, `curve` how big the smile is. */
+function drawMouth(ctx, f, look) {
+  const { h, headY, headR } = f
+  const m = look.mouth
+  const my = headY + headR * 0.62
+  const mw = headR * m.w
+  const drop = headR * m.open
+  const lift = headR * m.curve * 0.5
+
+  if (drop < headR * 0.05) {
+    // Closed smile: a tapered curve with a hint of a lower lip under it.
+    ctx.save()
+    ctx.strokeStyle = '#7a4034'
+    ctx.lineCap = 'round'
+    ctx.lineWidth = Math.max(1, headR * 0.075)
+    ctx.beginPath()
+    ctx.moveTo(-mw, my - lift * 0.5)
+    ctx.quadraticCurveTo(0, my + lift, mw, my - lift * 0.5)
+    ctx.stroke()
+    ctx.globalAlpha = 0.35
+    ctx.strokeStyle = shade(look.skinHex, -0.3)
+    ctx.lineWidth = Math.max(0.8, headR * 0.035)
+    ctx.beginPath()
+    ctx.moveTo(-mw * 0.55, my + lift * 0.55)
+    ctx.quadraticCurveTo(0, my + lift * 1.25, mw * 0.55, my + lift * 0.55)
+    ctx.stroke()
+    ctx.restore()
+    return
+  }
+
+  const mouth = () => {
+    ctx.beginPath()
+    ctx.moveTo(-mw, my - lift * 0.45)
+    ctx.quadraticCurveTo(0, my + lift * 0.25, mw, my - lift * 0.45)
+    ctx.quadraticCurveTo(0, my + drop * 1.5, -mw, my - lift * 0.45)
+    ctx.closePath()
+  }
+  ctx.save()
+  mouth()
+  ctx.fillStyle = '#6b2f31'
+  ctx.fill()
+  mouth(); ctx.clip()
+  // Teeth along the top, then the tongue behind them.
+  ctx.fillStyle = '#fffaf2'
+  ctx.beginPath()
+  ctx.ellipse(0, my - lift * 0.55, mw * 0.92, drop * 0.5, 0, 0, TAU)
+  ctx.fill()
+  ctx.fillStyle = '#e0737d'
+  ctx.beginPath()
+  ctx.ellipse(0, my + drop * 1.0, mw * 0.6, drop * 0.7, 0, 0, TAU)
+  ctx.fill()
+  ctx.restore()
+  // Lip line, heavier at the corners.
+  ctx.save()
+  mouth()
+  ctx.strokeStyle = '#7a3a34'
+  ctx.lineWidth = Math.max(1, headR * 0.045)
+  ctx.lineJoin = 'round'
+  ctx.stroke()
+  ctx.restore()
+}
+
+/** Elders get a beard instead of a mouth. */
+function drawBeard(ctx, f, look) {
+  const { h, headY, headR } = f
+  const beard = () => {
+    ctx.beginPath()
+    ctx.moveTo(-headR * 0.7, headY + headR * 0.3)
+    ctx.bezierCurveTo(-headR * 0.82, headY + headR * 1.2, -headR * 0.44, headY + headR * 1.82, 0, headY + headR * 1.84)
+    ctx.bezierCurveTo(headR * 0.44, headY + headR * 1.82, headR * 0.82, headY + headR * 1.2, headR * 0.7, headY + headR * 0.3)
+    ctx.quadraticCurveTo(0, headY + headR * 0.95, -headR * 0.7, headY + headR * 0.3)
+    ctx.closePath()
+  }
+  beard()
+  ctx.fillStyle = '#f2f2fb'
+  ctx.fill()
+  volume(ctx, beard, { x: -headR, y: headY, w: headR * 2, h: headR * 2.0 }, 0.7)
+  beard()
+  outline(ctx, h, '#c2c2dc', 0.7)
+  // A moustache on top, so the beard has a face attached to it.
+  ctx.beginPath()
+  ctx.ellipse(0, headY + headR * 0.5, headR * 0.46, headR * 0.19, 0, 0, TAU)
+  ctx.fillStyle = '#f7f7ff'
+  ctx.fill()
 }
 
 // --- Hair ---------------------------------------------------------------------
@@ -294,11 +638,21 @@ function drawHair(ctx, h, headY, headR, look, view, pass) {
   const fall = [0, 0.10, 0.30, 0.58][style] * h
 
   if (pass === 'back') {
+    // The mass behind the skull — always present, so the back view is never a
+    // void. It gets the same lighting and line as everything else, or from
+    // behind the wizard is just a flat egg of colour.
+    const mass = () => {
+      ctx.beginPath()
+      ctx.ellipse(0, headY - headR * 0.04, headR * 1.05, headR * 1.1, 0, 0, TAU)
+      ctx.closePath()
+    }
+    mass()
     ctx.fillStyle = col
-    // The mass behind the skull — always present, so the back view is never a void.
-    ctx.beginPath()
-    ctx.arc(0, headY - headR * 0.06, headR * 1.06, 0, TAU)
     ctx.fill()
+    volume(ctx, mass, { x: -headR * 1.1, y: headY - headR * 1.2, w: headR * 2.2, h: headR * 2.3 }, 0.9)
+    mass()
+    outline(ctx, h, col, 0.8)
+    ctx.fillStyle = col
     // The full curtain only makes sense from behind. Drawn in the front view it
     // hangs down the middle of the chest and reads as a long white bib, so from
     // the front the length is carried by the side locks in the front pass.
@@ -347,9 +701,9 @@ function drawHair(ctx, h, headY, headR, look, view, pass) {
     if (style >= 1) {
       for (const sgn of [-1, 1]) {
         ctx.beginPath()
-        ctx.moveTo(sgn * headR * 0.95, headY - headR * 0.3)
-        ctx.quadraticCurveTo(sgn * headR * 1.22, headY + fall * 0.55, sgn * headR * 0.74, headY + fall * 0.92)
-        ctx.quadraticCurveTo(sgn * headR * 0.6, headY + fall * 0.4, sgn * headR * 0.62, headY - headR * 0.2)
+        ctx.moveTo(sgn * headR * 0.96, headY - headR * 0.36)
+        ctx.quadraticCurveTo(sgn * headR * 1.16, headY + fall * 0.5, sgn * headR * 0.92, headY + fall * 0.95)
+        ctx.quadraticCurveTo(sgn * headR * 0.78, headY + fall * 0.42, sgn * headR * 0.74, headY - headR * 0.26)
         ctx.closePath()
         ctx.fill()
       }
@@ -419,57 +773,94 @@ function drawHat(ctx, h, kind, robe, trim, t, view = 'front') {
     // Kept snug: no wider than the shoulders and hemmed at the collar, so the
     // robe, the cape and the trim are all still visible underneath. An oversized
     // cowl swallows the whole figure and every hooded form looks the same.
-    const W = h * 0.168                // half-width where the cloth meets the shoulders
+    // Sized from the head, not from the hat line — the face opening has to
+    // clear the chin or the hood eats the smile, and the hem has to reach the
+    // shoulders or there's a band of bare neck under it.
+    const W = h * 0.215                // half-width where the cloth meets the shoulders
     const peakY = brimY - h * 0.15
-    const hemY = brimY + h * 0.205
-    const faceY = -h * 0.665           // matches headY in drawWizard
-    const faceRX = h * 0.096, faceRY = h * 0.114
+    const hemY = -h * 0.425
+    const faceY = -h * 0.605           // matches headY in drawWizard
+    const faceRX = h * 0.114, faceRY = h * 0.142
     const front = view === 'front'
 
-    ctx.beginPath()
-    // Left shoulder, up the outside of the cowl to the peak.
-    ctx.moveTo(-W, hemY)
-    ctx.bezierCurveTo(-W * 1.12, brimY + h * 0.02, -h * 0.16, peakY + h * 0.10, -h * 0.026, peakY + h * 0.012)
-    // The peak: a real point, tipping forward, so it reads as a hood from behind
-    // too rather than as a dome.
-    ctx.quadraticCurveTo(h * 0.022, peakY - h * 0.026, h * 0.072, peakY + h * 0.03)
-    // Down the right side to the other shoulder.
-    ctx.bezierCurveTo(h * 0.14, brimY + h * 0.01, W * 1.1, brimY + h * 0.11, W, hemY)
-    // Hem, sagging slightly between the shoulders.
-    ctx.quadraticCurveTo(0, hemY + h * 0.035, -W, hemY)
-    ctx.closePath()
-    // From behind there is no opening — you're looking at the back of the hood.
-    if (front) {
-      ctx.moveTo(faceRX, faceY)
-      ctx.ellipse(0, faceY, faceRX, faceRY, 0, 0, TAU)
+    // The opening.
+    //
+    // Not a porthole: a real hood is open at the BOTTOM. The cloth arches over
+    // the head and runs down each side past the temples, and below the cheekbone
+    // there is nothing there — you can see the chin, the jaw and the neck. Cut
+    // as a tunnel that runs off the bottom of the cowl rather than as a closed
+    // ellipse, which is what made it read as a diving mask.
+    const oX = faceRX * 1.02
+    const oTop = faceY - faceRY * 1.04
+    const oSide = faceY + faceRY * 0.18          // where the cloth stops covering
+    const oBot = hemY + h * 0.05                 // past the hem, so the cut is clean
+
+    /** The cloth, opening included. One function so the fill, the clip and the
+     *  outline use exactly the same shape — which is what stops the hem being
+     *  stroked straight across the open front. */
+    const cowl = () => {
+      ctx.beginPath()
+      // Left shoulder, up the outside of the cowl to the peak.
+      ctx.moveTo(-W, hemY)
+      ctx.bezierCurveTo(-W * 1.1, brimY + h * 0.02, -h * 0.17, peakY + h * 0.10, -h * 0.026, peakY + h * 0.012)
+      // The peak: a real point, tipping forward, so it reads as a hood from
+      // behind too rather than as a dome.
+      ctx.quadraticCurveTo(h * 0.022, peakY - h * 0.026, h * 0.072, peakY + h * 0.03)
+      // Down the right side to the other shoulder.
+      ctx.bezierCurveTo(h * 0.15, brimY + h * 0.01, W * 1.08, brimY + h * 0.11, W, hemY)
+      // Hem, sagging slightly between the shoulders.
+      ctx.quadraticCurveTo(0, hemY + h * 0.035, -W, hemY)
+      ctx.closePath()
+      if (front) {
+        ctx.moveTo(-oX, oBot)
+        ctx.lineTo(-oX, oSide)
+        ctx.bezierCurveTo(-oX, oTop, oX, oTop, oX, oSide)
+        ctx.lineTo(oX, oBot)
+        ctx.closePath()
+      }
     }
 
+    cowl()
     const g = ctx.createLinearGradient(-W, 0, W, 0)
     g.addColorStop(0, shade(hatCol, -0.34)); g.addColorStop(0.38, hatCol)
     g.addColorStop(0.72, shade(hatCol, -0.14)); g.addColorStop(1, shade(hatCol, -0.38))
     ctx.fillStyle = g
     ctx.fill('evenodd')
-    outline(ctx, h, robe)
+    // Outline clipped to the cloth, so the hem isn't drawn across the opening.
+    ctx.save()
+    cowl(); ctx.clip('evenodd')
+    cowl(); outline(ctx, h, robe, 1.4)
+    ctx.restore()
 
     if (front) {
-      // Trim piping round the opening — reads as a lined hood, and it's the only
-      // place a hooded form's second colour shows near the face.
+      // Trim piping along the edge of the opening — reads as a lined hood, and
+      // it's the only place a hooded form's second colour shows near the face.
+      // Piping over the arch only. Running it down the legs as well put a
+      // bracket round the face, which is the porthole look again.
+      const edge = () => {
+        ctx.beginPath()
+        ctx.moveTo(-oX, oSide)
+        ctx.bezierCurveTo(-oX, oTop, oX, oTop, oX, oSide)
+      }
       ctx.save()
-      ctx.beginPath()
-      ctx.ellipse(0, faceY, faceRX, faceRY, 0, 0, TAU)
+      cowl(); ctx.clip('evenodd')
+      edge()
       ctx.strokeStyle = trim
-      ctx.lineWidth = Math.max(1, h * 0.008)
-      ctx.globalAlpha = 0.7
+      ctx.lineWidth = Math.max(1, h * 0.018)
+      ctx.globalAlpha = 0.75
       ctx.stroke()
-      // Shadow across the brow, so the face sits INSIDE the hood.
-      ctx.beginPath()
-      ctx.ellipse(0, faceY, faceRX, faceRY, 0, 0, TAU)
+      ctx.restore()
+      ctx.save()
+      // Shadow across the brow, so the face sits INSIDE the hood rather than
+      // being framed by it.
+      edge()
+      ctx.closePath()
       ctx.clip()
       ctx.globalAlpha = 1
-      const s = ctx.createLinearGradient(0, faceY - faceRY, 0, faceY + faceRY * 0.3)
-      s.addColorStop(0, 'rgba(4,2,16,.6)'); s.addColorStop(1, 'rgba(4,2,16,0)')
-      ctx.fillStyle = s
-      ctx.fillRect(-faceRX, faceY - faceRY, faceRX * 2, faceRY * 1.45)
+      const sg = ctx.createLinearGradient(0, oTop, 0, faceY + faceRY * 0.1)
+      sg.addColorStop(0, 'rgba(4,2,16,.55)'); sg.addColorStop(1, 'rgba(4,2,16,0)')
+      ctx.fillStyle = sg
+      ctx.fillRect(-oX, oTop, oX * 2, faceRY * 1.5)
       ctx.restore()
     } else {
       // A centre seam down the back of the hood, so it isn't a flat blob.
@@ -491,8 +882,8 @@ function drawHat(ctx, h, kind, robe, trim, t, view = 'front') {
     ctx.lineWidth = Math.max(1, h * 0.006)
     for (const sx of [-1, 1]) {
       ctx.beginPath()
-      ctx.moveTo(sx * h * 0.118, brimY - h * 0.045)
-      ctx.quadraticCurveTo(sx * h * 0.152, brimY + h * 0.07, sx * h * 0.132, hemY)
+      ctx.moveTo(sx * h * 0.13, brimY - h * 0.045)
+      ctx.quadraticCurveTo(sx * h * 0.175, brimY + h * 0.07, sx * h * 0.158, hemY)
       ctx.stroke()
     }
     ctx.restore()
@@ -513,7 +904,10 @@ function drawHat(ctx, h, kind, robe, trim, t, view = 'front') {
     ctx.beginPath()
     ctx.moveTo(-w / 2, brimY)
     ctx.lineTo(-w / 2, brimY - h * 0.05)
-    for (let i = 0; i < 5; i++) {
+    // Four spikes across the width. This ran to i < 5, which built a fifth
+    // spike starting AT the right edge and running off it — the strange angled
+    // section that appeared on the staff side.
+    for (let i = 0; i < 4; i++) {
       const px = -w / 2 + (w / 4) * i
       ctx.lineTo(px + w / 8, brimY - h * (i % 2 === 0 ? 0.14 : 0.10))
       ctx.lineTo(px + w / 4, brimY - h * 0.05)

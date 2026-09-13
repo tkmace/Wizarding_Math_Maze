@@ -25,4 +25,8 @@ await page.locator('text=Show fixed skill level modes').click(); await page.wait
 const rows2 = await page.locator('button').filter({hasText:/Novice|Sorcerer|Legendary/}).count()
 console.log('toggle reveals them:', rows2===3?'PASS':'FAIL ('+rows2+')')
 await page.screenshot({path:`${OUT}/99-hub-expanded.png`,fullPage:true})
+await page.locator('button',{hasText:'Back to the Castle'}).first().click().catch(()=>{})
+await page.waitForTimeout(300)
+await page.locator('button',{hasText:'My Look'}).first().click(); await page.waitForTimeout(600)
+await page.screenshot({path:`${OUT}/97-lookpicker.png`,fullPage:true})
 await b.close(); srv.close()
