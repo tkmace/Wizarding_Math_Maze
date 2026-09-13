@@ -47,5 +47,12 @@ row('WARDROBE TILE (64px)', ['apprentice','candle','leaf','frost','storm','thorn
 // Hats big, to check the crown's spikes and the horned/wide shapes.
 row('HATS at size', ['dawn','astral','grand','flamebinder','thorn','tide','glass','moon']
   .map(id => ({ form: f(id), look: look(1, 2, 1) })), 190)
+// Elders, big — the beard is the thing to judge here.
+row('ELDERS at size', [
+  { form: f('dawn'), look: look(2, 1, 1) },
+  { form: f('grand'), look: look(0, 0, 2) },
+  { form: f('astral'), look: look(4, 4, 1) },
+  { form: f('runesage'), look: look(3, 2, 3) },
+], 300)
 window.__done = true
 </script></body></html>

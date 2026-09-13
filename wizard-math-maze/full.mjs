@@ -16,6 +16,9 @@ await page.goto('http://localhost:4174/',{waitUntil:'networkidle'})
 await page.fill('input[type=text]','Camille'); await page.fill('input[type=password]','1234')
 await page.click('text=Begin the Journey'); await page.waitForTimeout(500)
 await page.click('text=Multiplication'); await page.click('text=Addition')  // multiplication only
+// Fixed tiers are collapsed by default; open them before picking one.
+await page.locator('text=Show fixed skill level modes').click().catch(()=>{})
+await page.waitForTimeout(200)
 await page.click('text=Apprentice >> nth=1').catch(()=>{})
 await page.click('text=Enter the Maze'); await page.waitForTimeout(900)
 

@@ -367,6 +367,7 @@ function drawFace(ctx, h, headY, headR, look, form) {
   drawEyes(ctx, f, look)
   drawBrows(ctx, f, look)
   drawNose(ctx, f, look)
+  // An elder's beard draws the mouth itself, between moustache and whiskers.
   if (form.rank >= 5) drawBeard(ctx, f, look)
   else drawMouth(ctx, f, look)
   ctx.lineCap = 'butt'
@@ -601,28 +602,99 @@ function drawMouth(ctx, f, look) {
   ctx.restore()
 }
 
-/** Elders get a beard instead of a mouth. */
+/**
+ * An elder's beard.
+ *
+ * The old one was a single smooth shield of near-white, starting right under
+ * the nose and covering the mouth, the chin and half the chest. It didn't read
+ * as hair at all — it read as a surgical mask, which is exactly what Tom saw.
+ *
+ * What makes a beard read as a beard: it is the SAME HAIR as the head, so it
+ * connects to the sideburns and takes its colour from the hair (silvered with
+ * age, not bleached to paper); it has a moustache above the mouth and a mass
+ * below it, with the mouth visible between them; the bottom edge is waved into
+ * lobes rather than smooth; and a few strand lines run down it. All five are
+ * here, and the mouth still shows — this is a children's game, and a wizard who
+ * can't smile is a wizard with no expression.
+ */
 function drawBeard(ctx, f, look) {
   const { h, headY, headR } = f
+  // Silvered hair, not white paper: a dark-haired elder greys, a fair one goes
+  // white, and either way the beard belongs to the head it's attached to.
+  const col = mix(look.hairHex, '#eceaf6', 0.68)
+  const dark = shade(col, -0.22)
+
+  // Sideburns: the beard has to grow out of the hair, or it looks stuck on.
+  ctx.fillStyle = col
+  for (const s of [-1, 1]) {
+    ctx.beginPath()
+    ctx.moveTo(s * headR * 0.94, headY - headR * 0.12)
+    ctx.quadraticCurveTo(s * headR * 1.0, headY + headR * 0.5, s * headR * 0.66, headY + headR * 0.86)
+    ctx.quadraticCurveTo(s * headR * 0.82, headY + headR * 0.36, s * headR * 0.74, headY - headR * 0.1)
+    ctx.closePath()
+    ctx.fill()
+  }
+
+  // The mass below the mouth: jaw, chin, and a waved hem.
+  const jawY = headY + headR * 0.78
+  const tipY = headY + headR * 2.0
   const beard = () => {
     ctx.beginPath()
-    ctx.moveTo(-headR * 0.7, headY + headR * 0.3)
-    ctx.bezierCurveTo(-headR * 0.82, headY + headR * 1.2, -headR * 0.44, headY + headR * 1.82, 0, headY + headR * 1.84)
-    ctx.bezierCurveTo(headR * 0.44, headY + headR * 1.82, headR * 0.82, headY + headR * 1.2, headR * 0.7, headY + headR * 0.3)
-    ctx.quadraticCurveTo(0, headY + headR * 0.95, -headR * 0.7, headY + headR * 0.3)
+    ctx.moveTo(-headR * 0.8, headY + headR * 0.28)
+    ctx.quadraticCurveTo(-headR * 0.86, jawY, -headR * 0.6, headY + headR * 1.35)
+    // Three lobes along the bottom, so the hem is hair rather than a hem.
+    ctx.quadraticCurveTo(-headR * 0.5, tipY * 0.55 + headY * 0.45, -headR * 0.26, headY + headR * 1.78)
+    ctx.quadraticCurveTo(-headR * 0.12, tipY, 0, headY + headR * 1.92)
+    ctx.quadraticCurveTo(headR * 0.12, tipY, headR * 0.26, headY + headR * 1.78)
+    ctx.quadraticCurveTo(headR * 0.5, tipY * 0.55 + headY * 0.45, headR * 0.6, headY + headR * 1.35)
+    ctx.quadraticCurveTo(headR * 0.86, jawY, headR * 0.8, headY + headR * 0.28)
+    // Upper edge, dipping below the mouth so the smile stays visible.
+    ctx.quadraticCurveTo(0, headY + headR * 1.02, -headR * 0.8, headY + headR * 0.28)
     ctx.closePath()
   }
   beard()
-  ctx.fillStyle = '#f2f2fb'
+  ctx.fillStyle = col
   ctx.fill()
-  volume(ctx, beard, { x: -headR, y: headY, w: headR * 2, h: headR * 2.0 }, 0.7)
+  volume(ctx, beard, { x: -headR, y: headY, w: headR * 2, h: headR * 2.1 }, 0.6)
+
+  // Strands, so it has grain.
+  ctx.save()
+  beard(); ctx.clip()
+  ctx.strokeStyle = dark
+  ctx.globalAlpha = 0.45
+  ctx.lineWidth = Math.max(0.8, headR * 0.045)
+  ctx.lineCap = 'round'
+  for (const sx of [-0.44, -0.16, 0.16, 0.44]) {
+    ctx.beginPath()
+    ctx.moveTo(headR * sx * 1.5, headY + headR * 0.95)
+    ctx.quadraticCurveTo(headR * sx * 1.2, headY + headR * 1.45, headR * sx, headY + headR * 1.85)
+    ctx.stroke()
+  }
+  ctx.restore()
   beard()
-  outline(ctx, h, '#c2c2dc', 0.7)
-  // A moustache on top, so the beard has a face attached to it.
-  ctx.beginPath()
-  ctx.ellipse(0, headY + headR * 0.5, headR * 0.46, headR * 0.19, 0, 0, TAU)
-  ctx.fillStyle = '#f7f7ff'
+  outline(ctx, h, col, 0.65)
+
+  // The mouth sits between moustache and beard.
+  drawMouth(ctx, f, look)
+
+  // Moustache last, over the top lip: two lobes with a dip in the middle.
+  const mY = headY + headR * 0.42
+  const tash = () => {
+    ctx.beginPath()
+    ctx.moveTo(-headR * 0.58, mY - headR * 0.06)
+    ctx.quadraticCurveTo(-headR * 0.34, mY - headR * 0.24, -headR * 0.06, mY - headR * 0.02)
+    ctx.quadraticCurveTo(0, mY + headR * 0.04, headR * 0.06, mY - headR * 0.02)
+    ctx.quadraticCurveTo(headR * 0.34, mY - headR * 0.24, headR * 0.58, mY - headR * 0.06)
+    ctx.quadraticCurveTo(headR * 0.42, mY + headR * 0.32, 0, mY + headR * 0.22)
+    ctx.quadraticCurveTo(-headR * 0.42, mY + headR * 0.32, -headR * 0.58, mY - headR * 0.06)
+    ctx.closePath()
+  }
+  tash()
+  ctx.fillStyle = shade(col, 0.08)
   ctx.fill()
+  volume(ctx, tash, { x: -headR * 0.6, y: mY - headR * 0.3, w: headR * 1.2, h: headR * 0.7 }, 0.5)
+  tash()
+  outline(ctx, h, col, 0.6)
 }
 
 // --- Hair ---------------------------------------------------------------------
@@ -634,8 +706,10 @@ function drawBeard(ctx, f, look) {
  */
 function drawHair(ctx, h, headY, headR, look, view, pass) {
   const { hairHex: col, hairStyle: style } = look
-  // How far past the jaw the hair falls, by length.
-  const fall = [0, 0.10, 0.30, 0.58][style] * h
+  // How far past the jaw the hair falls, by length. Shortened when the head
+  // dropped and grew: measured from the head's centre, the old numbers put
+  // "Long" somewhere around the ankles.
+  const fall = [0, 0.085, 0.24, 0.40][style] * h
 
   if (pass === 'back') {
     // The mass behind the skull — always present, so the back view is never a
@@ -657,28 +731,49 @@ function drawHair(ctx, h, headY, headR, look, view, pass) {
     // hangs down the middle of the chest and reads as a long white bib, so from
     // the front the length is carried by the side locks in the front pass.
     if (fall > 0 && view === 'back') {
-      // A curtain down the back, narrowing as it falls.
-      ctx.beginPath()
-      ctx.moveTo(-headR * 1.02, headY)
-      ctx.quadraticCurveTo(-headR * 1.15, headY + fall * 0.7, -headR * 0.62, headY + fall)
-      ctx.quadraticCurveTo(0, headY + fall * 1.16, headR * 0.62, headY + fall)
-      ctx.quadraticCurveTo(headR * 1.15, headY + fall * 0.7, headR * 1.02, headY)
-      ctx.closePath()
+      // A curtain down the back. It used to taper to a point, which with the
+      // bigger head read as a sausage hanging off the skull; hair falls roughly
+      // parallel and rounds off at the hem, so that's what it does now.
+      const curtain = () => {
+        ctx.beginPath()
+        ctx.moveTo(-headR * 0.98, headY - headR * 0.1)
+        ctx.bezierCurveTo(-headR * 1.06, headY + fall * 0.45, -headR * 0.92, headY + fall * 0.84, -headR * 0.72, headY + fall)
+        ctx.quadraticCurveTo(0, headY + fall * 1.14, headR * 0.72, headY + fall)
+        ctx.bezierCurveTo(headR * 0.92, headY + fall * 0.84, headR * 1.06, headY + fall * 0.45, headR * 0.98, headY - headR * 0.1)
+        ctx.closePath()
+      }
+      curtain()
       const g = ctx.createLinearGradient(0, headY, 0, headY + fall)
       g.addColorStop(0, col)
-      g.addColorStop(1, shade(col, -0.35))
+      g.addColorStop(1, shade(col, -0.32))
       ctx.fillStyle = g
       ctx.fill()
+      // Strands, so it's hair rather than a cape.
+      ctx.save()
+      curtain(); ctx.clip()
+      ctx.strokeStyle = shade(col, -0.3)
+      ctx.globalAlpha = 0.4
+      ctx.lineWidth = Math.max(0.8, headR * 0.06)
+      ctx.lineCap = 'round'
+      for (const sx of [-0.62, -0.22, 0.22, 0.62]) {
+        ctx.beginPath()
+        ctx.moveTo(headR * sx * 0.8, headY + headR * 0.2)
+        ctx.quadraticCurveTo(headR * sx * 1.1, headY + fall * 0.6, headR * sx, headY + fall * 0.98)
+        ctx.stroke()
+      }
+      ctx.restore()
+      curtain()
+      outline(ctx, h, col, 0.7)
     }
     return
   }
 
   // Front pass
   ctx.fillStyle = col
-  if (style === 0) {
+  if (style === 0 && view === 'front') {
     // Cropped still needs a hairline from the front, or the face reads as bald
     // rather than as hair tucked neatly under the hat.
-    if (view === 'front') {
+    {
       ctx.beginPath()
       ctx.moveTo(-headR * 0.95, headY - headR * 0.28)
       ctx.quadraticCurveTo(0, headY - headR * 1.02, headR * 0.95, headY - headR * 0.28)
@@ -688,6 +783,7 @@ function drawHair(ctx, h, headY, headR, look, view, pass) {
     }
     return
   }
+  if (view === 'front' && style === 0) return
   if (view === 'front') {
     // A fringe across the brow.
     ctx.beginPath()
@@ -709,26 +805,73 @@ function drawHair(ctx, h, headY, headR, look, view, pass) {
       }
     }
   } else {
-    // From behind, a soft crown highlight so the mass reads as hair not a cap.
-    ctx.globalAlpha = 0.35
-    ctx.fillStyle = shade(col, 0.3)
-    ctx.beginPath()
-    ctx.ellipse(-headR * 0.22, headY - headR * 0.4, headR * 0.42, headR * 0.22, -0.5, 0, TAU)
+    // From behind you are looking at the back of someone's head, which is hair
+    // — all of it, at every length. This used to be a thin rim around a bare
+    // skin-coloured skull, because the head is drawn over the hair mass and
+    // nothing put the hair back on top. The cap fixes that.
+    const cap = () => {
+      ctx.beginPath()
+      ctx.ellipse(0, headY - headR * 0.05, headR * 0.99, headR * 1.04, 0, 0, TAU)
+      ctx.closePath()
+    }
+    cap()
+    ctx.fillStyle = col
     ctx.fill()
-    ctx.globalAlpha = 1
+    volume(ctx, cap, { x: -headR, y: headY - headR * 1.1, w: headR * 2, h: headR * 2.1 }, 1.25)
+    cap()
+    outline(ctx, h, col, 0.7)
+    // A parting, so the back of the head has some grain.
+    ctx.save()
+    cap(); ctx.clip()
+    ctx.strokeStyle = shade(col, -0.3)
+    ctx.globalAlpha = 0.3
+    ctx.lineWidth = Math.max(0.8, headR * 0.055)
+    ctx.lineCap = 'round'
+    for (const sx of [-0.42, 0, 0.42]) {
+      ctx.beginPath()
+      ctx.moveTo(headR * sx * 0.5, headY - headR * 0.95)
+      ctx.quadraticCurveTo(headR * sx, headY - headR * 0.1, headR * sx * 1.1, headY + headR * 0.9)
+      ctx.stroke()
+    }
+    ctx.restore()
   }
 }
 
 // --- Hats ---------------------------------------------------------------------
 function drawHat(ctx, h, kind, robe, trim, t, view = 'front') {
-  const brimY = -h * 0.725
+  const brimY = -h * 0.718
   const hatCol = shade(robe, 0.1)
+  // How far the hat's lower edge bows DOWN at the centre.
+  //
+  // A hat sits on a round skull, so the edge you see is an arc that dips
+  // towards you in the middle — not a straight line. Drawn straight, the hat's
+  // two bottom corners hang in the air either side of the head, which is
+  // exactly the "floating just above" look. Bowing the edge tucks it onto the
+  // head. Small on purpose: the eyebrows are only a little below this.
+  const sit = h * 0.024
+
+  /** A shadow on the forehead, so the hat is ON the head rather than near it. */
+  const seat = w => {
+    ctx.save()
+    const g = ctx.createLinearGradient(0, brimY, 0, brimY + h * 0.055)
+    g.addColorStop(0, 'rgba(60,30,20,0.4)')
+    g.addColorStop(1, 'rgba(60,30,20,0)')
+    ctx.fillStyle = g
+    ctx.beginPath()
+    ctx.moveTo(-w / 2, brimY)
+    ctx.quadraticCurveTo(0, brimY + sit + h * 0.05, w / 2, brimY)
+    ctx.closePath()
+    ctx.fill()
+    ctx.restore()
+  }
 
   const cone = (height, width, curve) => {
     ctx.beginPath()
     ctx.moveTo(-width / 2, brimY)
     ctx.quadraticCurveTo(-width * 0.1, brimY - height * 0.78, curve, brimY - height)
     ctx.quadraticCurveTo(width * 0.18, brimY - height * 0.5, width / 2, brimY)
+    // The seated lower edge, bowing down over the skull.
+    ctx.quadraticCurveTo(0, brimY + sit, -width / 2, brimY)
     ctx.closePath()
     const g = ctx.createLinearGradient(-width / 2, 0, width / 2, 0)
     g.addColorStop(0, shade(hatCol, -0.26)); g.addColorStop(0.45, hatCol); g.addColorStop(1, shade(hatCol, -0.3))
@@ -738,7 +881,7 @@ function drawHat(ctx, h, kind, robe, trim, t, view = 'front') {
   }
   const brim = (w, thick) => {
     ctx.beginPath()
-    ctx.ellipse(0, brimY, w / 2, thick, 0, 0, TAU)
+    ctx.ellipse(0, brimY + sit * 0.4, w / 2, thick, 0, 0, TAU)
     ctx.fillStyle = shade(robe, -0.25)
     ctx.fill()
     outline(ctx, h, robe)
@@ -760,6 +903,7 @@ function drawHat(ctx, h, kind, robe, trim, t, view = 'front') {
   }
 
   if (kind === 'wide') {
+    seat(h * 0.62)
     brim(h * 0.62, h * 0.028)
     cone(h * 0.30, h * 0.32, h * 0.02)
     band(h * 0.32)
@@ -777,7 +921,7 @@ function drawHat(ctx, h, kind, robe, trim, t, view = 'front') {
     // clear the chin or the hood eats the smile, and the hem has to reach the
     // shoulders or there's a band of bare neck under it.
     const W = h * 0.215                // half-width where the cloth meets the shoulders
-    const peakY = brimY - h * 0.15
+    const peakY = -h * 0.885
     const hemY = -h * 0.425
     const faceY = -h * 0.605           // matches headY in drawWizard
     const faceRX = h * 0.114, faceRY = h * 0.142
@@ -888,6 +1032,7 @@ function drawHat(ctx, h, kind, robe, trim, t, view = 'front') {
     }
     ctx.restore()
   } else if (kind === 'horned') {
+    seat(h * 0.30)
     cone(h * 0.30, h * 0.30, h * 0.015)
     for (const s of [-1, 1]) {
       ctx.beginPath()
@@ -901,6 +1046,7 @@ function drawHat(ctx, h, kind, robe, trim, t, view = 'front') {
     band(h * 0.30)
   } else if (kind === 'crown') {
     const w = h * 0.30
+    seat(w)
     ctx.beginPath()
     ctx.moveTo(-w / 2, brimY)
     ctx.lineTo(-w / 2, brimY - h * 0.05)
@@ -913,6 +1059,7 @@ function drawHat(ctx, h, kind, robe, trim, t, view = 'front') {
       ctx.lineTo(px + w / 4, brimY - h * 0.05)
     }
     ctx.lineTo(w / 2, brimY)
+    ctx.quadraticCurveTo(0, brimY + sit, -w / 2, brimY)
     ctx.closePath()
     const g = ctx.createLinearGradient(-w / 2, 0, w / 2, 0)
     g.addColorStop(0, shade(trim, -0.35)); g.addColorStop(0.5, trim); g.addColorStop(1, shade(trim, -0.4))
@@ -925,6 +1072,7 @@ function drawHat(ctx, h, kind, robe, trim, t, view = 'front') {
       ctx.fill()
     }
   } else {
+    seat(h * 0.30)
     cone(h * 0.34, h * 0.30, h * 0.03)
     band(h * 0.30)
     star(h * 0.035, brimY - h * 0.35, h * 0.08)
@@ -1054,7 +1202,19 @@ function drawAura(ctx, h, kind, t, trim, layer) {
 
 // --- Colour helper ------------------------------------------------------------
 /** Lighten (positive) or darken (negative) a #rrggbb colour. */
-export function shade(hex, amt) {
+export /** Blend two hex colours. `t` 0 = a, 1 = b. */
+function mix(a, b, t) {
+  const pa = /^#?([0-9a-f]{6})$/i.exec(String(a)), pb = /^#?([0-9a-f]{6})$/i.exec(String(b))
+  if (!pa || !pb) return a
+  const na = parseInt(pa[1], 16), nb = parseInt(pb[1], 16)
+  const ch = i => {
+    const va = (na >> (16 - i * 8)) & 255, vb = (nb >> (16 - i * 8)) & 255
+    return Math.round(va + (vb - va) * t)
+  }
+  return `rgb(${ch(0)},${ch(1)},${ch(2)})`
+}
+
+function shade(hex, amt) {
   const m = /^#?([0-9a-f]{6})$/i.exec(String(hex))
   if (!m) return hex
   const n = parseInt(m[1], 16)

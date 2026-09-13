@@ -37,6 +37,9 @@ async function run(label, width, height) {
 
   // Turn on multiplication + sorcerer difficulty
   await page.click('text=Multiplication')
+  // The fixed tiers live behind a checkbox now — Wizard's Sense is the default.
+  await page.locator('text=Show fixed skill level modes').click().catch(() => {})
+  await page.waitForTimeout(200)
   await page.click('text=Sorcerer')
   await page.waitForTimeout(250)
   await page.click('text=Enter the Maze')
