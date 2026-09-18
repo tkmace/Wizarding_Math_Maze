@@ -148,8 +148,31 @@ export function drawWizard(ctx, o) {
   // was about three and a half heads tall, which is toddler proportions, and is
   // now closer to four. Small enough a step that the silhouette still reads on a
   // 40px wardrobe tile, big enough that the faces stopped looking like dolls.
-  const headY = -h * 0.618, headR = h * 0.126
+  //
+  // The head also sits a little higher than it used to. It has to: there was no
+  // room for a neck between the chin and the collar, so the head rested straight
+  // on the shoulders like a snowman's. Everything that has to stay with the head
+  // — the hat brim, the hood's face opening — is now measured FROM headY rather
+  // than written out in its own numbers, so moving the head can't leave a hat
+  // perched above it again.
+  const headY = -h * 0.645, headR = h * 0.126
   const seed = (form.robe || '').length + (form.title || '').length * 7
+
+  // The neck.
+  //
+  // A head joined directly to a collar is the strongest "doll" signal left in
+  // this figure — it is how a toy is assembled, with the head pushed onto a peg.
+  // What a neck buys is not the cylinder itself, most of which is hidden: it is
+  // the gap, and the shadow the jaw throws down into it.
+  //
+  // Kept SHORT and NARROW on purpose. About a third of a head radius shows below
+  // the chin; any more and a chibi turns into a bottle, which is what the first
+  // attempt at this looked like. It is also darker than the face at every point,
+  // because a neck is a surface facing away from the light with a head hanging
+  // over it — a neck lit as brightly as the cheek reads as a white bib.
+  const neckHalf = headR * 0.34            // half-width at the throat
+  const neckTop = headY + headR * 0.66     // vanishes behind the jaw
+  const neckBot = yShoulder + h * 0.026    // vanishes into the collar
 
   // ── Contact shadow, so the figure stands on something ──
   ctx.save()
@@ -296,16 +319,65 @@ export function drawWizard(ctx, o) {
     ctx.fill()
   }
 
+  // ── Neck, before the collar so the collar hides where it ends ──
+  //
+  // Drawn as a tapered column with a slight flare at the base, and lit as one:
+  // a hard shadow under the jaw fading to nothing at the collar, and a soft
+  // highlight down the light side. The shadow is doing most of the work — it is
+  // what says the head is IN FRONT of the neck rather than resting on it.
+  {
+    const neckPath = () => {
+      const span = neckBot - neckTop
+      ctx.beginPath()
+      ctx.moveTo(-neckHalf, neckTop)
+      ctx.bezierCurveTo(-neckHalf * 1.02, neckTop + span * 0.45, -neckHalf * 1.16, neckBot - span * 0.2, -neckHalf * 1.42, neckBot)
+      ctx.lineTo(neckHalf * 1.42, neckBot)
+      ctx.bezierCurveTo(neckHalf * 1.16, neckBot - span * 0.2, neckHalf * 1.02, neckTop + span * 0.45, neckHalf, neckTop)
+      ctx.closePath()
+    }
+    neckPath()
+    ctx.fillStyle = shade(look.skinHex, view === 'front' ? -0.18 : -0.3)
+    ctx.fill()
+    ctx.save()
+    neckPath(); ctx.clip()
+    // The jaw's shadow, heaviest right under the chin.
+    const ng = ctx.createLinearGradient(0, neckTop, 0, neckBot)
+    ng.addColorStop(0, 'rgba(48,22,15,0.46)')
+    ng.addColorStop(0.62, 'rgba(48,22,15,0.13)')
+    ng.addColorStop(1, 'rgba(48,22,15,0.03)')
+    ctx.fillStyle = ng
+    ctx.fillRect(-neckHalf * 2, neckTop, neckHalf * 4, neckBot - neckTop)
+    // A narrow lit edge on the light side — enough to round it, not to brighten it.
+    const nh = ctx.createLinearGradient(-neckHalf * 1.3, 0, -neckHalf * 0.1, 0)
+    nh.addColorStop(0, 'rgba(255,238,220,0.16)')
+    nh.addColorStop(1, 'rgba(255,238,220,0)')
+    ctx.fillStyle = nh
+    ctx.fillRect(-neckHalf * 2, neckTop, neckHalf * 4, neckBot - neckTop)
+    ctx.restore()
+    neckPath()
+    outline(ctx, h, look.skinHex, 0.7)
+  }
+
   // ── Shoulder cape / collar ──
+  //
+  // The top edge used to be one smooth dome from shoulder point to shoulder
+  // point, which is the silhouette of a bell, not of a person. A shoulder is
+  // nearly flat across the deltoid and then climbs to the neck, and the cloth
+  // crosses in FRONT of the throat rather than arching over it — which is also
+  // what makes room for the neck to come through.
   const capeW = shoulder + h * 0.05
   const cape = () => {
     ctx.beginPath()
-    ctx.moveTo(-capeW, yShoulder + h * 0.028)
-    ctx.quadraticCurveTo(0, yShoulder - h * 0.082, capeW, yShoulder + h * 0.028)
+    ctx.moveTo(-capeW, yShoulder + h * 0.022)
+    ctx.bezierCurveTo(-capeW * 0.78, yShoulder - h * 0.026, -capeW * 0.56, yShoulder - h * 0.050, -capeW * 0.38, yShoulder - h * 0.056)
+    // The neckline, dipping in front of the throat.
+    ctx.quadraticCurveTo(-neckHalf * 1.5, yShoulder - h * 0.048, 0, yShoulder - h * 0.004)
+    ctx.quadraticCurveTo(neckHalf * 1.5, yShoulder - h * 0.048, capeW * 0.38, yShoulder - h * 0.056)
+    ctx.bezierCurveTo(capeW * 0.56, yShoulder - h * 0.050, capeW * 0.78, yShoulder - h * 0.026, capeW, yShoulder + h * 0.022)
     // A draped hem rather than one smooth curve — cloth gathers where it hangs.
-    ctx.quadraticCurveTo(capeW * 0.72, yShoulder + h * 0.088, capeW * 0.42, yShoulder + h * 0.058)
-    ctx.quadraticCurveTo(0, yShoulder + h * 0.108, -capeW * 0.42, yShoulder + h * 0.058)
-    ctx.quadraticCurveTo(-capeW * 0.72, yShoulder + h * 0.088, -capeW, yShoulder + h * 0.028)
+    ctx.quadraticCurveTo(capeW * 0.72, yShoulder + h * 0.086, capeW * 0.42, yShoulder + h * 0.056)
+    ctx.quadraticCurveTo(0, yShoulder + h * 0.106, -capeW * 0.42, yShoulder + h * 0.056)
+    ctx.quadraticCurveTo(-capeW * 0.72, yShoulder + h * 0.086, -capeW, yShoulder + h * 0.022)
     ctx.closePath()
   }
   cape()
@@ -323,10 +395,11 @@ export function drawWizard(ctx, o) {
   // The clasp that holds it, at the throat. A small piece of jewellery does a
   // lot of work: it says "this is fastened at the neck", which is the detail
   // that turns a coloured shape into a garment.
-  // Below the chin, not behind it. The head is narrower than it was, so a clasp
-  // tucked under the old jawline now sits out in the open at the throat.
-  const clY = yShoulder + h * 0.006
-  const clR = h * 0.021
+  // Below the chin, not behind it — and now below the NECK, sitting in the dip
+  // of the neckline where a real cloak is pinned, rather than floating at the
+  // throat where the neck itself wants to be.
+  const clY = yShoulder + h * 0.034
+  const clR = h * 0.019
   ctx.beginPath(); ctx.arc(0, clY, clR, 0, TAU)
   const cg = ctx.createRadialGradient(-clR * 0.3, clY - clR * 0.35, clR * 0.1, 0, clY, clR)
   cg.addColorStop(0, shade(trim, 0.6)); cg.addColorStop(0.6, trim); cg.addColorStop(1, shade(trim, -0.45))
@@ -347,12 +420,39 @@ export function drawWizard(ctx, o) {
   drawHair(ctx, h, headY, headR, look, view, 'back')
 
   // ── Ears, before the head so they tuck behind it ──
+  //
+  // They were two flat beans stuck to the sides of the skull. An ear at this
+  // size does not need an anatomy lesson, but it does need three things: to tilt
+  // back rather than stand straight out, to have a bowl in it, and to be warmer
+  // than the cheek beside it, because an ear is thin and light comes through it.
   if (view === 'front') {
     for (const sgn of [-1, 1]) {
-      ctx.beginPath()
-      ctx.ellipse(sgn * headR * 0.97, headY + headR * 0.14, headR * 0.17, headR * 0.24, 0, 0, TAU)
-      ctx.fillStyle = shade(look.skinHex, -0.1)
+      const ex = sgn * headR * 0.95, ey = headY + headR * 0.16
+      const erx = headR * 0.185, ery = headR * 0.265
+      const earPath = () => {
+        ctx.beginPath()
+        ctx.ellipse(ex, ey, erx, ery, sgn * 0.22, 0, TAU)
+        ctx.closePath()
+      }
+      earPath()
+      ctx.fillStyle = shade(look.skinHex, -0.06)
       ctx.fill()
+      ctx.save()
+      earPath(); ctx.clip()
+      // Light coming through thin skin.
+      ctx.fillStyle = 'rgba(208,122,104,0.22)'
+      ctx.fillRect(ex - erx * 2, ey - ery * 2, erx * 4, ery * 4)
+      // The bowl: a C-shaped rim opening away from the face.
+      ctx.strokeStyle = shade(look.skinHex, -0.38)
+      ctx.globalAlpha = 0.7
+      ctx.lineWidth = Math.max(0.7, erx * 0.36)
+      ctx.lineCap = 'round'
+      ctx.beginPath()
+      ctx.moveTo(ex + sgn * erx * 0.12, ey - ery * 0.52)
+      ctx.quadraticCurveTo(ex - sgn * erx * 0.5, ey, ex + sgn * erx * 0.12, ey + ery * 0.44)
+      ctx.stroke()
+      ctx.restore()
+      earPath()
       outline(ctx, h, look.skinHex, 0.6)
     }
   }
@@ -398,7 +498,7 @@ export function drawWizard(ctx, o) {
   drawHair(ctx, h, headY, headR, look, view, 'front')
 
   // ── Hat, drawn last so its brim sits over the head ──
-  drawHat(ctx, h, form.hat || 'pointed', robe, trim, t, view)
+  drawHat(ctx, h, form.hat || 'pointed', robe, trim, t, view, headY, headR)
 
   drawAura(ctx, h, form.aura, t, trim, 'over')
   ctx.restore()
@@ -922,8 +1022,12 @@ function drawHair(ctx, h, headY, headR, look, view, pass) {
 }
 
 // --- Hats ---------------------------------------------------------------------
-function drawHat(ctx, h, kind, robe, trim, t, view = 'front') {
-  const brimY = -h * 0.712
+function drawHat(ctx, h, kind, robe, trim, t, view = 'front', headY = -h * 0.655, headR = h * 0.126) {
+  // Measured DOWN from the top of the skull, not written as its own number.
+  // Every time the head has moved, the hats have had to be re-tuned one at a
+  // time and one of them has ended up perched in the air; tying the brim line
+  // to the head is what stops that happening again.
+  const brimY = headY - headR * 0.746
   const hatCol = shade(robe, 0.1)
   // How far the hat's lower edge bows DOWN at the centre.
   //
@@ -1014,10 +1118,10 @@ function drawHat(ctx, h, kind, robe, trim, t, view = 'front') {
     // clear the chin or the hood eats the smile, and the hem has to reach the
     // shoulders or there's a band of bare neck under it.
     const W = h * 0.215                // half-width where the cloth meets the shoulders
-    const peakY = -h * 0.885
+    const peakY = headY - headR * 2.12
     const hemY = -h * 0.425
-    const faceY = -h * 0.605           // matches headY in drawWizard
-    const faceRX = h * 0.114, faceRY = h * 0.142
+    const faceY = headY + headR * 0.103   // follows the head, by construction
+    const faceRX = headR * 0.905, faceRY = headR * 1.127
     const front = view === 'front'
 
     // The opening.
