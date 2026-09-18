@@ -76,18 +76,70 @@ export function answerChoices(q) {
   return [...out].sort(() => Math.random() - 0.5)
 }
 
+// --- When does the creature start racing you? ---------------------------------
+//
+// A spell duel has always had a clock: the creature charges on its own and you
+// answer against it. For a child who is still working out what the game even is,
+// that is two hard things at once — the maths, and the hurry — and the hurry is
+// the one that makes her freeze. So early on the clock simply does not run.
+//
+// The duel keeps every other rule. The creature's spell still grows and can
+// still cost you the round, but ONLY from wrong answers. The bar stops being a
+// timer and becomes a mistake meter, which is the same thing Rune Catch already
+// does with its three chances — and it means nothing has to be re-explained when
+// the clock does start.
+//
+// Two conditions, both required:
+//
+//  - EXPERIENCE. She has answered enough questions for the game to be familiar.
+//    Not a difficulty judgement, just "she has been here a while".
+//  - FLUENCY, measured on her WEAKEST operation in play, not her best. A child
+//    doing addition and division together is not ready for a clock because her
+//    addition is quick; she is as ready as her division makes her.
+//
+// The handover is a ramp, not a switch. The moment the clock starts it is at its
+// most generous — sixteen seconds, half again as long as the old timer ever gave
+// anyone — and it tightens as she grows into it. There is no step to fall off.
+export const TIMED_BAND = 1.0       // about the Apprentice tier
+export const TIMED_PLAYS = 40       // answers, summed over the operations in play
+
+const ALL_OPS = ['addition', 'subtraction', 'multiplication', 'division']
+
+/** Where the player sits, 0..4, on her weakest operation in play. */
+function weakestBand(diff, profile, ops) {
+  const list = [...(ops || [])].filter(op => ALL_OPS.includes(op))
+  const inPlay = list.length ? list : ALL_OPS
+  if (diff !== SENSE) return Math.max(0, TIERS.findIndex(t => t.key === diff))
+  return Math.min(...inPlay.map(op => senseTier(skillOf(profile, op), op).band))
+}
+
+/**
+ * Does the creature's spell charge on its own yet?
+ *
+ * Exported so the encounter's opening card can say which game she is about to
+ * play, and so App can explain the change the first time it happens.
+ */
+export function duelIsTimed(diff, profile, ops) {
+  const plays = [...(ops?.length || ops?.size ? ops : ALL_OPS)]
+    .reduce((n, op) => n + (profile?.opPlays?.[op] || 0), 0)
+  return plays >= TIMED_PLAYS && weakestBand(diff, profile, ops) >= TIMED_BAND
+}
+
 /** Creature toughness and reward, scaled so an encounter is worth roughly one good door. */
-export function duelPlan(diff, profile) {
-  const band = diff === SENSE
-    ? senseTier(skillOf(profile, 'multiplication'), 'multiplication').band
-    : TIERS.findIndex(t => t.key === diff)
-  const hp = 3 + (band > 2.5 ? 1 : 0)
+export function duelPlan(diff, profile, ops) {
+  const band = weakestBand(diff, profile, ops)
+  const timed = duelIsTimed(diff, profile, ops)
   return {
-    hp,
+    hp: 3 + (band > 2.5 ? 1 : 0),
     wards: 3,
-    chargeMs: 11000 - Math.min(3000, band * 600),
-    hitRelief: 0.42,          // fraction of the charge a correct answer knocks back
-    missCost: 0.22,           // fraction added by a wrong answer
+    timed,
+    // Infinity rather than a flag the draw loop has to remember to check: an
+    // untimed duel divides by it and adds nothing, every frame, for free.
+    chargeMs: timed ? Math.max(9000, 16000 - 1700 * (band - TIMED_BAND)) : Infinity,
+    hitRelief: 0.42,                    // fraction of the charge a correct answer knocks back
+    // Wrong answers have to carry the whole bar when the clock isn't running,
+    // or an untimed duel has no way to end badly and stops being a duel.
+    missCost: timed ? 0.22 : 0.30,
   }
 }
 

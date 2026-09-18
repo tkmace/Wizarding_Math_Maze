@@ -51,6 +51,19 @@ export const TIPS = {
     ],
     cta: 'Raise my wand',
   },
+  // Shown once, at the first duel where the creature's spell charges on its own.
+  // Up to now the bar has only moved when she got one wrong, so this is a change
+  // to a rule she already knows — and it is worth a card, because a bar that
+  // starts creeping with no explanation is alarming rather than exciting.
+  duelTimer: {
+    icon: '⏳',
+    title: 'It casts back now',
+    lines: [
+      'You have got quick enough that the creatures have started **charging their spells as you think**. Watch the bar under it.',
+      'Every right answer knocks the bar back down, and losing still costs you nothing you already have.',
+    ],
+    cta: "I'm ready",
+  },
   rune: {
     icon: '🔮',
     title: 'A rune stone',

@@ -3,7 +3,7 @@ import { genMaze, revealFrom, WALL, PATH, DOOR, END, FACING_DELTA, cellKey } fro
 import { recordAnswer } from './game/curriculum.js'
 import { roundPts, SENSE } from './game/math.js'
 import { formById, rankFor, pendingRanks, activePerks, buyState, STARTER } from './game/skins.js'
-import { rollEncounter, encounterReward } from './game/encounters.js'
+import { rollEncounter, encounterReward, duelIsTimed } from './game/encounters.js'
 import { hasNest } from './game/nests.js'
 import { seenTip } from './game/tips.js'
 import { saveProfile } from './store/storage.js'
@@ -231,12 +231,16 @@ export default function App() {
       setTimeout(() => {
         encPending.current = false
         setEncounter(enc)
-        teach('encounter')
+        // What an encounter IS comes first; only once that's known is the
+        // creature's clock worth a card of its own. Both are once-only, and
+        // `teach` ignores whichever has already been seen.
+        if (!seenTip(profileRef.current, 'encounter')) teach('encounter')
+        else if (enc.kind === 'duel' && duelIsTimed(diff, profileRef.current, ops)) teach('duelTimer')
         setEffects(e => e.filter(x => x.start !== start))
       }, AMBUSH_MS)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [doorQ, encounter, maze, profile, commit, say, teach])
+  }, [doorQ, encounter, maze, profile, commit, say, teach, diff, ops])
 
   // The movement pad repeats on hold, so it must not capture `act` from the
   // render where the hold began — the maze can change underneath it.

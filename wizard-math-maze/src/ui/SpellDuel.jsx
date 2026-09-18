@@ -21,7 +21,7 @@ import { C, sans, serif, btn } from './theme.js'
  * state would re-render the answer buttons sixty times a second.
  */
 export default function SpellDuel({ creature, ops, diff, profile, form, appearance, onDone }) {
-  const plan = useRef(duelPlan(diff, profile)).current
+  const plan = useRef(duelPlan(diff, profile, ops)).current
   const canvasRef = useRef(null)
   const [q, setQ] = useState(() => encounterQuestion(ops, diff, profile))
   const [phase, setPhase] = useState('fight')     // fight | won | lost
@@ -112,6 +112,8 @@ export default function SpellDuel({ creature, ops, diff, profile, form, appearan
 
       // ── advance ──
       if (!d.over) {
+        // chargeMs is Infinity for a beginner, so this adds nothing and the bar
+        // only ever moves on a wrong answer.
         d.charge += dt / plan.chargeMs
         if (d.charge >= 1) {
           d.charge = 0
@@ -176,9 +178,9 @@ export default function SpellDuel({ creature, ops, diff, profile, form, appearan
       ctx.fillStyle = d.charge > 0.7 ? '#ff5f6d' : '#f9ca74'
       ctx.fillRect(bx, by, bw * d.charge, Math.max(4, H * 0.024))
       ctx.font = `900 ${Math.max(8, H * 0.038)}px Nunito, sans-serif`
-      ctx.fillStyle = '#8f8fc0'
+      ctx.fillStyle = plan.timed ? '#8f8fc0' : '#7ee8a2'
       ctx.textAlign = 'center'
-      ctx.fillText('SPELL CHARGING', creatureX, by - H * 0.018)
+      ctx.fillText(plan.timed ? 'SPELL CHARGING' : 'NO TIMER — TAKE YOUR TIME', creatureX, by - H * 0.018)
 
       // Wards
       ctx.font = `${Math.max(10, H * 0.06)}px serif`
@@ -257,8 +259,10 @@ export default function SpellDuel({ creature, ops, diff, profile, form, appearan
               })}
             </div>
             <div style={{ textAlign: 'center', color: C.faint, fontSize: 11, marginTop: 10, lineHeight: 1.5 }}>
-              Tap the answer to break its spell. Lose and it just runs off —
-              you keep every point you already have.
+              {plan.timed
+                ? 'Tap the answer to break its spell.'
+                : "Tap the answer to break its spell. It won't cast while you think — only a wrong answer feeds it."}
+              {' '}Lose and it just runs off — you keep every point you already have.
             </div>
           </>
         )}

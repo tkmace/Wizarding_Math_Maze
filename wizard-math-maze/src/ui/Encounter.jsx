@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { drawCreature } from '../engine/creatureSprite.js'
+import { duelIsTimed } from '../game/encounters.js'
 import { C, sans, serif, btn } from './theme.js'
 import SpellDuel from './SpellDuel.jsx'
 import RuneCatch from './RuneCatch.jsx'
@@ -13,6 +14,11 @@ import RuneCatch from './RuneCatch.jsx'
  */
 export default function Encounter({ kind, creature, ops, diff, profile, form, appearance, onDone }) {
   const [phase, setPhase] = useState('intro')
+  // Which duel she is about to play, said out loud on the card. When the clock
+  // eventually starts running this line is what changes — so the card that
+  // introduces every encounter is also the one that announces it, and there is
+  // no separate moment to miss.
+  const timed = kind === 'duel' && duelIsTimed(diff, profile, ops)
 
   if (phase === 'intro') {
     return (
@@ -38,9 +44,11 @@ export default function Encounter({ kind, creature, ops, diff, profile, form, ap
             {creature.taunt}
             <br />
             <span style={{ color: C.faint, fontSize: 12 }}>
-              {kind === 'duel'
-                ? 'Break its spell with quick answers.'
-                : 'Catch the runes before they scatter.'}
+              {kind !== 'duel'
+                ? 'Catch the runes before they scatter.'
+                : timed
+                  ? 'Break its spell before it finishes casting.'
+                  : "Break its spell. No rush — it waits while you think."}
             </span>
           </p>
           <button className="bh" onClick={() => setPhase('game')}
