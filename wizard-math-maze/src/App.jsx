@@ -22,6 +22,7 @@ import SkinChoice from './ui/SkinChoice.jsx'
 import LookPicker from './ui/LookPicker.jsx'
 import NestPicker from './ui/NestPicker.jsx'
 import Encounter from './ui/Encounter.jsx'
+import Attunement from './ui/Attunement.jsx'
 import Coach from './ui/Coach.jsx'
 
 const DISSOLVE_MS = 620
@@ -428,8 +429,13 @@ export default function App() {
   }, [profile, commit, syncUp])
 
   const saveNest = useCallback(id => {
+    // Choosing a nest for the FIRST time is the first half of the Attunement,
+    // so she goes straight on to the second rather than being dropped in the
+    // castle and expected to find it. Changing nests later is just changing
+    // nests — it does not drag her back through the ceremony.
+    const arriving = !hasNest(profile) && !profile.attuned
     commit({ ...profile, nest: id })
-    setScreen('hub')
+    setScreen(arriving ? 'attune' : 'hub')
   }, [profile, commit])
 
   const saveLook = useCallback(look => {
@@ -481,6 +487,7 @@ export default function App() {
           onScroll={() => setScreen('scroll')}
           onLook={() => setScreen('look')}
           onNest={() => setScreen('nest')}
+          onAttune={() => setScreen('attune')}
           onLogout={() => { setProfile(null); setScreen('login') }}
         />
       )}
@@ -519,6 +526,13 @@ export default function App() {
           current={profile.nest}
           onChoose={saveNest}
           onClose={hasNest(profile) ? () => setScreen('hub') : null}
+        />
+      )}
+      {screen === 'attune' && profile && (
+        <Attunement
+          profile={profile} ops={ops} form={form}
+          onDone={commit}
+          onCancel={() => setScreen('hub')}
         />
       )}
       {screen === 'look' && profile && (

@@ -12,7 +12,17 @@ import Hint from './Hint.jsx'
  *  - a visual hint rather than the answer, free after two misses;
  *  - no dead end — she can always step back and try another corridor.
  */
-export default function MathDoor({ q, stones, swiftMs = 0, bigKeypad, onCorrect, onWrong, onSpendStone, onStepBack }) {
+/**
+ * `exam` is the Attunement's door: one answer, no hints, no walking away.
+ *
+ * All three matter to the measurement rather than to the difficulty. A hint
+ * hands over the answer, a retry turns "needed three goes" into "knew it", and
+ * a child who backs out of every hard door places far higher than she is. So in
+ * exam mode the hint is gone, the door does not shake or clear the box on a
+ * miss — the caller closes it either way — and "step back" becomes an honest
+ * way of saying she does not know this one.
+ */
+export default function MathDoor({ q, stones, swiftMs = 0, bigKeypad, exam = false, onCorrect, onWrong, onSpendStone, onStepBack }) {
   // Two panels side by side need roughly 840px. That's an iPad in either
   // orientation and any laptop; a phone keeps the single panel it had.
   const [roomy, setRoomy] = useState(
@@ -71,6 +81,8 @@ export default function MathDoor({ q, stones, swiftMs = 0, bigKeypad, onCorrect,
     const ms = performance.now() - startRef.current
     if (!isNaN(n) && n === q.ans) {
       onCorrect(ms, showHint)
+    } else if (exam) {
+      onWrong()                               // one answer per door; it opens anyway
     } else {
       setAns('')
       setShake(true)
@@ -211,7 +223,7 @@ export default function MathDoor({ q, stones, swiftMs = 0, bigKeypad, onCorrect,
 
         {/* Actions */}
         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-          {!showHint && (
+          {!exam && !showHint && (
             <button className="bh" onClick={useStone} disabled={!hintFree && stones <= 0}
               style={btn('ghost', {
                 flex: 1, fontSize: 13, minHeight: 46,
@@ -222,7 +234,7 @@ export default function MathDoor({ q, stones, swiftMs = 0, bigKeypad, onCorrect,
             </button>
           )}
           <button className="bh" onClick={onStepBack} style={btn('ghost', { flex: 1, fontSize: 13, minHeight: 46 })}>
-            ↩ Step back
+            {exam ? "I'm not sure" : '↩ Step back'}
           </button>
         </div>
       </div>

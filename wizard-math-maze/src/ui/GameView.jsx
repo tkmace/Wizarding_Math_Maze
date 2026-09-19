@@ -10,6 +10,10 @@ const MAX_PIXEL_W = 960     // ray count cap — one ray per pixel column
 export default function GameView({
   maze, pos, form, appearance, runPoints, total, stones, doorsLeft, effects,
   showCompass, paused, gateMet, onAction, onExit,
+  // A different strip above the viewport. The Attunement has no score, no
+  // doors-remaining and no sealed exit, so the usual HUD would be four zeroes
+  // and a bar that is already full.
+  hud = null,
 }) {
   const wrapRef = useRef(null)
   const canvasRef = useRef(null)
@@ -148,15 +152,17 @@ export default function GameView({
   return (
     <div style={{ width: '100%', maxWidth: 900, zIndex: 10 }}>
       {/* HUD */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, padding: '0 2px' }}>
-        <Chip label="RUN" value={runPoints} color={C.gold} />
-        <Chip label="TOTAL" value={total} color={C.dim} />
-        <Chip label="🚪" value={doorsLeft} color={C.teal} />
-        <Chip label="🔮" value={stones} color={C.teal} />
-      </div>
+      {hud || (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, padding: '0 2px' }}>
+          <Chip label="RUN" value={runPoints} color={C.gold} />
+          <Chip label="TOTAL" value={total} color={C.dim} />
+          <Chip label="🚪" value={doorsLeft} color={C.teal} />
+          <Chip label="🔮" value={stones} color={C.teal} />
+        </div>
+      )}
 
       {/* Exit gate progress */}
-      {maze?.pointsRequired > 0 && (
+      {!hud && maze?.pointsRequired > 0 && (
         <div style={{ marginBottom: 7, padding: '0 2px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9.5, fontWeight: 900, letterSpacing: 1, marginBottom: 3 }}>
             <span style={{ fontFamily: serif, color: gateMet ? C.good : C.gold }}>

@@ -43,6 +43,30 @@ const SPEED_BONUS    = 0.25   // up to +25% for answering well inside the window
 const WARM_BASE = 0.16
 const WARM_STEP = 0.042
 
+/** The beginner ceiling after `plays` answers of one operation. */
+const warmCapAt = plays => WARM_BASE + WARM_STEP * plays
+
+/**
+ * How many answers must be on record before `skill` is allowed to sit at
+ * `level` and still climb.
+ *
+ * The ceiling above is written for someone starting at the bottom, where it can
+ * only ever slow a climb down. The Attunement breaks that assumption: it sets a
+ * skill high while the play count is still zero, and then
+ * `Math.min(next, Math.max(cur, warmCap))` collapses to `Math.min(next, cur)` —
+ * she can fall but cannot rise, for as long as the ceiling is below where she
+ * was placed. A child placed at Sorcerer would spend her first two mazes
+ * sliding downhill with no way back up.
+ *
+ * So a placement credits the play count as well as the skill. This is the one
+ * place that knows the arithmetic, rather than the constants being copied into
+ * whatever does the placing.
+ */
+export function warmPlaysFor(level) {
+  if (!Number.isFinite(level) || level <= WARM_BASE) return 0
+  return Math.ceil((level - WARM_BASE) / WARM_STEP) + 2
+}
+
 export const blankFact = () => ({ n: 0, right: 0, wrong: 0, box: 0, due: 0, bestMs: null, lastMs: null, streak: 0 })
 
 /**
@@ -131,7 +155,7 @@ export function recordAnswer(profile, q, correct, ms, swiftBonusMs = 0) {
   }
   // Ease off as it approaches the ceiling so the top tier has to be earned.
   const scaled = delta > 0 ? delta * (1 - cur * 0.50) : delta
-  const warmCap = WARM_BASE + WARM_STEP * opPlays[q.op]
+  const warmCap = warmCapAt(opPlays[q.op])
   const next = Math.min(1, Math.max(SKILL_MIN, cur + scaled))
   // The cap holds back a climb, never a wizard: `Math.max(cur, warmCap)` means
   // it can only ever slow someone down, not send them backwards.

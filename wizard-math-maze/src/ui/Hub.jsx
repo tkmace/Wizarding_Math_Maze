@@ -7,7 +7,7 @@ import WizardPreview from './WizardPreview.jsx'
 import NestCrest from './NestCrest.jsx'
 
 /** The castle: choose what to practice, see your rank, head into a maze. */
-export default function Hub({ profile, ops, diff, onToggleOp, onSetDiff, onStart, onWardrobe, onReport, onScroll, onLook, onNest, onLogout, pendingPicks }) {
+export default function Hub({ profile, ops, diff, onToggleOp, onSetDiff, onStart, onWardrobe, onReport, onScroll, onLook, onNest, onAttune, onLogout, pendingPicks }) {
   const form = formById(profile.equippedSkin)
   const rank = rankFor(profile.totalPoints)
   const next = nextRank(profile.totalPoints)
@@ -219,8 +219,14 @@ export default function Hub({ profile, ops, diff, onToggleOp, onSetDiff, onStart
         </button>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginTop: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginTop: 16, flexWrap: 'wrap' }}>
         <button onClick={onScroll} style={linkStyle}>📜 Wizard Scroll</button>
+        {/* A wizard grows, and one who was measured badly should not be stuck
+            with it. A link rather than a card: doing it twice in one afternoon
+            is not the idea. */}
+        <button onClick={onAttune} style={linkStyle}>
+          ✦ {profile.attuned ? 'Be measured again' : 'The Attunement'}
+        </button>
       </div>
     </div>
   )
