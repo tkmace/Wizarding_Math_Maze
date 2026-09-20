@@ -1,6 +1,7 @@
 // The nest flow, end to end: a new wizard is asked once, the crest turns up on
 // the hub, it survives a reload, and it can be changed from the castle.
 import { chromium } from 'playwright'
+import { pickWizard } from './harness.mjs'
 import http from 'http'; import fs from 'fs'; import path from 'path'
 const ROOT='/home/claude/wmm/dist'
 const M={'.html':'text/html','.js':'text/javascript','.webmanifest':'application/manifest+json'}
@@ -22,6 +23,7 @@ await page.fill('input[type=text]','Camille'); await page.fill('input[type=passw
 await page.locator('button',{hasText:'Begin the Journey'}).click()
 
 console.log('1. a new wizard is asked to choose')
+await pickWizard(page)
 await page.waitForSelector('text=Choose your Nest',{timeout:15000})
 check('the nest screen comes up first', true)
 check('all four nests offered', await page.locator('canvas[aria-label$="Eagles"]').count()===4)

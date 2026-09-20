@@ -5,8 +5,10 @@ import {
 } from '../game/appearance.js'
 import { formById } from '../game/skins.js'
 import { nestById } from '../game/nests.js'
+import { wizardById } from '../game/wizards.js'
 import { C, sans, serif, btn, panel, label } from './theme.js'
 import WizardPreview from './WizardPreview.jsx'
+import Portrait from './Portrait.jsx'
 import NestCrest from './NestCrest.jsx'
 
 /**
@@ -18,11 +20,12 @@ import NestCrest from './NestCrest.jsx'
  * find it behind the word "look". Changes preview live on the robe she's
  * actually wearing.
  */
-export default function LookPicker({ profile, onSave, onClose, onNest }) {
+export default function LookPicker({ profile, onSave, onClose, onNest, onWizard }) {
   const [look, setLook] = useState(() => ({ ...blankAppearance(), ...(profile.appearance || {}) }))
   const form = formById(profile.equippedSkin)
 
   const nest = nestById(profile.nest)
+  const wiz = wizardById(profile.wizard)
   const set = (key, value) => setLook(l => ({ ...l, [key]: value }))
 
   return (
@@ -42,12 +45,41 @@ export default function LookPicker({ profile, onSave, onClose, onNest }) {
       </p>
 
       <div style={{ textAlign: 'center', marginBottom: 12 }}>
+        {/* The portrait, not the little figure — these are the choices that
+            change a face, so the face is what has to be on screen. */}
         <div style={{ filter: `drop-shadow(0 0 22px ${form.trim}66)` }}>
-          <WizardPreview form={form} appearance={look} size={190} style={{ margin: '0 auto' }} />
+          <Portrait profile={{ ...profile, appearance: look }} form={form} size={200} style={{ margin: '0 auto' }} />
         </div>
         <div style={{ color: form.trim, fontFamily: serif, fontSize: 13, letterSpacing: 2, fontWeight: 900, marginTop: -6 }}>
           {form.title.toUpperCase()}
         </div>
+      </div>
+
+      {/* Which of the six she is. Top of the page because it is the biggest
+          single thing about her, and because a child who wants to be someone
+          else should not have to hunt for it. */}
+      <div style={panel({ padding: '12px 14px', marginBottom: 10 })}>
+        <div style={label()}>MY FACE</div>
+        <button className="bh" onClick={() => onWizard(look)} style={{
+          display: 'flex', alignItems: 'center', gap: 12, width: '100%',
+          padding: '8px 10px', borderRadius: 13, cursor: 'pointer', textAlign: 'left',
+          border: `2px solid ${C.lineHi}`, background: C.panelHi,
+          WebkitTapHighlightColor: 'transparent',
+        }}>
+          <Portrait profile={{ ...profile, appearance: look }} form={form} size={44}
+            animate={false} style={{ borderRadius: 9 }} />
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ display: 'block', color: '#fff', fontWeight: 900, fontSize: 15, fontFamily: sans }}>
+              {wiz.name}
+            </span>
+            <span style={{ display: 'block', color: C.dim, fontSize: 11, fontStyle: 'italic' }}>
+              {wiz.blurb}
+            </span>
+          </span>
+          <span style={{ color: C.gold, fontSize: 12, fontWeight: 900, fontFamily: serif, letterSpacing: 1 }}>
+            CHANGE ›
+          </span>
+        </button>
       </div>
 
       {/* Your nest belongs on the page about who you are, not tucked behind a

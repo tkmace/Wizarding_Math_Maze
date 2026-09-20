@@ -7,18 +7,20 @@
 /**
  * Get through the arrival ceremonies to the castle.
  *
- * A new wizard chooses a nest and is then offered the Attunement, both of which
- * sit between "Begin the Journey" and every hub assertion in every test. Rather
- * than teach a dozen scripts about each new ceremony, they call this. A wizard
- * who has already done them falls straight through.
+ * A new wizard now picks WHO SHE IS, then a nest, then is offered the
+ * Attunement — three screens between "Begin the Journey" and every hub
+ * assertion in every test. Rather than teach a dozen scripts about each new
+ * ceremony as it arrives, they all call this. A wizard who has already done
+ * them falls straight through.
  */
 export async function takeNest(page, nest = 'Bald Eagles') {
   try {
     await page.waitForSelector(
-      'text=/Choose your Nest|WHAT SHALL WE PRACTICE|Choose the robes you will wear|YOUR POINTS HAVE EARNED/',
+      'text=/Who are you\\?|Choose your Nest|WHAT SHALL WE PRACTICE|Choose the robes you will wear|YOUR POINTS HAVE EARNED/',
       { timeout: 8000 })
   } catch { /* the caller's own wait will report it */ }
   let did = false
+  if (await pickWizard(page)) did = true
   if (await page.locator('text=Choose your Nest').count()) {
     await page.locator('button', { hasText: nest }).first().click()
     await page.locator('button', { hasText: /^Join the / }).click()
@@ -27,6 +29,20 @@ export async function takeNest(page, nest = 'Bald Eagles') {
   }
   if (await skipAttunement(page)) did = true
   return did
+}
+
+/** Accept whichever of the six is offered first, for tests that aren't about it. */
+export async function pickWizard(page, name = null) {
+  // Waits, rather than checking once. Called straight after "Begin the
+  // Journey" the screen has not rendered yet, so a bare count() returns zero
+  // and the caller sails on into a timeout further down.
+  await page.locator('text=Who are you?').first()
+    .waitFor({ state: 'visible', timeout: 6000 }).catch(() => {})
+  if (!(await page.locator('text=Who are you?').count())) return false
+  if (name) await page.locator('button[aria-label="' + name + '"]').click()
+  await page.locator('button', { hasText: /^This is me/ }).click()
+  await page.waitForTimeout(250)
+  return true
 }
 
 /** Decline the Attunement, for any test that isn't about the Attunement. */

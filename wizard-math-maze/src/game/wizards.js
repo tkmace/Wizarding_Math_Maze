@@ -268,6 +268,101 @@ export const WIZARDS = [
       ],
     },
   },
+  {
+    id: 'finch',
+    name: 'Finch',
+    blurb: 'Watches before he speaks',
+    skin: 4, hair: 0, eye: 1,
+
+    // A second boy who is nothing like the first. Rook is square and heavy;
+    // Finch is lean and sharp — the point being that a child who wants to be a
+    // boy and does not like Rook has somewhere else to go. Where Rook widens,
+    // this one narrows: a long jaw rather than a broad one, high cheekbones,
+    // a ridge that is present but not a shelf, eyes narrowed and tilted.
+    brow: { lift: 0.44, arch: 0.07, w: 0.098, tilt: 0.00, len: 0.34 },
+    head: { w: 0.93, cheek: 0.96, jaw: 0.66, chin: 1.30, tilt: -0.04, ridge: 0.7 },
+    neck: { top: 0.38, bot: 0.60 },
+    eyes: {
+      out: 0.388, y: 0.05, rx: 0.180, ry: 0.118, tilt: 0.11,
+      lid: 0.50, iris: 0.78, shine: 1,
+    },
+    nose: { y: 0.46, w: 0.102, bridge: 0.36, tipLift: 0.05 },
+    mouth: { y: 0.785, w: 0.198, curve: 0.075, lower: 0.044, upper: 0.028 },
+
+    // Long and loose, well past the shoulders. Locks again — the length lives
+    // in `back`, which is the curtain behind the head, so this cost nothing.
+    hairPlan: {
+      hairline: -0.46, temple: 0.02, peak: 0.06, back: 2.25,
+      fringe: [
+        { x: -0.92, y: -0.22, len: 0.54, sweep: -0.14, thick: 0.23, curl: -0.08 },
+        { x: -0.70, y: -0.44, len: 0.48, sweep: -0.16, thick: 0.22, curl: -0.07 },
+        { x: -0.44, y: -0.58, len: 0.40, sweep: -0.18, thick: 0.20, curl: -0.06 },
+        { x: -0.16, y: -0.64, len: 0.30, sweep: -0.12, thick: 0.18, curl: -0.03 },
+        { x: 0.14, y: -0.64, len: 0.32, sweep: 0.14, thick: 0.18, curl: 0.04 },
+        { x: 0.44, y: -0.56, len: 0.42, sweep: 0.20, thick: 0.20, curl: 0.06 },
+        { x: 0.72, y: -0.40, len: 0.50, sweep: 0.18, thick: 0.22, curl: 0.08 },
+        { x: 0.93, y: -0.20, len: 0.56, sweep: 0.12, thick: 0.23, curl: 0.08 },
+      ],
+      side: [
+        { x: -1.02, y: -0.06, len: 2.05, sweep: -0.18, thick: 0.28, curl: -0.16 },
+        { x: -0.92, y: 0.14, len: 1.80, sweep: -0.06, thick: 0.21, curl: -0.09 },
+        { x: 1.02, y: -0.06, len: 2.10, sweep: 0.20, thick: 0.28, curl: 0.18 },
+        { x: 0.92, y: 0.14, len: 1.84, sweep: 0.08, thick: 0.21, curl: 0.10 },
+      ],
+      flyaway: [
+        { x: -0.58, y: -0.74, len: 0.22, sweep: -0.30, w: 0.020 },
+        { x: 0.66, y: -0.62, len: 0.26, sweep: 0.28, w: 0.018 },
+      ],
+    },
+  },
+  {
+    id: 'pip',
+    name: 'Pip',
+    blurb: 'The smallest, and the loudest',
+    skin: 0, hair: 3, eye: 3,
+
+    // The youngest of the six, and the only one whose proportions say so. A
+    // child's face is not an adult's made smaller: the eyes are larger relative
+    // to the skull and set lower, the forehead is bigger, the chin is short,
+    // the nose is small and the brow is barely there. Linden should be able to
+    // pick someone her own age.
+    brow: { lift: 0.40, arch: 0.15, w: 0.072, tilt: 0.04, len: 0.26 },
+    head: { w: 1.03, cheek: 1.06, jaw: 0.80, chin: 1.06, tilt: 0.04 },
+    neck: { top: 0.33, bot: 0.52 },
+    eyes: {
+      out: 0.398, y: 0.115, rx: 0.208, ry: 0.175, tilt: 0.02,
+      lid: 0.32, iris: 0.86, shine: 1,
+    },
+    nose: { y: 0.42, w: 0.098, bridge: 0.16, tipLift: 0.07 },
+    mouth: { y: 0.735, w: 0.196, curve: 0.155, lower: 0.062, upper: 0.034 },
+
+    // Two bunches, springing out above the ears and falling. Still locks — the
+    // silhouette comes from where they start and how hard they sweep outward,
+    // not from any new machinery.
+    hairPlan: {
+      hairline: -0.50, temple: -0.06, peak: 0.00, back: 0.55,
+      fringe: [
+        { x: -0.72, y: -0.44, len: 0.34, sweep: -0.10, thick: 0.22, curl: -0.04 },
+        { x: -0.46, y: -0.60, len: 0.30, sweep: -0.08, thick: 0.21, curl: -0.03 },
+        { x: -0.18, y: -0.68, len: 0.26, sweep: -0.04, thick: 0.20, curl: -0.01 },
+        { x: 0.12, y: -0.68, len: 0.26, sweep: 0.06, thick: 0.20, curl: 0.02 },
+        { x: 0.40, y: -0.60, len: 0.30, sweep: 0.10, thick: 0.21, curl: 0.03 },
+        { x: 0.68, y: -0.44, len: 0.34, sweep: 0.12, thick: 0.22, curl: 0.04 },
+      ],
+      side: [
+        { x: -0.98, y: -0.30, len: 0.46, sweep: -0.52, thick: 0.30, curl: -0.22 },
+        { x: -1.02, y: -0.12, len: 0.66, sweep: -0.44, thick: 0.32, curl: -0.18 },
+        { x: -0.96, y: 0.06, len: 0.62, sweep: -0.30, thick: 0.26, curl: -0.12 },
+        { x: 0.98, y: -0.30, len: 0.48, sweep: 0.54, thick: 0.30, curl: 0.24 },
+        { x: 1.02, y: -0.12, len: 0.68, sweep: 0.46, thick: 0.32, curl: 0.20 },
+        { x: 0.96, y: 0.06, len: 0.64, sweep: 0.32, thick: 0.26, curl: 0.13 },
+      ],
+      flyaway: [
+        { x: -0.24, y: -0.84, len: 0.18, sweep: -0.22, w: 0.020 },
+        { x: 0.30, y: -0.82, len: 0.16, sweep: 0.24, w: 0.020 },
+      ],
+    },
+  },
 ]
 
 export const wizardById = id => WIZARDS.find(w => w.id === id) || WIZARDS[0]

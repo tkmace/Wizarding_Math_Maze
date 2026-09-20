@@ -23,6 +23,8 @@ import LookPicker from './ui/LookPicker.jsx'
 import NestPicker from './ui/NestPicker.jsx'
 import Encounter from './ui/Encounter.jsx'
 import Attunement from './ui/Attunement.jsx'
+import WizardPicker from './ui/WizardPicker.jsx'
+import { wizardById } from './game/wizards.js'
 import Coach from './ui/Coach.jsx'
 
 const DISSOLVE_MS = 620
@@ -133,8 +135,10 @@ export default function App() {
   // the moment she's back in the castle rather than interrupting a maze.
   useEffect(() => {
     if (screen !== 'hub') return
-    // A nest first — it's the shortest of the three screens and it's the one
-    // that makes the castle feel like hers before she picks anything else.
+    // Who she is comes first. A nest is a team you join and the Attunement is
+    // something done to you; this is the one that is simply hers, so it is not
+    // third in a queue behind the other two.
+    if (profile && !profile.wizard) { setScreen('wizard'); return }
     if (profile && !hasNest(profile)) { setScreen('nest'); return }
     if (pending.length) setScreen('pick')
   }, [screen, pending.length, profile])
@@ -428,6 +432,20 @@ export default function App() {
     syncUp()
   }, [profile, commit, syncUp])
 
+  const saveWizard = useCallback(id => {
+    const wiz = wizardById(id)
+    // On a FIRST pick she gets the colouring she was just looking at, so the
+    // castle shows her the wizard she actually chose rather than that face in
+    // somebody else's hair. Changing face later leaves her own colours alone.
+    const appearance = profile.wizard
+      ? profile.appearance
+      : { ...profile.appearance, skin: wiz.skin, hairColor: wiz.hair, eyeColor: wiz.eye }
+    commit({ ...profile, wizard: id, appearance })
+    // Back to the castle, and the arrival effect carries her on to the nest if
+    // she still needs one. One place decides the running order.
+    setScreen('hub')
+  }, [profile, commit])
+
   const saveNest = useCallback(id => {
     // Choosing a nest for the FIRST time is the first half of the Attunement,
     // so she goes straight on to the second rather than being dropped in the
@@ -528,6 +546,13 @@ export default function App() {
           onClose={hasNest(profile) ? () => setScreen('hub') : null}
         />
       )}
+      {screen === 'wizard' && profile && (
+        <WizardPicker
+          profile={profile} form={form}
+          onChoose={saveWizard}
+          onClose={profile.wizard ? () => setScreen('hub') : null}
+        />
+      )}
       {screen === 'attune' && profile && (
         <Attunement
           profile={profile} ops={ops} form={form}
@@ -541,6 +566,7 @@ export default function App() {
           onSave={saveLook}
           onClose={() => setScreen('hub')}
           onNest={look => { if (look) commit({ ...profile, appearance: look }); setScreen('nest') }}
+          onWizard={look => { if (look) commit({ ...profile, appearance: look }); setScreen('wizard') }}
         />
       )}
 

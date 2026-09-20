@@ -1,0 +1,16 @@
+import { chromium } from 'playwright'
+const OUT='/tmp/claude-0/-home-claude/9e4f1146-1d92-5690-b689-30dcc0c1e170/scratchpad'
+const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--no-sandbox','--disable-dev-shm-usage']})
+const page=await b.newPage({viewport:{width:430,height:1000},deviceScaleFactor:2})
+const errs=[];page.on('pageerror',e=>errs.push(e.message))
+await page.goto('http://localhost:4173/',{waitUntil:'networkidle'})
+await page.fill('input[type=text]','Linden'); await page.fill('input[type=password]','1234')
+await page.locator('button',{hasText:'Begin the Journey'}).click()
+await page.waitForSelector('text=Who are you?',{timeout:15000})
+await page.waitForTimeout(700)
+await page.screenshot({path:`${OUT}/picker-1.png`,fullPage:true})
+await page.locator('button[aria-label="Rook"]').click()
+await page.waitForTimeout(600)
+await page.screenshot({path:`${OUT}/picker-2.png`,fullPage:true})
+console.log('errors:',errs.length?errs.join('|'):'none')
+await b.close()

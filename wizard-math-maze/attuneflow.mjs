@@ -7,6 +7,7 @@
 // door, and that the placement must still be able to CLIMB afterwards rather
 // than being pinned by the beginner ceiling.
 import { chromium } from 'playwright'
+import { pickWizard } from './harness.mjs'
 import http from 'http'; import fs from 'fs'; import path from 'path'
 const ROOT = '/home/claude/wmm/dist'
 const M = { '.html': 'text/html', '.js': 'text/javascript', '.webmanifest': 'application/manifest+json' }
@@ -32,6 +33,7 @@ await page.fill('input[type=text]', 'Linden'); await page.fill('input[type=passw
 await page.locator('button', { hasText: 'Begin the Journey' }).click()
 
 console.log('1. a new wizard is offered it, after her nest')
+await pickWizard(page)
 await page.waitForSelector('text=Choose your Nest', { timeout: 15000 })
 await page.locator('button', { hasText: 'Golden Eagles' }).first().click()
 await page.locator('button', { hasText: /^Join the / }).click()
@@ -66,12 +68,26 @@ async function answer(correctly) {
   await page.waitForTimeout(200)
   return m ? m[0] : null
 }
-/** Wander until a door opens. Doors are thick on the ground, so this is quick. */
-async function findDoor(limit = 40) {
+/**
+ * Wander until a door opens.
+ *
+ * A seeded random walk, and both of those words are load-bearing. Always
+ * turning right walks a small circle; alternating right and left oscillates in
+ * place, which is worse — that version found exactly one door. And an unseeded
+ * walk makes this test pass or fail on the dice, which is the one thing a test
+ * must never do.
+ *
+ * A child has a minimap and navigates far better than this. The walker only has
+ * to be good enough to prove the ceremony finishes.
+ */
+let seed = 12345
+const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff)
+async function findDoor(limit = 120) {
   for (let i = 0; i < limit; i++) {
     if (await doorUp()) return true
-    await page.keyboard.press(i % 3 === 2 ? 'ArrowRight' : 'ArrowUp')
-    await page.waitForTimeout(90)
+    const r = rnd()
+    await page.keyboard.press(r < 0.55 ? 'ArrowUp' : r < 0.78 ? 'ArrowRight' : 'ArrowLeft')
+    await page.waitForTimeout(70)
   }
   return false
 }
@@ -90,8 +106,8 @@ console.log('4. it finishes on its own, and the placement lands')
 // Answer everything correctly from here, so she places HIGH — which is the case
 // that exercises the beginner ceiling, and the one that used to pin her.
 let asked = 1
-for (let i = 0; i < 40 && !(await page.locator('text=The castle knows you now').count()); i++) {
-  if (!(await findDoor(30))) break
+for (let i = 0; i < 60 && !(await page.locator('text=The castle knows you now').count()); i++) {
+  if (!(await findDoor())) break
   await answer(true)
   asked++
 }
