@@ -4,6 +4,7 @@ import { formById, rankFor, nextRank, rankProgress, activePerks } from '../game/
 import { nestById } from '../game/nests.js'
 import { C, sans, serif, btn, panel, label } from './theme.js'
 import WizardPreview from './WizardPreview.jsx'
+import Portrait from './Portrait.jsx'
 import NestCrest from './NestCrest.jsx'
 
 /** The castle: choose what to practice, see your rank, head into a maze. */
@@ -46,7 +47,7 @@ export default function Hub({ profile, ops, diff, onToggleOp, onSetDiff, onStart
           </button>
         )}
         <div className="wf" style={{ filter: `drop-shadow(0 0 26px ${form.trim}88)` }}>
-          <WizardPreview form={form} appearance={profile.appearance} size={168} style={{ margin: '0 auto' }} />
+          <Portrait profile={profile} form={form} size={196} style={{ margin: '0 auto' }} />
         </div>
         <div style={{ color: '#fff', fontWeight: 900, fontSize: 22, fontFamily: sans, marginTop: -6 }}>{profile.name}</div>
         <div style={{ color: form.trim, fontFamily: serif, fontSize: 14, letterSpacing: 2, fontWeight: 900 }}>
