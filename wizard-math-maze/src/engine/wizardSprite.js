@@ -9,7 +9,7 @@
 // same character.
 
 import { resolveLook } from '../game/appearance.js'
-import { drawHead } from './portrait.js'
+import { drawHead, grain } from './portrait.js'
 
 const TAU = Math.PI * 2
 
@@ -270,6 +270,28 @@ export function drawWizard(ctx, o) {
     ctx.translate(-h * 0.012, 0)
   }
   ctx.restore()
+
+  // On the screens that show the painted head, the robe gets the painted
+  // treatment too: a woven grain and a line of light down its lit edge. Both
+  // are skipped in the maze, where the figure is forty pixels tall — the grain
+  // is a few thousand rectangles and neither would survive the scaling.
+  if (painted) {
+    ctx.save()
+    robePath()
+    ctx.clip()
+    grain(ctx, -hem * 1.1, yShoulder - h * 0.05, hem * 2.2, -yShoulder + h * 0.08, seed + 19, 0.05)
+    ctx.restore()
+    ctx.save()
+    ctx.filter = `blur(${Math.max(0.6, h * 0.008)}px)`
+    ctx.strokeStyle = 'rgba(255,255,255,0.26)'
+    ctx.lineWidth = h * 0.014
+    ctx.beginPath()
+    ctx.moveTo(-hem * 0.99 + sway, -h * 0.02)
+    ctx.bezierCurveTo(-hem * 0.98, -h * 0.14, -waist * 1.03, -h * 0.22, -waist, yWaist)
+    ctx.bezierCurveTo(-waist * 0.98, yWaist - h * 0.06, -shoulder * 0.99, yShoulder + h * 0.05, -shoulder * 0.98, yShoulder + h * 0.004)
+    ctx.stroke()
+    ctx.restore()
+  }
 
   // A drawn line around the silhouette. Flat shapes butted against each other
   // read as assembled; the same shapes inside an outline read as drawn. The

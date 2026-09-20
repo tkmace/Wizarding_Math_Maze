@@ -1,0 +1,44 @@
+<!doctype html><html><head><meta charset="utf-8"><title>robes</title>
+<style>body{margin:0;background:#0b0a22;color:#c8a4ff;font:11px system-ui;padding:10px}
+h3{margin:12px 0 4px;font-size:12px;color:#f9ca74;letter-spacing:1px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}.c{text-align:center}
+canvas{display:block;border:1px solid #2a2a55;background:#141232;border-radius:10px}</style></head>
+<body><div id="out"></div>
+<script type="module">
+import { drawPortrait } from '/src/engine/portrait.js'
+import { drawWizard } from '/src/engine/wizardSprite.js'
+import { WIZARDS, lookFor } from '/src/game/wizards.js'
+import { FORMS, formById } from '/src/game/skins.js'
+const out=document.getElementById('out')
+function row(title){const h=document.createElement('h3');h.textContent=title;out.append(h)
+  const r=document.createElement('div');r.className='row';out.append(r);return r}
+function port(r,size,form,wizId,label){
+  const d=document.createElement('div');d.className='c'
+  const cv=document.createElement('canvas');cv.width=size*2;cv.height=size*2
+  cv.style.width=size+'px';cv.style.height=size+'px';d.append(cv)
+  const f=lookFor({wizard:wizId})
+  drawPortrait(cv.getContext('2d'),{cx:size,cy:size*0.86,R:size*0.44,
+    wiz:f.wiz,skin:f.skin,eye:f.eye,hair:f.hair,form,t:1200})
+  if(label){const t=document.createElement('div');t.textContent=label;d.append(t)}
+  r.append(d)
+}
+function sprite(r,size,form,wizId,label){
+  const d=document.createElement('div');d.className='c'
+  const cv=document.createElement('canvas');cv.width=size*2;cv.height=size*2
+  cv.style.width=size+'px';cv.style.height=size+'px';d.append(cv)
+  drawWizard(cv.getContext('2d'),{x:size,yBase:size*2*0.94,h:size*2*0.82,form,
+    face:lookFor({wizard:wizId}),t:1200,moving:false,view:'front'})
+  if(label){const t=document.createElement('div');t.textContent=label;d.append(t)}
+  r.append(d)
+}
+const kinds=['pointed','wide','hood','crown','horned']
+const pick=k=>FORMS.find(f=>f.hat===k)
+let r=row('Every hat, close up')
+kinds.forEach(k=>port(r,230,pick(k),'wren',k+' — '+pick(k).title))
+r=row('Robes on the figure')
+kinds.forEach(k=>sprite(r,190,pick(k),'wren',pick(k).title))
+r=row('A spread of robes')
+;['apprentice','frost','emberacolyte','tidecaller','stormcaller','archmage'].forEach(id=>{
+  const f=formById(id); if(f) port(r,190,f,'kestrel',f.title)})
+window.__done=1
+</script></body></html>

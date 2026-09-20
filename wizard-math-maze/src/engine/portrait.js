@@ -90,17 +90,57 @@ function blob(ctx, cx, cy, rx, ry, rot, color, alpha) {
  * computer's idea of a surface; a slightly broken one is a painted one. Kept
  * faint enough that you would not name it if asked what changed.
  */
-function grain(ctx, x, y, w, h, seed, alpha = 0.03) {
+const TILE = 64
+const grainTiles = new Map()
+
+/**
+ * The grain, baked once into a small tile and then repeated.
+ *
+ * It used to be drawn a rectangle at a time, every frame — around six thousand
+ * fill calls per grained shape. With one grain pass on the face that was
+ * invisible; with grain on the face, the collar, the hat, the brim, the band
+ * and the robe it more than doubled the cost of drawing a wizard, and the hub
+ * portrait runs this sixty times a second. The noise never changes, so the only
+ * honest place for it is a cache.
+ */
+function grainTile(seed, step) {
+  const key = `${seed}|${step}`
+  const hit = grainTiles.get(key)
+  if (hit) return hit
+  const c = document.createElement('canvas')
+  c.width = c.height = TILE * step
+  const g = c.getContext('2d')
+  for (let gy = 0; gy < TILE; gy++) {
+    for (let gx = 0; gx < TILE; gx++) {
+      const n = noise(gx * step * 0.7 + seed, gy * step * 0.7)
+      if (n < 0.5) continue
+      g.fillStyle = n > 0.82 ? '#ffffff' : '#1a1024'
+      g.fillRect(gx * step, gy * step, step * 0.9, step * 0.9)
+    }
+  }
+  grainTiles.set(key, c)
+  return c
+}
+
+export function grain(ctx, x, y, w, h, seed, alpha = 0.03) {
+  const step = Math.max(2, Math.round(w / 110))
   ctx.save()
   ctx.globalAlpha = alpha
-  const step = Math.max(2, w / 110)
-  for (let gy = y; gy < y + h; gy += step) {
-    for (let gx = x; gx < x + w; gx += step) {
-      const n = noise(gx * 0.7 + seed, gy * 0.7)
-      if (n < 0.5) continue
-      ctx.fillStyle = n > 0.82 ? '#ffffff' : '#1a1024'
-      ctx.fillRect(gx, gy, step * 0.9, step * 0.9)
+  if (typeof document === 'undefined') {
+    // No DOM to bake a tile into (a test harness, a server render): fall back
+    // to the slow path rather than losing the texture.
+    for (let gy = y; gy < y + h; gy += step) {
+      for (let gx = x; gx < x + w; gx += step) {
+        const n = noise(gx * 0.7 + seed, gy * 0.7)
+        if (n < 0.5) continue
+        ctx.fillStyle = n > 0.82 ? '#ffffff' : '#1a1024'
+        ctx.fillRect(gx, gy, step * 0.9, step * 0.9)
+      }
     }
+  } else {
+    ctx.translate(x, y)
+    ctx.fillStyle = ctx.createPattern(grainTile(seed, step), 'repeat')
+    ctx.fillRect(0, 0, w, h)
   }
   ctx.restore()
 }
@@ -718,65 +758,185 @@ function drawHairFront(ctx, R, wiz, hair) {
   ctx.restore()
 }
 
+/**
+ * The robe, painted rather than filled.
+ *
+ * The faces got six layers of modelling and the garment got a flat colour with
+ * four strokes on it, which is exactly what you could see: a painted head
+ * sitting on a vector body. Cloth needs the same three things skin needed —
+ * a direction the light comes from, soft transitions rather than lines, and a
+ * texture — plus one of its own: folds hang from where the cloth is CAUGHT (the
+ * shoulders and the clasp) and open out as they fall.
+ *
+ * Every fold is a soft dark valley with a narrow lit ridge beside it, on the
+ * light's side. A fold drawn as a single dark line is a crease in paper.
+ */
 function drawShoulders(ctx, R, wiz, robe, trim) {
   const top = R * 1.95
   const halfW = R * 2.05
-  ctx.save()
-  // The garment, as a shape that goes off the bottom of the picture — a
-  // portrait cropped at the chest reads as a person; one that stops in mid-air
-  // reads as a bust on a shelf.
-  ctx.beginPath()
-  ctx.moveTo(-halfW, R * 3.4)
-  ctx.bezierCurveTo(-halfW * 0.96, top + R * 0.22, -R * 1.0, top - R * 0.16, -R * 0.52, top - R * 0.2)
-  ctx.quadraticCurveTo(0, top + R * 0.12, R * 0.52, top - R * 0.2)
-  ctx.bezierCurveTo(R * 1.0, top - R * 0.16, halfW * 0.96, top + R * 0.22, halfW, R * 3.4)
-  ctx.closePath()
+  const body = () => {
+    ctx.beginPath()
+    ctx.moveTo(-halfW, R * 3.4)
+    ctx.bezierCurveTo(-halfW * 0.96, top + R * 0.22, -R * 1.0, top - R * 0.16, -R * 0.52, top - R * 0.2)
+    ctx.quadraticCurveTo(0, top + R * 0.12, R * 0.52, top - R * 0.2)
+    ctx.bezierCurveTo(R * 1.0, top - R * 0.16, halfW * 0.96, top + R * 0.22, halfW, R * 3.4)
+    ctx.closePath()
+  }
+
+  body()
   ctx.fillStyle = robe
   ctx.fill()
+
+  ctx.save()
+  body()
   ctx.clip()
-  // Cloth: a broad fall of light, a couple of folds, and the shadow the head
-  // throws onto the chest.
+
+  // The broad fall of light across the chest, lit side to shadow side.
   const g = ctx.createLinearGradient(-halfW, 0, halfW, 0)
-  g.addColorStop(0, rgba('#ffffff', 0.16))
-  g.addColorStop(0.45, rgba('#ffffff', 0))
-  g.addColorStop(1, rgba('#000010', 0.34))
+  g.addColorStop(0, rgba('#ffffff', 0.17))
+  g.addColorStop(0.42, rgba('#ffffff', 0))
+  g.addColorStop(1, rgba('#000010', 0.38))
   ctx.fillStyle = g
   ctx.fillRect(-halfW, top - R, halfW * 2, R * 3)
-  blob(ctx, 0, top + R * 0.28, R * 1.0, R * 0.44, 0, '#000010', 0.34)
-  ctx.strokeStyle = rgba('#000010', 0.28)
-  ctx.lineWidth = R * 0.05
-  ctx.lineCap = 'round'
-  for (const f of [-1.3, -0.72, 0.8, 1.35]) {
+
+  // Weave. Barely visible on its own; what it does is stop the cloth reading as
+  // a coloured rectangle, the same job the grain does on skin.
+  ctx.save()
+  ctx.lineWidth = Math.max(0.4, R * 0.009)
+  let n = 0
+  for (let y = top - R * 0.1; y < R * 3.5; y += R * 0.062) {
+    // Uneven weight and uneven spacing. Evenly spaced lines of equal weight
+    // are corduroy, which is what the first attempt at this looked like.
+    ctx.strokeStyle = rgba('#000010', 0.05 + 0.05 * Math.abs(noise(n, 5)))
     ctx.beginPath()
-    ctx.moveTo(R * f * 0.7, top + R * 0.1)
-    ctx.quadraticCurveTo(R * f * 0.9, top + R * 0.7, R * f, R * 3.4)
+    ctx.moveTo(-halfW, y + noise(y, 3) * R * 0.02)
+    ctx.lineTo(halfW, y + noise(y, 7) * R * 0.02)
     ctx.stroke()
+    n++
   }
   ctx.restore()
 
-  // The collar, in the form's second colour — where a robe shows its identity.
+  // Folds. Each is caught at the top and swings out as it falls; the ones on
+  // the shadow side are deeper, because that is where the cloth turns away.
+  const folds = [
+    { x: -1.36, sway: -0.30, deep: 0.30 },
+    { x: -0.86, sway: -0.16, deep: 0.24 },
+    { x: -0.34, sway: -0.06, deep: 0.16 },
+    { x: 0.42, sway: 0.08, deep: 0.26 },
+    { x: 0.92, sway: 0.20, deep: 0.36 },
+    { x: 1.42, sway: 0.34, deep: 0.44 },
+  ]
+  const fold = f => {
+    ctx.beginPath()
+    ctx.moveTo(R * f.x * 0.66, top + R * 0.12)
+    ctx.quadraticCurveTo(R * (f.x * 0.9 + f.sway * 0.4), top + R * 0.8, R * (f.x + f.sway), R * 3.5)
+  }
   ctx.save()
+  ctx.lineCap = 'round'
+  ctx.filter = `blur(${Math.max(0.6, R * 0.055)}px)`
+  for (const f of folds) {
+    ctx.strokeStyle = rgba('#000010', f.deep)
+    ctx.lineWidth = R * 0.13
+    fold(f)
+    ctx.stroke()
+  }
+  ctx.filter = 'none'
+  // The lit ridge, always on the light's side of its own valley.
+  ctx.save()
+  ctx.translate(-R * 0.075, 0)
+  ctx.filter = `blur(${Math.max(0.4, R * 0.03)}px)`
+  for (const f of folds) {
+    ctx.strokeStyle = rgba('#ffffff', 0.13 - f.x * 0.035)
+    ctx.lineWidth = R * 0.055
+    fold(f)
+    ctx.stroke()
+  }
+  ctx.restore()
+  ctx.restore()
+
+  // What the head and the collar throw onto the chest.
+  blob(ctx, 0, top + R * 0.3, R * 1.15, R * 0.5, 0, '#000010', 0.38)
+
+  // Rim light down the lit shoulder: the edge where the robe meets the dark
+  // behind it. Without it the silhouette is a cut-out, exactly as the head was.
+  ctx.save()
+  ctx.filter = `blur(${Math.max(0.6, R * 0.04)}px)`
+  ctx.strokeStyle = rgba('#ffffff', 0.3)
+  ctx.lineWidth = R * 0.07
   ctx.beginPath()
-  ctx.moveTo(-R * 0.56, top - R * 0.2)
-  ctx.quadraticCurveTo(0, top + R * 0.16, R * 0.56, top - R * 0.2)
-  ctx.lineTo(R * 0.86, top + R * 0.34)
-  ctx.quadraticCurveTo(0, top + R * 0.86, -R * 0.86, top + R * 0.34)
-  ctx.closePath()
-  ctx.fillStyle = shade(robe, -0.32)
-  ctx.fill()
-  ctx.strokeStyle = rgba(trim, 0.75)
-  ctx.lineWidth = R * 0.05
+  ctx.moveTo(-halfW * 0.99, R * 3.4)
+  ctx.bezierCurveTo(-halfW * 0.95, top + R * 0.22, -R * 1.0, top - R * 0.16, -R * 0.54, top - R * 0.2)
   ctx.stroke()
   ctx.restore()
 
-  // The clasp.
-  const clY = top + R * 0.5, clR = R * 0.14
-  const cg = ctx.createRadialGradient(-clR * 0.3, clY - clR * 0.35, clR * 0.1, 0, clY, clR)
-  cg.addColorStop(0, shade(trim, 0.6))
-  cg.addColorStop(0.6, trim)
-  cg.addColorStop(1, shade(trim, -0.5))
+  grain(ctx, -halfW, top - R * 0.4, halfW * 2, R * 2.2, 31, 0.035)
+  ctx.restore()
+
+  // ── The collar ──
+  // Rolled rather than cut out: a darker under-fold, the collar itself with the
+  // light running across it, and the trim as a stitched edge with a highlight
+  // above it. A single flat polygon with a stroke round it was the second most
+  // vector-looking thing in the picture after the hat.
+  const collar = (out = 0) => {
+    const a = R * (0.56 + out), b = R * (0.88 + out)
+    const y0 = top - R * 0.2, y1 = top + R * (0.36 + out * 0.5)
+    ctx.beginPath()
+    ctx.moveTo(-a, y0)
+    ctx.quadraticCurveTo(0, top + R * 0.16, a, y0)
+    // The outer corners are turned, not mitred: cloth folded over on itself
+    // has no sharp points, and the two right angles here were doing more to
+    // make this look like clip art than anything else in the picture.
+    ctx.quadraticCurveTo(R * (0.84 + out), y0 + R * 0.12, b, y1)
+    ctx.quadraticCurveTo(0, top + R * (0.9 + out * 0.6), -b, y1)
+    ctx.quadraticCurveTo(-R * (0.84 + out), y0 + R * 0.12, -a, y0)
+    ctx.closePath()
+  }
+  ctx.save()
+  collar(0.05)
+  ctx.fillStyle = shade(robe, -0.55)
+  ctx.fill()
+  collar()
+  const cg = ctx.createLinearGradient(-R * 0.9, 0, R * 0.9, 0)
+  cg.addColorStop(0, shade(robe, -0.14))
+  cg.addColorStop(0.45, shade(robe, -0.32))
+  cg.addColorStop(1, shade(robe, -0.52))
   ctx.fillStyle = cg
+  ctx.fill()
+  ctx.save()
+  collar()
+  ctx.clip()
+  grain(ctx, -R, top - R * 0.3, R * 2, R * 1.3, 17, 0.04)
+  ctx.restore()
+  // Stitched trim: the bright line, and a darker one just inside it so the
+  // trim has a thickness rather than being a coloured outline.
+  collar()
+  ctx.strokeStyle = rgba(shade(trim, -0.5), 0.8)
+  ctx.lineWidth = R * 0.07
+  ctx.stroke()
+  collar()
+  ctx.strokeStyle = rgba(trim, 0.72)
+  ctx.lineWidth = R * 0.03
+  ctx.filter = `blur(${Math.max(0.3, R * 0.008)}px)`
+  ctx.stroke()
+  ctx.filter = 'none'
+  ctx.restore()
+
+  // The clasp, with a cast shadow so it sits ON the collar.
+  const clY = top + R * 0.5, clR = R * 0.14
+  ctx.save()
+  ctx.filter = `blur(${Math.max(0.5, R * 0.03)}px)`
+  ctx.fillStyle = rgba('#000010', 0.5)
+  ctx.beginPath(); ctx.arc(R * 0.03, clY + R * 0.05, clR, 0, TAU); ctx.fill()
+  ctx.restore()
+  const cl = ctx.createRadialGradient(-clR * 0.3, clY - clR * 0.35, clR * 0.1, 0, clY, clR)
+  cl.addColorStop(0, shade(trim, 0.6))
+  cl.addColorStop(0.6, trim)
+  cl.addColorStop(1, shade(trim, -0.5))
+  ctx.fillStyle = cl
   ctx.beginPath(); ctx.arc(0, clY, clR, 0, TAU); ctx.fill()
+  // One specular dot: the difference between a coloured circle and a stone.
+  ctx.fillStyle = rgba('#ffffff', 0.85)
+  ctx.beginPath(); ctx.ellipse(-clR * 0.32, clY - clR * 0.36, clR * 0.26, clR * 0.2, -0.5, 0, TAU); ctx.fill()
 }
 
 /**
@@ -785,6 +945,13 @@ function drawShoulders(ctx, R, wiz, robe, trim) {
  * Two things do that: the brim line bows down at the centre because it is
  * wrapped round a skull, and a shadow falls from it onto the forehead. Without
  * the second one a hat floats however well the first is drawn.
+ *
+ * Everything else here is the same argument the robe makes. A cone filled with
+ * a left-to-right gradient is a cone; a HAT is felt, which means it takes the
+ * grain, it catches a line of light along its lit edge, it goes dark in the
+ * crease where the band is tied, and its brim has a thickness you can see. The
+ * faces are painted, so a vector hat on top of one is the first thing the eye
+ * finds — and it was.
  */
 function drawHat(ctx, R, wiz, kind, robe, trim, t) {
   const brimY = -R * 0.86
@@ -794,46 +961,124 @@ function drawHat(ctx, R, wiz, kind, robe, trim, t) {
   // Shadow onto the hair and brow first, under everything else.
   blob(ctx, 0, brimY + R * 0.12, R * 1.15, R * 0.42, 0, '#1e0e1a', 0.62)
 
-  const crown = (h, w, lean) => {
+  /** Felt: grain and a soft inner shading, inside whatever shape was drawn. */
+  const felt = (path, bb, seed) => {
+    ctx.save()
+    path()
+    ctx.clip()
+    grain(ctx, bb[0], bb[1], bb[2], bb[3], seed, 0.05)
+    ctx.restore()
+  }
+  /** The line of light along an edge. Blurred, or it is just a stroke. */
+  const rim = (path, alpha = 0.3, w = 0.05) => {
+    ctx.save()
+    ctx.filter = `blur(${Math.max(0.5, R * 0.03)}px)`
+    ctx.strokeStyle = rgba('#ffffff', alpha)
+    ctx.lineWidth = R * w
+    path()
+    ctx.stroke()
+    ctx.restore()
+  }
+
+  const crownPath = (h, w, lean) => () => {
     ctx.beginPath()
     ctx.moveTo(-w / 2, brimY)
     ctx.quadraticCurveTo(-w * 0.16, brimY - h * 0.74, lean, brimY - h)
     ctx.quadraticCurveTo(w * 0.2, brimY - h * 0.46, w / 2, brimY)
     ctx.quadraticCurveTo(0, brimY + R * 0.3, -w / 2, brimY)
     ctx.closePath()
+  }
+  const crown = (h, w, lean) => {
+    const path = crownPath(h, w, lean)
+    path()
     const g = ctx.createLinearGradient(-w / 2, 0, w / 2, 0)
-    g.addColorStop(0, shade(col, 0.1))
-    g.addColorStop(0.4, col)
-    g.addColorStop(1, shade(col, -0.42))
+    g.addColorStop(0, shade(col, 0.14))
+    g.addColorStop(0.38, col)
+    g.addColorStop(1, shade(col, -0.46))
     ctx.fillStyle = g
     ctx.fill()
+    felt(path, [-w, brimY - h - R * 0.2, w * 2, h + R * 0.7], 41)
+    // Where the cone meets the head it turns away from the light on every side,
+    // so it darkens into the brim. This is what stops a cone reading as a
+    // triangle of flat colour with a gradient painted across it.
+    ctx.save()
+    path()
+    ctx.clip()
+    const ao = ctx.createLinearGradient(0, brimY - h * 0.55, 0, brimY + R * 0.3)
+    ao.addColorStop(0, rgba('#1a0c18', 0))
+    ao.addColorStop(1, rgba('#1a0c18', 0.42))
+    ctx.fillStyle = ao
+    ctx.fillRect(-w, brimY - h, w * 2, h + R * 0.4)
+    ctx.restore()
+    // The lit edge, left side only, from the tip down to the brim.
+    rim(() => {
+      ctx.beginPath()
+      ctx.moveTo(lean, brimY - h * 0.98)
+      ctx.quadraticCurveTo(-w * 0.16, brimY - h * 0.74, -w * 0.49, brimY - R * 0.02)
+    }, 0.34, 0.045)
   }
+
   const brim = (w, th) => {
+    // A brim has a top and an under-side, and you can see both. Drawing the
+    // under-side first, offset down, is the whole trick: without it the brim is
+    // a disc of zero thickness stuck through the hat.
     ctx.beginPath()
-    ctx.ellipse(0, brimY + R * 0.1, w / 2, th, 0, 0, TAU)
+    ctx.ellipse(0, brimY + R * 0.17, w / 2, th, 0, 0, TAU)
+    ctx.fillStyle = shade(robe, -0.62)
+    ctx.fill()
+    const top = () => {
+      ctx.beginPath()
+      ctx.ellipse(0, brimY + R * 0.1, w / 2, th, 0, 0, TAU)
+    }
+    top()
     const g = ctx.createLinearGradient(-w / 2, 0, w / 2, 0)
-    g.addColorStop(0, shade(robe, -0.1))
-    g.addColorStop(1, shade(robe, -0.48))
+    g.addColorStop(0, shade(robe, 0.02))
+    g.addColorStop(0.45, shade(robe, -0.14))
+    g.addColorStop(1, shade(robe, -0.52))
     ctx.fillStyle = g
     ctx.fill()
+    felt(top, [-w, brimY - th, w * 2, th * 3], 23)
+    // The near edge of the brim catches the light along its whole sweep.
+    rim(() => {
+      ctx.beginPath()
+      ctx.ellipse(0, brimY + R * 0.1, w / 2 - R * 0.02, th - R * 0.02, 0, Math.PI * 0.62, Math.PI * 1.9)
+    }, 0.22, 0.04)
   }
+
   const band = w => {
     // Wrapped, not stuck on: the near edge of a band round a cone dips towards
     // you, and a straight strip is the single thing that makes a hat look like
     // a sticker.
+    const path = () => {
+      ctx.beginPath()
+      ctx.moveTo(-w * 0.44, brimY - R * 0.3)
+      ctx.quadraticCurveTo(0, brimY - R * 0.18, w * 0.44, brimY - R * 0.3)
+      ctx.lineTo(w * 0.46, brimY - R * 0.08)
+      ctx.quadraticCurveTo(0, brimY + R * 0.06, -w * 0.46, brimY - R * 0.08)
+      ctx.closePath()
+    }
     ctx.save()
+    // Cloth gathers where it is tied, so the crown darkens just above the band.
+    ctx.save()
+    ctx.filter = `blur(${Math.max(0.6, R * 0.045)}px)`
+    ctx.fillStyle = rgba('#1a0c18', 0.45)
     ctx.beginPath()
-    ctx.moveTo(-w * 0.44, brimY - R * 0.3)
-    ctx.quadraticCurveTo(0, brimY - R * 0.18, w * 0.44, brimY - R * 0.3)
-    ctx.lineTo(w * 0.46, brimY - R * 0.08)
-    ctx.quadraticCurveTo(0, brimY + R * 0.06, -w * 0.46, brimY - R * 0.08)
+    ctx.moveTo(-w * 0.44, brimY - R * 0.4)
+    ctx.quadraticCurveTo(0, brimY - R * 0.28, w * 0.44, brimY - R * 0.4)
+    ctx.lineTo(w * 0.44, brimY - R * 0.24)
+    ctx.quadraticCurveTo(0, brimY - R * 0.12, -w * 0.44, brimY - R * 0.24)
     ctx.closePath()
-    const g = ctx.createLinearGradient(-w / 2, 0, w / 2, 0)
-    g.addColorStop(0, shade(trim, 0.1)); g.addColorStop(0.45, trim); g.addColorStop(1, shade(trim, -0.42))
-    ctx.fillStyle = g
     ctx.fill()
     ctx.restore()
+    path()
+    const g = ctx.createLinearGradient(-w / 2, 0, w / 2, 0)
+    g.addColorStop(0, shade(trim, 0.14)); g.addColorStop(0.42, trim); g.addColorStop(1, shade(trim, -0.46))
+    ctx.fillStyle = g
+    ctx.fill()
+    felt(path, [-w, brimY - R * 0.5, w * 2, R], 59)
+    ctx.restore()
   }
+
   const star = (sx, sy, size) => {
     ctx.save()
     ctx.globalAlpha = 0.65 + 0.35 * Math.sin(t / 420)
@@ -851,22 +1096,52 @@ function drawHat(ctx, R, wiz, kind, robe, trim, t) {
     // A ring of cloth with the face cut out of it: the outer edge falls to the
     // shoulders, the inner edge arches over the brow and runs down past the
     // jaw. Drawn as one path with evenodd so the opening is genuinely a hole.
-    ctx.beginPath()
-    ctx.moveTo(-R * 1.62, R * 2.4)
-    ctx.bezierCurveTo(-R * 1.72, -R * 0.5, -R * 1.2, -R * 1.9, -R * 0.12, -R * 1.98)
-    ctx.quadraticCurveTo(R * 0.5, -R * 2.1, R * 0.78, -R * 1.66)
-    ctx.bezierCurveTo(R * 1.44, -R * 0.9, R * 1.72, -R * 0.4, R * 1.62, R * 2.4)
-    ctx.closePath()
-    ctx.moveTo(-R * 1.12, R * 2.4)
-    ctx.bezierCurveTo(-R * 1.16, -R * 0.4, -R * 0.66, -R * 1.3, 0, -R * 1.32)
-    ctx.bezierCurveTo(R * 0.66, -R * 1.3, R * 1.16, -R * 0.4, R * 1.12, R * 2.4)
-    ctx.closePath()
+    // The outer edge flares onto the shoulders instead of running straight
+    // down. A hood with parallel sides is an archway with a face in it, which
+    // is what this looked like: cloth draped over a head is WIDER where it
+    // reaches the shoulders than where it crosses the crown.
+    const ring = () => {
+      ctx.beginPath()
+      ctx.moveTo(-R * 1.94, R * 2.4)
+      ctx.bezierCurveTo(-R * 1.82, R * 0.55, -R * 1.34, -R * 1.72, -R * 0.14, -R * 1.98)
+      ctx.quadraticCurveTo(R * 0.54, -R * 2.12, R * 0.82, -R * 1.62)
+      ctx.bezierCurveTo(R * 1.5, -R * 0.78, R * 1.84, R * 0.6, R * 1.96, R * 2.4)
+      ctx.closePath()
+      ctx.moveTo(-R * 1.12, R * 2.4)
+      ctx.bezierCurveTo(-R * 1.16, -R * 0.4, -R * 0.66, -R * 1.3, 0, -R * 1.32)
+      ctx.bezierCurveTo(R * 0.66, -R * 1.3, R * 1.16, -R * 0.4, R * 1.12, R * 2.4)
+      ctx.closePath()
+    }
+    ring()
     const g = ctx.createLinearGradient(-R * 1.7, 0, R * 1.7, 0)
-    g.addColorStop(0, shade(col, 0.08))
+    g.addColorStop(0, shade(col, 0.12))
     g.addColorStop(0.42, col)
-    g.addColorStop(1, shade(col, -0.52))
+    g.addColorStop(1, shade(col, -0.56))
     ctx.fillStyle = g
     ctx.fill('evenodd')
+    ctx.save()
+    ring()
+    ctx.clip('evenodd')
+    grain(ctx, -R * 1.8, -R * 2.2, R * 3.6, R * 4.6, 71, 0.05)
+    // Two folds in the cloth, falling from where it is drawn over the crown.
+    ctx.filter = `blur(${Math.max(0.6, R * 0.05)}px)`
+    ctx.lineCap = 'round'
+    for (const f of [[-1.38, -1.78, 0.26], [1.4, 1.8, 0.34], [-1.0, -1.2, 0.16]]) {
+      ctx.strokeStyle = rgba('#1a0c18', f[2])
+      ctx.lineWidth = R * 0.14
+      ctx.beginPath()
+      ctx.moveTo(R * f[0] * 0.72, -R * 1.5)
+      ctx.quadraticCurveTo(R * f[0], -R * 0.2, R * f[1], R * 2.4)
+      ctx.stroke()
+    }
+    ctx.restore()
+    // The lit outer edge — a hood is mostly silhouette, so this does more work
+    // here than anywhere else.
+    rim(() => {
+      ctx.beginPath()
+      ctx.moveTo(-R * 1.9, R * 2.0)
+      ctx.bezierCurveTo(-R * 1.8, R * 0.55, -R * 1.34, -R * 1.74, -R * 0.14, -R * 2.0)
+    }, 0.22, 0.05)
     // Shadow thrown into the hood, so the face sits inside it.
     ctx.save()
     ctx.beginPath()
@@ -881,33 +1156,81 @@ function drawHat(ctx, R, wiz, kind, robe, trim, t) {
     ctx.fillStyle = hg
     ctx.fillRect(-R * 1.2, -R * 1.4, R * 2.4, R * 1.4)
     ctx.restore()
+    // The lining, where the cloth turns back on itself round the face.
+    ctx.save()
+    ctx.strokeStyle = rgba(shade(trim, -0.3), 0.55)
+    ctx.lineWidth = R * 0.055
+    ctx.beginPath()
+    ctx.moveTo(-R * 1.13, R * 1.6)
+    ctx.bezierCurveTo(-R * 1.16, -R * 0.4, -R * 0.66, -R * 1.29, 0, -R * 1.31)
+    ctx.bezierCurveTo(R * 0.66, -R * 1.29, R * 1.16, -R * 0.4, R * 1.13, R * 1.6)
+    ctx.stroke()
+    ctx.restore()
   } else if (kind === 'crown') {
     const w = R * 1.7
-    ctx.beginPath()
-    ctx.moveTo(-w / 2, brimY + R * 0.1)
-    ctx.lineTo(-w / 2, brimY - R * 0.28)
-    for (let i = 0; i < 4; i++) {
-      const px = -w / 2 + (w / 4) * i
-      ctx.lineTo(px + w / 8, brimY - R * (i % 2 === 0 ? 0.82 : 0.56))
-      ctx.lineTo(px + w / 4, brimY - R * 0.28)
+    const path = () => {
+      ctx.beginPath()
+      ctx.moveTo(-w / 2, brimY + R * 0.1)
+      ctx.lineTo(-w / 2, brimY - R * 0.28)
+      for (let i = 0; i < 4; i++) {
+        const px = -w / 2 + (w / 4) * i
+        ctx.lineTo(px + w / 8, brimY - R * (i % 2 === 0 ? 0.82 : 0.56))
+        ctx.lineTo(px + w / 4, brimY - R * 0.28)
+      }
+      ctx.lineTo(w / 2, brimY + R * 0.1)
+      ctx.quadraticCurveTo(0, brimY + R * 0.42, -w / 2, brimY + R * 0.1)
+      ctx.closePath()
     }
-    ctx.lineTo(w / 2, brimY + R * 0.1)
-    ctx.quadraticCurveTo(0, brimY + R * 0.42, -w / 2, brimY + R * 0.1)
-    ctx.closePath()
+    path()
     const g = ctx.createLinearGradient(-w / 2, 0, w / 2, 0)
     g.addColorStop(0, shade(trim, -0.3)); g.addColorStop(0.45, trim); g.addColorStop(1, shade(trim, -0.5))
     ctx.fillStyle = g
     ctx.fill()
+    // Metal, not felt: no grain, but a hard horizontal specular band, because
+    // what makes something read as polished is a sharp edge between light and
+    // dark rather than a smooth ramp.
+    ctx.save()
+    path()
+    ctx.clip()
+    const sp = ctx.createLinearGradient(0, brimY - R * 0.3, 0, brimY + R * 0.12)
+    sp.addColorStop(0, rgba('#ffffff', 0))
+    sp.addColorStop(0.45, rgba('#ffffff', 0.5))
+    sp.addColorStop(0.62, rgba('#ffffff', 0.06))
+    sp.addColorStop(1, rgba('#2a1a06', 0.42))
+    ctx.fillStyle = sp
+    ctx.fillRect(-w, brimY - R, w * 2, R * 1.6)
+    ctx.restore()
+    // A stone in the middle band.
+    const gy = brimY - R * 0.08
+    const gg = ctx.createRadialGradient(-R * 0.03, gy - R * 0.04, R * 0.01, 0, gy, R * 0.12)
+    gg.addColorStop(0, rgba('#ffffff', 0.9))
+    gg.addColorStop(0.5, shade(robe, 0.2))
+    gg.addColorStop(1, shade(robe, -0.5))
+    ctx.fillStyle = gg
+    ctx.beginPath(); ctx.ellipse(0, gy, R * 0.12, R * 0.13, 0, 0, TAU); ctx.fill()
   } else if (kind === 'horned') {
     crown(R * 1.5, R * 1.72, R * 0.06)
     for (const s of [-1, 1]) {
-      ctx.beginPath()
-      ctx.moveTo(s * R * 0.62, brimY - R * 0.1)
-      ctx.quadraticCurveTo(s * R * 1.42, brimY - R * 0.56, s * R * 1.16, brimY - R * 1.16)
-      ctx.quadraticCurveTo(s * R * 1.1, brimY - R * 0.48, s * R * 0.52, brimY - R * 0.24)
-      ctx.closePath()
-      ctx.fillStyle = trim
+      const horn = () => {
+        ctx.beginPath()
+        // Wide where it leaves the hat, tapering to an actual point. The first
+        // pass had both curves finishing far apart, so the horns ended in a
+        // blunt stub and read as two pink ribbons pinned to the crown.
+        ctx.moveTo(s * R * 0.6, brimY - R * 0.04)
+        ctx.quadraticCurveTo(s * R * 1.5, brimY - R * 0.6, s * R * 1.28, brimY - R * 1.34)
+        ctx.quadraticCurveTo(s * R * 1.02, brimY - R * 0.66, s * R * 0.46, brimY - R * 0.3)
+        ctx.closePath()
+      }
+      horn()
+      // Horn rather than sticker: dark where it leaves the hat, bright at the
+      // point, with the light on the same side as everything else.
+      const hg = ctx.createLinearGradient(s * R * 0.5, brimY, s * R * 1.2, brimY - R * 1.2)
+      hg.addColorStop(0, shade(trim, -0.5))
+      hg.addColorStop(0.55, trim)
+      hg.addColorStop(1, shade(trim, 0.3))
+      ctx.fillStyle = hg
       ctx.fill()
+      felt(horn, [-R * 1.6, brimY - R * 1.4, R * 3.2, R * 1.6], 83 + s)
     }
     band(R * 1.72)
   } else {

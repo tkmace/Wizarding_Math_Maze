@@ -107,7 +107,23 @@ export default function MathDoor({ q, stones, swiftMs = 0, bigKeypad, exam = fal
     const h = e => {
       if (e.ctrlKey || e.metaKey || e.altKey) return
       if (e.repeat) { e.preventDefault(); return }
-      if (performance.now() - openedAt.current < 140) { e.preventDefault(); return }
+      // The settling window used to swallow EVERY key for 140ms, digits
+      // included. What it was guarding against is a stale Enter or Space — the
+      // key that opened the door re-firing whatever button still had focus —
+      // and neither of those is a digit. Meanwhile a child who starts typing
+      // the moment the door opens lost her first digit: "21" arrived as "1",
+      // marked wrong, and in the Attunement that walked her measurably down.
+      // So the window now blocks only the keys it was ever about.
+      // ...and only while the box is still empty. An Enter that arrives after
+      // she has typed a digit is hers, whatever the clock says; swallowing it
+      // left the door open with her answer sitting in the box, so the next
+      // thing she typed landed on the end of it and turned a right answer into
+      // a wrong one.
+      const settling = performance.now() - openedAt.current < 140
+      if (settling && !ans && (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar')) {
+        e.preventDefault()
+        return
+      }
       if (/^[0-9]$/.test(e.key)) { e.preventDefault(); setAns(a => (a + e.key).slice(0, 6)) }
       else if (e.key === 'Backspace') { e.preventDefault(); setAns(a => a.slice(0, -1)) }
       else if (e.key === 'Escape') { e.preventDefault(); setAns('') }

@@ -82,6 +82,9 @@ async function answer(correctly) {
     const [, a, op, c] = m
     value = op === '+' ? +a + +c : op === '−' ? +a - +c : op === '×' ? +a * +c : +a / +c
   }
+  // Clear anything already in the box before typing. A walker that appends to
+  // a half-entered answer is testing nothing except itself.
+  await page.keyboard.press('Escape')
   await page.keyboard.type(String(value))
   await page.keyboard.press('Enter')
   // Wait for the door to actually close before walking on.

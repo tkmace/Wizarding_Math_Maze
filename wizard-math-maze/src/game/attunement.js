@@ -120,9 +120,24 @@ function seed(session, lane) {
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v)
 
-/** A lane's measurement: the mean of its last few turning points. */
+/**
+ * A lane's measurement: the mean of its last few turning points.
+ *
+ * A turning point is only meaningful once there are a few of them. A lane that
+ * has turned around once and then climbed for ten straight questions has ONE
+ * reversal, way back at the bottom where it started — and averaging that alone
+ * placed a child who got everything right at the floor of the game. It is the
+ * single worst outcome this whole ceremony exists to avoid, and it is what a
+ * confident answerer actually got: the staircase ran out of corridor while it
+ * was still travelling, and the estimate was read off the one place it had
+ * turned around.
+ *
+ * So until there are three turning points, where the lane has GOT to counts as
+ * evidence too. With none it is the only evidence there is.
+ */
 function estimateOf(lane, shade = SHADE) {
-  const pts = lane.reversals.length ? lane.reversals.slice(-3) : [lane.level]
+  const r = lane.reversals
+  const pts = r.length >= 3 ? r.slice(-3) : [...r, lane.level]
   const mean = pts.reduce((a, b) => a + b, 0) / pts.length
   return clamp(mean - shade, 0.02, 1)
 }
@@ -213,7 +228,13 @@ const round2 = v => Math.round(v * 100) / 100
  * so it turns corners and feels like somewhere rather than a straight line.
  */
 export function attuneCorridor(ops, profile) {
-  const R = 4                          // rooms per side
+  // Long enough that the staircase can never run out of doors before it has
+  // settled. It nearly always stops early — five turning points and it is done
+  // — but a fixed sixteen rooms meant a single-operation ceremony could reach
+  // the exit mid-climb, and then the placement was read off an unfinished
+  // staircase. The corridor is cheap; being short is not.
+  const rooms = attuneLength(ops).max + 1
+  const R = Math.max(4, Math.ceil(Math.sqrt(rooms)))   // rooms per side
   const H = R * 2 + 1, W = R * 2 + 1
   const grid = Array.from({ length: H }, () => Array(W).fill(WALL))
 
