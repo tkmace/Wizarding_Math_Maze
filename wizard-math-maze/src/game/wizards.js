@@ -173,6 +173,101 @@ export const WIZARDS = [
       ],
     },
   },
+  {
+    id: 'rook',
+    name: 'Rook',
+    blurb: 'Steady, and hard to rattle',
+    skin: 2, hair: 1, eye: 2,
+
+    // What actually makes a stylised face read as a boy's, in order: a squarer
+    // jaw, a heavier and flatter brow sitting lower, a longer nose, thinner
+    // lips, and slightly smaller eyes. Hair carries a lot of it, but hair comes
+    // off under a hat — these do not.
+    brow: { lift: 0.375, arch: 0.05, w: 0.116, tilt: -0.01, len: 0.35 },
+    head: { w: 1.00, cheek: 0.99, jaw: 0.88, chin: 1.18, tilt: 0.02, ridge: 1 },
+    neck: { top: 0.42, bot: 0.66 },
+    eyes: {
+      out: 0.385, y: 0.075, rx: 0.172, ry: 0.122, tilt: 0.02,
+      lid: 0.48, iris: 0.76, shine: 1,
+    },
+    nose: { y: 0.46, w: 0.118, bridge: 0.34, tipLift: 0.06 },
+    mouth: { y: 0.775, w: 0.205, curve: 0.08, lower: 0.042, upper: 0.028 },
+
+    // Cropped short. Same construction as Wren's — locks, just short ones — so
+    // this one cost nothing but the numbers.
+    hairPlan: {
+      hairline: -0.52, temple: -0.10, peak: 0.12, back: 0,
+      fringe: [
+        { x: -0.92, y: -0.26, len: 0.32, sweep: -0.12, thick: 0.22, curl: -0.04 },
+        { x: -0.68, y: -0.50, len: 0.30, sweep: -0.10, thick: 0.21, curl: -0.03 },
+        { x: -0.42, y: -0.66, len: 0.28, sweep: -0.08, thick: 0.20, curl: -0.02 },
+        { x: -0.14, y: -0.74, len: 0.24, sweep: 0.06, thick: 0.19, curl: 0.02 },
+        { x: 0.16, y: -0.72, len: 0.26, sweep: 0.10, thick: 0.19, curl: 0.03 },
+        { x: 0.46, y: -0.62, len: 0.28, sweep: 0.12, thick: 0.20, curl: 0.04 },
+        { x: 0.74, y: -0.44, len: 0.30, sweep: 0.12, thick: 0.21, curl: 0.04 },
+        { x: 0.94, y: -0.22, len: 0.30, sweep: 0.10, thick: 0.21, curl: 0.04 },
+      ],
+      side: [
+        { x: -1.01, y: -0.14, len: 0.44, sweep: -0.04, thick: 0.20, curl: -0.02 },
+        { x: 1.01, y: -0.14, len: 0.46, sweep: 0.06, thick: 0.20, curl: 0.03 },
+      ],
+      flyaway: [
+        { x: -0.34, y: -0.86, len: 0.16, sweep: -0.20, w: 0.020 },
+        { x: 0.44, y: -0.82, len: 0.14, sweep: 0.20, w: 0.018 },
+      ],
+    },
+  },
+  {
+    id: 'lark',
+    name: 'Lark',
+    blurb: 'Curious about everything',
+    skin: 0, hair: 4, eye: 4,
+
+    // Deliberately in between. Nothing here pushes hard in either direction:
+    // a moderate jaw, a brow with some arch but not much, medium lips. A child
+    // who does not see herself in the other three should find nothing here
+    // insisting she is one thing or the other.
+    brow: { lift: 0.42, arch: 0.11, w: 0.095, tilt: 0.03, len: 0.32 },
+    head: { w: 0.98, cheek: 1.00, jaw: 0.74, chin: 1.19, tilt: -0.02, ridge: 0.45 },
+    neck: { top: 0.38, bot: 0.60 },
+    eyes: {
+      out: 0.396, y: 0.075, rx: 0.184, ry: 0.146, tilt: 0.05,
+      lid: 0.40, iris: 0.80, shine: 1,
+    },
+    nose: { y: 0.44, w: 0.110, bridge: 0.28, tipLift: 0.06 },
+    mouth: { y: 0.755, w: 0.208, curve: 0.105, lower: 0.055, upper: 0.036 },
+
+    // Shaggy, parted hard to one side and swept across the brow. The only
+    // ASYMMETRIC hair of the four, which is most of why it reads as a different
+    // person at a glance rather than as Wren with other numbers.
+    hairPlan: {
+      hairline: -0.40, temple: 0.10, peak: -0.40, back: 1.05,
+      // A swept fringe travels ACROSS the brow, not down it. The first pass
+      // gave these locks a long `len` and a short `sweep`, which is the same
+      // shape as Wren's straight fringe and hung the whole lot over both eyes.
+      // Long sweep, short drop — and every inner lock ends above the brow.
+      fringe: [
+        { x: -0.82, y: -0.40, len: 0.20, sweep: 0.52, thick: 0.24, curl: 0.12 },
+        { x: -0.62, y: -0.56, len: 0.24, sweep: 0.86, thick: 0.23, curl: 0.16 },
+        { x: -0.42, y: -0.66, len: 0.28, sweep: 0.92, thick: 0.22, curl: 0.18 },
+        { x: -0.20, y: -0.72, len: 0.30, sweep: 0.86, thick: 0.20, curl: 0.16 },
+        { x: 0.04, y: -0.74, len: 0.28, sweep: 0.70, thick: 0.19, curl: 0.12 },
+        { x: 0.30, y: -0.68, len: 0.26, sweep: 0.46, thick: 0.19, curl: 0.08 },
+        { x: 0.62, y: -0.52, len: 0.28, sweep: 0.22, thick: 0.20, curl: 0.06 },
+        { x: 0.88, y: -0.28, len: 0.34, sweep: 0.10, thick: 0.21, curl: 0.04 },
+      ],
+      side: [
+        { x: -1.02, y: -0.04, len: 0.96, sweep: -0.10, thick: 0.24, curl: -0.08 },
+        { x: -0.92, y: 0.14, len: 0.84, sweep: 0.00, thick: 0.18, curl: -0.04 },
+        { x: 1.02, y: -0.04, len: 1.02, sweep: 0.12, thick: 0.24, curl: 0.10 },
+        { x: 0.92, y: 0.14, len: 0.88, sweep: 0.04, thick: 0.18, curl: 0.06 },
+      ],
+      flyaway: [
+        { x: -0.70, y: -0.62, len: 0.28, sweep: 0.40, w: 0.020 },
+        { x: 0.52, y: -0.74, len: 0.20, sweep: 0.26, w: 0.018 },
+      ],
+    },
+  },
 ]
 
 export const wizardById = id => WIZARDS.find(w => w.id === id) || WIZARDS[0]

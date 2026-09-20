@@ -33,19 +33,17 @@ function sprite(r,size,form,label){
   if(label){const t=document.createElement('div');t.textContent=label;d.append(t)}
   r.append(d)
 }
-const DEF=['#b0541f','#2b2732']
-let r=row('The set so far')
-sprite(r,220,formById('apprentice'),'now')
-WIZARDS.forEach((w,i)=>port(r,220,formById('apprentice'),w,DEF[i],w.name))
-r=row('Every skin tone — Wren')
-SKIN_TONES.forEach(s=>port(r,168,formById('apprentice'),WIZARDS[0],DEF[0],s.name,s.id))
-r=row('Every skin tone — Kestrel')
-SKIN_TONES.forEach(s=>port(r,168,formById('apprentice'),WIZARDS[1],DEF[1],s.name,s.id))
-r=row('Every eye colour (on Umber, where a white highlight would show)')
-EYE_COLORS.forEach(e=>port(r,168,formById('apprentice'),WIZARDS[1],DEF[1],e.name,4,e.id))
-r=row('Hair colours still work')
-for(const hc of HAIR_COLORS) port(r,150,formById('apprentice'),WIZARDS[0],hc.hex,hc.name)
+let r=row('The four')
+WIZARDS.forEach(w=>port(r,240,formById('apprentice'),w,
+  (HAIR_COLORS[w.hair]||HAIR_COLORS[1]).hex, w.name+' — '+w.blurb))
+r=row('Under a hat, where the hair stops helping')
+WIZARDS.forEach(w=>port(r,180,formById('storm'),w,(HAIR_COLORS[w.hair]||HAIR_COLORS[1]).hex,w.name))
+r=row('Same skin and hair on all four — is it the FACE that differs?')
+WIZARDS.forEach(w=>port(r,180,formById('apprentice'),w,HAIR_COLORS[1].hex,w.name,2,1))
+r=row('Every skin tone — Rook')
+SKIN_TONES.forEach(s=>port(r,150,formById('apprentice'),WIZARDS[2],HAIR_COLORS[1].hex,s.name,s.id))
 r=row('Small (110 / 76)')
-WIZARDS.forEach((w,i)=>{port(r,110,formById('apprentice'),w,DEF[i]);port(r,76,formById('apprentice'),w,DEF[i])})
+WIZARDS.forEach(w=>{const c=(HAIR_COLORS[w.hair]||HAIR_COLORS[1]).hex
+  port(r,110,formById('apprentice'),w,c);port(r,76,formById('apprentice'),w,c)})
 window.__done=true
 </script></body></html>

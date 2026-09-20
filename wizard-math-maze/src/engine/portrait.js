@@ -206,6 +206,17 @@ function modelFace(ctx, R, wiz, sk) {
   blob(ctx, -R * 0.40, -R * 0.08, R * 0.46, R * 0.30, -0.10, sk.shadow, 0.34)
   blob(ctx, R * 0.40, -R * 0.08, R * 0.46, R * 0.30, 0.10, sk.shadow, 0.40)
 
+  // The brow ridge: a shelf of bone above the eyes that throws its own shadow.
+  // Heavier on some faces than others, and the clearest structural difference
+  // between a face that reads masculine and one that does not — the one cue
+  // that still works when the hair is hidden under a hat.
+  if (H.ridge) {
+    for (const s of [-1, 1]) {
+      blob(ctx, s * R * 0.42, -R * 0.30, R * 0.42, R * 0.13, s * 0.06, sk.shadow, 0.34 * H.ridge)
+    }
+    blob(ctx, 0, -R * 0.34, R * 0.26, R * 0.10, 0, sk.shadow, 0.2 * H.ridge)
+  }
+
   // Temples, drawing the top of the skull in.
   blob(ctx, -R * 0.82, -R * 0.52, R * 0.34, R * 0.44, 0, sk.shadow, 0.30)
   blob(ctx, R * 0.82, -R * 0.52, R * 0.34, R * 0.44, 0, sk.shadow, 0.38)
@@ -238,9 +249,10 @@ function modelFace(ctx, R, wiz, sk) {
 
 function drawNeck(ctx, R, wiz, sk) {
   const H = wiz.head
+  const N = wiz.neck || { top: 0.36, bot: 0.56 }
   const top = R * (H.chin - 0.45)
   const bot = R * 2.05
-  const halfTop = R * 0.36, halfBot = R * 0.56
+  const halfTop = R * N.top, halfBot = R * N.bot
   ctx.beginPath()
   ctx.moveTo(-halfTop, top)
   ctx.bezierCurveTo(-halfTop * 1.02, top + (bot - top) * 0.5, -halfBot * 0.9, bot - (bot - top) * 0.2, -halfBot, bot)
@@ -613,7 +625,11 @@ function drawHairFront(ctx, R, wiz, hair) {
   const crown = () => {
     ctx.beginPath()
     ctx.moveTo(-R * 1.02, R * p.temple)
-    ctx.bezierCurveTo(-R * 1.16, -R * 1.05, R * 1.16, -R * 1.05, R * 1.02, R * p.temple)
+    // Controls well above the skull. A cubic sits only three-quarters of the
+    // way towards its control points, so -1.05 put the crown's apex at about
+    // -0.79R — below the top of a head that reaches -1.02R. The result was a
+    // crescent of bare scalp between the hair and the hat brim.
+    ctx.bezierCurveTo(-R * 1.16, -R * 1.5, R * 1.16, -R * 1.5, R * 1.02, R * p.temple)
     ctx.quadraticCurveTo(R * 0.52, R * (p.hairline - 0.1), R * p.peak, R * p.hairline)
     ctx.quadraticCurveTo(-R * 0.52, R * (p.hairline - 0.12), -R * 1.02, R * p.temple)
     ctx.closePath()
