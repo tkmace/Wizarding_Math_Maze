@@ -545,6 +545,62 @@ function drawHairBack(ctx, R, wiz, hair) {
  * the first attempt did. The lower edge dips at the centre and lifts at the
  * temples, because that is where a hairline actually sits.
  */
+/**
+ * Coiled hair, as a cloud of overlapping clumps rather than falling locks.
+ *
+ * The lock model is wrong for this and no amount of tuning fixes it: a lock
+ * hangs, and a coil does not — it springs out from the scalp and holds its
+ * volume. So curly hair gets its own construction, which is the whole argument
+ * for hand-authoring each wizard instead of parameterising one. Wren's hair and
+ * Kestrel's are not the same thing with different numbers.
+ *
+ * Built the way it reads: a soft mass first, then a lit edge along the top, then
+ * a few visible coils. Blurred, because hair has no edges.
+ */
+function drawCurls(ctx, R, p, hair) {
+  const lit = shade(hair, 0.34), dark = shade(hair, -0.52)
+
+  ctx.save()
+  if (typeof ctx.filter === 'string') ctx.filter = `blur(${(R * 0.045).toFixed(2)}px)`
+  for (const c of p.curls) {
+    const cx = c.x * R, cy = c.y * R, r = c.r * R
+    // Each clump lit from the same upper-left as everything else, so the mass
+    // turns as one thing rather than reading as a pile of separate balls.
+    const g = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.4, r * 0.1, cx, cy, r)
+    g.addColorStop(0, lit)
+    g.addColorStop(0.5, hair)
+    g.addColorStop(1, dark)
+    ctx.fillStyle = g
+    ctx.beginPath()
+    ctx.arc(cx, cy, r, 0, TAU)
+    ctx.fill()
+  }
+  ctx.restore()
+
+  // The coils themselves: short arcs following each clump, so there is
+  // something to read as hair at portrait size without turning into noise.
+  ctx.save()
+  ctx.lineCap = 'round'
+  for (let i = 0; i < p.curls.length; i++) {
+    const c = p.curls[i]
+    const cx = c.x * R, cy = c.y * R, r = c.r * R
+    const up = cy < -R * 0.5 || Math.abs(cx) > R * 0.9
+    ctx.globalAlpha = up ? 0.5 : 0.32
+    ctx.strokeStyle = i % 3 === 0 ? lit : dark
+    ctx.lineWidth = R * 0.022
+    const a0 = noise(i * 3.1, 7) * TAU
+    ctx.beginPath()
+    ctx.arc(cx + Math.cos(a0) * r * 0.2, cy + Math.sin(a0) * r * 0.2, r * 0.56, a0, a0 + 3.4)
+    ctx.stroke()
+    ctx.globalAlpha *= 0.7
+    ctx.strokeStyle = i % 2 === 0 ? dark : lit
+    ctx.beginPath()
+    ctx.arc(cx - Math.cos(a0) * r * 0.24, cy - Math.sin(a0) * r * 0.18, r * 0.4, a0 + 2.2, a0 + 5.2)
+    ctx.stroke()
+  }
+  ctx.restore()
+}
+
 function drawHairFront(ctx, R, wiz, hair) {
   const p = wiz.hairPlan
   const crown = () => {
@@ -564,6 +620,11 @@ function drawHairFront(ctx, R, wiz, hair) {
   blob(ctx, R * 0.56, -R * 0.66, R * 0.44, R * 0.34, 0.2, '#000000', 0.22)
   blob(ctx, 0, R * (p.hairline - 0.05), R * 0.9, R * 0.16, 0, '#000000', 0.2)
   ctx.restore()
+
+  if (p.curls) {
+    drawCurls(ctx, R, p, hair)
+    return
+  }
 
   // The locks themselves, drawn slightly out of focus.
   //

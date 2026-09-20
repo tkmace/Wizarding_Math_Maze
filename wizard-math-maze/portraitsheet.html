@@ -31,17 +31,16 @@ function sprite(r,size,form,label){
   if(label){const t=document.createElement('div');t.textContent=label;d.append(t)}
   r.append(d)
 }
-const w=WIZARDS[0]
-let r=row('New portrait vs the current renderer, at hub size (168px)')
-sprite(r,260,formById('apprentice'),'now')
-port(r,260,formById('apprentice'),w,'#b0541f','portrait')
-r=row('Hair colours')
-for(const h of HAIR_COLORS) port(r,180,formById('apprentice'),w,h.hex,h.name)
-r=row('Robes and hats')
-for(const id of ['apprentice','frost','ember','storm','leaf','candle'])
-  port(r,180,formById(id),w,'#b0541f',id)
-r=row('Does it survive small? (110 / 76)')
-port(r,110,formById('apprentice'),w,'#b0541f')
-port(r,76,formById('apprentice'),w,'#b0541f')
+const DEF=['#b0541f','#2b2732']
+let r=row('The set so far — do they read as different people?')
+sprite(r,240,formById('apprentice'),'now')
+WIZARDS.forEach((w,i)=>port(r,240,formById('apprentice'),w,DEF[i],w.name))
+r=row('Kestrel across hair colours')
+for(const h of HAIR_COLORS) port(r,170,formById('apprentice'),WIZARDS[1],h.hex,h.name)
+r=row('Kestrel in robes and hats')
+for(const id of ['frost','ember','storm','leaf','candle'])
+  port(r,170,formById(id),WIZARDS[1],'#2b2732',id)
+r=row('Small (110 / 76)')
+WIZARDS.forEach((w,i)=>{port(r,110,formById('apprentice'),w,DEF[i]);port(r,76,formById('apprentice'),w,DEF[i])})
 window.__done=true
 </script></body></html>
