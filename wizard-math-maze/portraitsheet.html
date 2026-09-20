@@ -7,18 +7,20 @@ canvas{display:block;border:1px solid #2a2a55;background:#141232;border-radius:1
 <script type="module">
 import { drawPortrait } from '/src/engine/portrait.js'
 import { drawWizard } from '/src/engine/wizardSprite.js'
-import { WIZARDS } from '/src/game/wizards.js'
+import { WIZARDS, paletteFor } from '/src/game/wizards.js'
 import { formById } from '/src/game/skins.js'
-import { HAIR_COLORS, blankAppearance } from '/src/game/appearance.js'
+import { HAIR_COLORS, EYE_COLORS, SKIN_TONES, blankAppearance } from '/src/game/appearance.js'
 const out=document.getElementById('out')
 function row(title){const h=document.createElement('h3');h.textContent=title;out.append(h)
   const r=document.createElement('div');r.className='row';out.append(r);return r}
-function port(r,size,form,wiz,hair,label){
+function port(r,size,form,wiz,hair,label,skinI,eyeI){
   const d=document.createElement('div');d.className='c'
   const cv=document.createElement('canvas');cv.width=size*2;cv.height=size*2
   cv.style.width=size+'px';cv.style.height=size+'px';d.append(cv)
   const ctx=cv.getContext('2d')
-  drawPortrait(ctx,{cx:size,cy:size*0.86,R:size*0.44,wiz,hair,form,t:1200})
+  drawPortrait(ctx,{cx:size,cy:size*0.86,R:size*0.44,wiz,
+    skin:paletteFor(skinI??wiz.skin),eye:(EYE_COLORS[eyeI??wiz.eye]||EYE_COLORS[0]).hex,
+    hair,form,t:1200})
   if(label){const t=document.createElement('div');t.textContent=label;d.append(t)}
   r.append(d)
 }
@@ -32,14 +34,17 @@ function sprite(r,size,form,label){
   r.append(d)
 }
 const DEF=['#b0541f','#2b2732']
-let r=row('The set so far — do they read as different people?')
-sprite(r,240,formById('apprentice'),'now')
-WIZARDS.forEach((w,i)=>port(r,240,formById('apprentice'),w,DEF[i],w.name))
-r=row('Kestrel across hair colours')
-for(const h of HAIR_COLORS) port(r,170,formById('apprentice'),WIZARDS[1],h.hex,h.name)
-r=row('Kestrel in robes and hats')
-for(const id of ['frost','ember','storm','leaf','candle'])
-  port(r,170,formById(id),WIZARDS[1],'#2b2732',id)
+let r=row('The set so far')
+sprite(r,220,formById('apprentice'),'now')
+WIZARDS.forEach((w,i)=>port(r,220,formById('apprentice'),w,DEF[i],w.name))
+r=row('Every skin tone — Wren')
+SKIN_TONES.forEach(s=>port(r,168,formById('apprentice'),WIZARDS[0],DEF[0],s.name,s.id))
+r=row('Every skin tone — Kestrel')
+SKIN_TONES.forEach(s=>port(r,168,formById('apprentice'),WIZARDS[1],DEF[1],s.name,s.id))
+r=row('Every eye colour (on Umber, where a white highlight would show)')
+EYE_COLORS.forEach(e=>port(r,168,formById('apprentice'),WIZARDS[1],DEF[1],e.name,4,e.id))
+r=row('Hair colours still work')
+for(const hc of HAIR_COLORS) port(r,150,formById('apprentice'),WIZARDS[0],hc.hex,hc.name)
 r=row('Small (110 / 76)')
 WIZARDS.forEach((w,i)=>{port(r,110,formById('apprentice'),w,DEF[i]);port(r,76,formById('apprentice'),w,DEF[i])})
 window.__done=true

@@ -26,6 +26,8 @@
 //  6. A little grain over everything. Almost free, and it does more for
 //     "painted rather than vector" than any amount of extra geometry.
 
+import { paletteFor } from '../game/wizards.js'
+
 const TAU = Math.PI * 2
 
 /** Deterministic noise — texture must not crawl between frames. */
@@ -108,17 +110,22 @@ function grain(ctx, x, y, w, h, seed, alpha = 0.03) {
  * @param o.cx   horizontal centre
  * @param o.cy   vertical centre of the HEAD (not the picture)
  * @param o.R    head radius in pixels — everything else is a fraction of it
- * @param o.wiz  a WIZARDS entry
+ * @param o.wiz  a WIZARDS entry — her SHAPE
+ * @param o.skin a SKIN_PALETTES entry — her colour, which is the child's choice
+ * @param o.eye  iris colour, #rrggbb
  * @param o.hair hair colour, #rrggbb
  * @param o.form a FORMS entry, for the robe and hat colours
  * @param o.t    milliseconds, for the faintest idle motion
  */
 export function drawPortrait(ctx, o) {
-  const { cx, cy, R, wiz, hair = '#6b4326', form, t = 0 } = o
+  const { cx, cy, R, wiz, skin, eye = '#5b3a24', hair = '#6b4326', form, t = 0 } = o
   if (!wiz) return
+  // Fall back to her usual tone rather than bailing. A missing palette used to
+  // return silently, which meant one forgetful caller got a blank canvas and no
+  // error — the kind of failure you find by screenshot three days later.
+  const sk = skin || paletteFor(wiz.skin)
   const robe = form?.robe || '#6f6fae'
   const trim = form?.trim || '#cfcff0'
-  const sk = wiz.skin
   const H = wiz.head
   const breathe = Math.sin(t / 2600) * R * 0.012
 
@@ -155,7 +162,7 @@ export function drawPortrait(ctx, o) {
   modelFace(ctx, R, wiz, sk)
   ctx.restore()
 
-  drawEyes(ctx, R, wiz, sk)
+  drawEyes(ctx, R, wiz, sk, eye)
   drawBrows(ctx, R, wiz, hair)
   drawNose(ctx, R, wiz, sk)
   drawMouth(ctx, R, wiz, sk)
@@ -166,8 +173,8 @@ export function drawPortrait(ctx, o) {
   headPath()
   ctx.clip()
   const rim = ctx.createLinearGradient(R * 0.55, 0, R * 1.05, 0)
-  rim.addColorStop(0, rgba('#ffe8cf', 0))
-  rim.addColorStop(1, rgba('#ffe8cf', 0.5))
+  rim.addColorStop(0, rgba(sk.lit, 0))
+  rim.addColorStop(1, rgba(sk.lit, 0.5))
   ctx.fillStyle = rim
   ctx.fillRect(-R * 1.2, -R * 1.2, R * 2.4, R * 2.8)
   ctx.restore()
@@ -213,12 +220,12 @@ function modelFace(ctx, R, wiz, sk) {
   blob(ctx, R * 0.62, R * 0.58, R * 0.30, R * 0.20, 0.30, sk.shadow, 0.28)
 
   // Chin: a lit ball with a crease above it.
-  blob(ctx, 0, R * (H.chin - 0.30), R * 0.26, R * 0.18, 0, '#fff4e4', 0.22)
+  blob(ctx, 0, R * (H.chin - 0.30), R * 0.26, R * 0.18, 0, sk.lit, 0.22)
   blob(ctx, 0, R * (H.chin - 0.52), R * 0.20, R * 0.09, 0, sk.shadow, 0.24)
 
   // The light itself, broad across the forehead and the near cheek.
-  blob(ctx, -R * 0.30, -R * 0.58, R * 0.58, R * 0.38, -0.12, '#fff6e8', 0.30)
-  blob(ctx, -R * 0.44, R * 0.18, R * 0.30, R * 0.26, 0, '#fff6e8', 0.16)
+  blob(ctx, -R * 0.30, -R * 0.58, R * 0.58, R * 0.38, -0.12, sk.lit, 0.30)
+  blob(ctx, -R * 0.44, R * 0.18, R * 0.30, R * 0.26, 0, sk.lit, 0.16)
 
   // Where the jaw turns under. Deep, and warm rather than grey — an edge of
   // skin with light coming through it is never neutral.
@@ -253,7 +260,7 @@ function drawNeck(ctx, R, wiz, sk) {
   g.addColorStop(1, rgba(sk.deep, 0.12))
   ctx.fillStyle = g
   ctx.fillRect(-R, top, R * 2, bot - top)
-  blob(ctx, -R * 0.22, R * (H.chin + 0.36), R * 0.24, R * 0.30, 0, '#ffe6cc', 0.14)
+  blob(ctx, -R * 0.22, R * (H.chin + 0.36), R * 0.24, R * 0.30, 0, sk.lit, 0.14)
   ctx.restore()
 }
 
@@ -296,7 +303,7 @@ function drawEars(ctx, R, wiz, sk) {
  * corner, an iris with a dark ring and a lighter middle, and a lower lid that
  * catches light — that last one is what makes an eye look wet.
  */
-function drawEyes(ctx, R, wiz, sk) {
+function drawEyes(ctx, R, wiz, sk, eye) {
   const e = wiz.eyes
   const ry = R * e.ry, rx = R * e.rx
   for (const s of [-1, 1]) {
@@ -306,17 +313,17 @@ function drawEyes(ctx, R, wiz, sk) {
     // Socket shadow, wider than the eye.
     blob(ctx, cx, cy - ry * 0.3, rx * 1.7, ry * 1.9, 0, sk.shadow, 0.3)
 
-    const eye = () => {
+    const eyePath = () => {
       ctx.beginPath()
       ctx.ellipse(cx, cy, rx, ry, tilt, 0, TAU)
       ctx.closePath()
     }
-    eye()
-    ctx.fillStyle = '#f6eee6'
+    eyePath()
+    ctx.fillStyle = mix('#ffffff', sk.warm, 0.12)
     ctx.fill()
 
     ctx.save()
-    eye(); ctx.clip()
+    eyePath(); ctx.clip()
     // Lid shadow across the top of the white.
     const lg = ctx.createLinearGradient(0, cy - ry, 0, cy + ry * 0.4)
     lg.addColorStop(0, rgba(sk.deep, 0.62))
@@ -328,9 +335,9 @@ function drawEyes(ctx, R, wiz, sk) {
     const ir = Math.min(rx, ry) * e.iris
     const iy = cy + ry * 0.06
     const ig = ctx.createRadialGradient(cx, iy + ir * 0.25, ir * 0.1, cx, iy, ir)
-    ig.addColorStop(0, shade(wiz.eyeHex || '#5b3a24', 0.4))
-    ig.addColorStop(0.62, wiz.eyeHex || '#5b3a24')
-    ig.addColorStop(1, shade(wiz.eyeHex || '#5b3a24', -0.62))
+    ig.addColorStop(0, shade(eye, 0.4))
+    ig.addColorStop(0.62, eye)
+    ig.addColorStop(1, shade(eye, -0.62))
     ctx.fillStyle = ig
     ctx.beginPath(); ctx.arc(cx, iy, ir, 0, TAU); ctx.fill()
     ctx.fillStyle = '#140b08'
@@ -355,7 +362,7 @@ function drawEyes(ctx, R, wiz, sk) {
 
     // Lash line: a tapered sweep, heaviest outside.
     ctx.save()
-    ctx.strokeStyle = '#33201a'
+    ctx.strokeStyle = shade(sk.deep, -0.35)
     ctx.lineCap = 'round'
     ctx.globalAlpha = 0.92
     ctx.lineWidth = R * 0.030
@@ -369,7 +376,7 @@ function drawEyes(ctx, R, wiz, sk) {
     ctx.stroke()
     // Lower lid: light, not line. This is the "wet" cue.
     ctx.globalAlpha = 0.42
-    ctx.strokeStyle = '#fff0dd'
+    ctx.strokeStyle = sk.lit
     ctx.lineWidth = R * 0.016
     ctx.beginPath()
     ctx.ellipse(cx, cy + ry * 0.12, rx * 0.94, ry * 0.94, tilt, Math.PI * 0.14, Math.PI * 0.86)
@@ -436,11 +443,11 @@ function drawNose(ctx, R, wiz, sk) {
   ctx.closePath()
   ctx.fill()
   // The lit ridge.
-  blob(ctx, -w * 0.25, ty - R * n.bridge * 0.55, w * 0.42, R * n.bridge * 0.62, 0, '#fff5e6', 0.34)
+  blob(ctx, -w * 0.25, ty - R * n.bridge * 0.55, w * 0.42, R * n.bridge * 0.62, 0, sk.lit, 0.34)
   // Under the tip, and the tip itself catching warmth.
   blob(ctx, 0, ty + w * 0.42, w * 1.05, w * 0.42, 0, sk.deep, 0.42)
   blob(ctx, -w * 0.18, ty - w * 0.1, w * 0.62, w * 0.48, 0, sk.warm, 0.3)
-  blob(ctx, -w * 0.28, ty - w * 0.28, w * 0.34, w * 0.26, 0, '#fff8ee', 0.42)
+  blob(ctx, -w * 0.28, ty - w * 0.28, w * 0.34, w * 0.26, 0, sk.lit, 0.42)
   // Nostrils: soft dents, not holes.
   for (const s of [-1, 1]) {
     blob(ctx, s * w * 0.66, ty + w * 0.2, w * 0.3, w * 0.22, s * 0.4, sk.deep, 0.5)
@@ -471,7 +478,7 @@ function drawMouth(ctx, R, wiz, sk) {
   blob(ctx, 0, my - R * m.upper * 0.9, mw * 0.9, R * m.upper, 0, sk.deep, 0.24)
   // Lower lip: lit, and warm.
   blob(ctx, 0, my + R * m.lower * 1.2, mw * 0.72, R * m.lower, 0, sk.warm, 0.42)
-  blob(ctx, -mw * 0.18, my + R * m.lower, mw * 0.34, R * m.lower * 0.5, 0, '#fff0e2', 0.34)
+  blob(ctx, -mw * 0.18, my + R * m.lower, mw * 0.34, R * m.lower * 0.5, 0, sk.lit, 0.34)
   // The shadow the lower lip casts onto the chin.
   blob(ctx, 0, my + R * m.lower * 3.0, mw * 0.8, R * m.lower * 0.9, 0, sk.shadow, 0.28)
   // Corners, dug in a little — this is where an expression lives.

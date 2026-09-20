@@ -20,22 +20,47 @@
 // at a 64px tile and a 400px portrait.
 
 /**
- * `warm`, `cool` and `deep` are not decoration. Skin is translucent: it picks
- * up warmth where it is thin (ears, nose, cheeks, the edge of the jaw) and goes
- * cool and grey where it turns away from the light. Painting a face in one flat
- * tone plus a darker version of that tone is most of what makes cartoon skin
- * look like plastic.
+ * A skin tone is five colours, not one.
+ *
+ * Swapping a single base colour and darkening it for the shadows gives you
+ * plastic — that is the whole reason the old sprite's faces looked like toys.
+ * Real skin is translucent and it does two things a flat fill cannot: it goes
+ * WARM where it is thin and light passes through it (ears, the tip of the nose,
+ * the lower lip, the edge of a cheek), and it goes cool and slightly grey where
+ * it turns away from the light.
+ *
+ * `lit` is the one people forget. A highlight is not white — it is the skin's
+ * own colour with the light on it. Painting a near-white highlight on dark skin
+ * blows a chalky patch in the middle of the face, which is the single most
+ * common way dark skin gets drawn badly. So every tone brings its own.
+ *
+ * Indexed to match SKIN_TONES in appearance.js, so `appearance.skin` selects one
+ * directly and any wizard can wear any of them. This is the free half of the
+ * personalisation line: COLOUR is interchangeable because it moves nothing.
  */
-const skinOf = (base, shadow, warm, deep) => ({ base, shadow, warm, deep })
+export const SKIN_PALETTES = [
+  // Porcelain
+  { base: '#f6ddc6', shadow: '#d9b193', warm: '#e0998a', deep: '#a9764f', lit: '#fffaf2' },
+  // Sand
+  { base: '#e8c9a0', shadow: '#c69b72', warm: '#d4866f', deep: '#94623e', lit: '#fff5e8' },
+  // Honey
+  { base: '#cf9d6d', shadow: '#a9764a', warm: '#c37356', deep: '#77492a', lit: '#ffeeda' },
+  // Chestnut
+  { base: '#a06f47', shadow: '#7c5231', warm: '#ad6446', deep: '#4c2b18', lit: '#f2d0a8' },
+  // Umber — the highlight here is a light warm brown, nowhere near white.
+  { base: '#6d472c', shadow: '#513320', warm: '#85472d', deep: '#2f1a0d', lit: '#d9a878' },
+]
+
+export const paletteFor = i => SKIN_PALETTES[i] ?? SKIN_PALETTES[1]
 
 export const WIZARDS = [
   {
     id: 'wren',
     name: 'Wren',
     blurb: 'Quick, and knows it',
-    skin: skinOf('#f0cfa8', '#cf9f74', '#d8836e', '#9a6442'),
-    hair: 2,                       // her usual colour; the child may change it
-    eyeHex: '#5c3a22',
+    // Her usual look. Every one of these is the child's to change — they are
+    // where she starts, not what she is.
+    skin: 1, hair: 2, eye: 0,
     brow: { lift: 0.46, arch: 0.20, w: 0.085, tilt: 0.06, len: 0.30 },
 
     // Head. `w` at the temples, `cheek` how far the cheekbone sits out, `jaw`
@@ -94,9 +119,7 @@ export const WIZARDS = [
     id: 'kestrel',
     name: 'Kestrel',
     blurb: 'Patient, and never rushed',
-    skin: skinOf('#a4744c', '#7d5233', '#b56c48', '#4a2a17'),
-    hair: 0,
-    eyeHex: '#3a2216',
+    skin: 3, hair: 0, eye: 1,
     // Heavier and flatter than Wren's, which is half of why the two faces read
     // as different people before you have looked at anything else.
     brow: { lift: 0.43, arch: 0.12, w: 0.104, tilt: 0.02, len: 0.33 },
