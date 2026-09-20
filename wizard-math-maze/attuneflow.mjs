@@ -56,8 +56,27 @@ async function sum() {
   const t = await page.getByText(SUM).first().innerText({ timeout: 1500 }).catch(() => '')
   return SUM.exec(t.trim())
 }
+/**
+ * The same read, but patient.
+ *
+ * A door takes a moment to open, and a single impatient read comes back empty
+ * perhaps one time in twenty. That used to be invisible: an unread sum fell
+ * through to the wrong-answer path, so a walker that was supposed to be acing
+ * the ceremony quietly threw a question away and placed itself at the floor.
+ * A rare, real-looking "the Attunement mis-placed her" that was never the app.
+ */
+let unreadable = 0
+async function sumPatient() {
+  for (let i = 0; i < 6; i++) {
+    const m = await sum()
+    if (m) return m
+    await page.waitForTimeout(250)
+  }
+  unreadable++
+  return null
+}
 async function answer(correctly) {
-  const m = await sum()
+  const m = correctly ? await sumPatient() : await sum()
   let value = 99999
   if (m && correctly) {
     const [, a, op, c] = m
@@ -65,28 +84,38 @@ async function answer(correctly) {
   }
   await page.keyboard.type(String(value))
   await page.keyboard.press('Enter')
-  await page.waitForTimeout(200)
+  // Wait for the door to actually close before walking on.
+  //
+  // Without this the walker could arrive at the next door while the answered
+  // one was still fading out, read ITS sum again, and type the old answer into
+  // the new question — which is why a walker answering everything correctly
+  // could still place at the floor, with the same sum appearing twice in the
+  // trace. The ceremony was fine; the harness was answering the wrong question.
+  for (let i = 0; i < 20 && await sum(); i++) await page.waitForTimeout(150)
+  if (process.env.TRACE) console.log('   door:', m ? m[0] : '(unread)', '→', value)
   return m ? m[0] : null
 }
 /**
- * Wander until a door opens.
+ * Walk forward until a door opens.
  *
- * A seeded random walk, and both of those words are load-bearing. Always
- * turning right walks a small circle; alternating right and left oscillates in
- * place, which is worse — that version found exactly one door. And an unseeded
- * walk makes this test pass or fail on the dice, which is the one thing a test
- * must never do.
+ * The Attunement is a single corridor now, so there is nothing to search — but
+ * a walker still has to take the corners. It reads the side signposts GameView
+ * already draws: in a one-wide corridor a tab only appears where there is an
+ * opening, so a tab means "turn this way", and no tab means "straight on".
  *
- * A child has a minimap and navigates far better than this. The walker only has
- * to be good enough to prove the ceremony finishes.
+ * The three walkers before this are worth remembering. Always-right walks a
+ * small circle. Alternating right and left oscillates in place. A seeded random
+ * walk explores a maze but flounders in a corridor, because a corridor wants
+ * exactly one decision at each corner and random gets it wrong most of the
+ * time. The signposts are the decision, already on screen.
  */
-let seed = 12345
-const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff)
-async function findDoor(limit = 120) {
+async function findDoor(limit = 60) {
   for (let i = 0; i < limit; i++) {
     if (await doorUp()) return true
-    const r = rnd()
-    await page.keyboard.press(r < 0.55 ? 'ArrowUp' : r < 0.78 ? 'ArrowRight' : 'ArrowLeft')
+    if (await page.getByText('↰').count()) await page.keyboard.press('ArrowLeft')
+    else if (await page.getByText('↱').count()) await page.keyboard.press('ArrowRight')
+    await page.waitForTimeout(70)
+    await page.keyboard.press('ArrowUp')
     await page.waitForTimeout(70)
   }
   return false
@@ -116,6 +145,7 @@ await page.screenshot({ path: `${OUT}/attune-verdict.png`, fullPage: true })
 
 const p = await saved()
 check('marked as attuned', !!p?.attuned)
+check('every door was legible to the walker', unreadable === 0, `${unreadable} unread`)
 // `plays` is the truth about how many questions were asked; the loop above can
 // double-count a door whose answer didn't register first time.
 check('and it was short', (p?.plays || 0) <= 16, `${p?.plays} questions asked`)
@@ -125,8 +155,11 @@ check('the fact table recorded the answers', Object.keys(p?.facts || {}).length 
 console.log('5. and she can still climb afterwards (the warmCap trap)')
 const level = p.skill.addition
 const plays = p.opPlays?.addition || 0
-check(`credited ${plays} plays for a placement of ${level}`, plays > 0)
-check('the beginner ceiling now sits above where she was placed', 0.16 + 0.042 * plays > level,
+// A placement at or below the warm base needs no credit at all: the ceiling
+// already sits at 0.16, and one answer in the first real maze lifts it again.
+// It is only a placement ABOVE the base that has to be paid for up front.
+check(`credited ${plays} plays for a placement of ${level}`, level <= 0.16 || plays > 0)
+check('the beginner ceiling now sits at or above where she was placed', 0.16 + 0.042 * plays >= level,
   `ceiling ${(0.16 + 0.042 * plays).toFixed(2)} vs placed ${level}`)
 
 await page.locator('button', { hasText: 'To the castle' }).click()

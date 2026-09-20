@@ -70,7 +70,7 @@ export default function Wardrobe({ profile, onEquip, onBuy, onClose }) {
                       opacity: dim ? 0.52 : 1,
                       position: 'relative',
                     }}>
-                      <WizardPreview form={f} appearance={profile.appearance} size={86} animate={isWorn} greyscale={dim} style={{ margin: '0 auto' }} />
+                      <WizardPreview profile={profile} form={f} size={86} animate={isWorn} greyscale={dim} style={{ margin: '0 auto' }} />
                       <div style={{
                         color: dim ? C.faint : '#fff', fontWeight: 900, fontSize: 11.5,
                         fontFamily: sans, lineHeight: 1.25, marginTop: 3, minHeight: 26,

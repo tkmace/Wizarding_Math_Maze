@@ -118,7 +118,28 @@ function grain(ctx, x, y, w, h, seed, alpha = 0.03) {
  * @param o.t    milliseconds, for the faintest idle motion
  */
 export function drawPortrait(ctx, o) {
-  const { cx, cy, R, wiz, skin, eye = '#5b3a24', hair = '#6b4326', form, t = 0 } = o
+  drawHead(ctx, o)
+}
+
+/**
+ * The same painted head, with the chest-up furniture made optional.
+ *
+ * The full-figure sprite already has a neck, a collar and shoulders of its own,
+ * drawn to ITS proportions — so when the wardrobe and the rank-up screen want
+ * this face on that body, they ask for the head alone and drop it onto the
+ * figure. One face rig, two framings; a wizard cannot end up with a different
+ * nose depending on which screen she is standing on.
+ *
+ * @param o.neck      draw the throat (off when the caller has its own)
+ * @param o.shoulders draw the robed chest (ditto)
+ * @param o.breathe   the slow idle rise (off when the body already bobs, or the
+ *                    head floats a pixel away from the neck it is sitting in)
+ */
+export function drawHead(ctx, o) {
+  const {
+    cx, cy, R, wiz, skin, eye = '#5b3a24', hair = '#6b4326', form, t = 0,
+    neck = true, shoulders = true, breathe: breathing = true,
+  } = o
   if (!wiz) return
   // Fall back to her usual tone rather than bailing. A missing palette used to
   // return silently, which meant one forgetful caller got a blank canvas and no
@@ -127,7 +148,7 @@ export function drawPortrait(ctx, o) {
   const robe = form?.robe || '#6f6fae'
   const trim = form?.trim || '#cfcff0'
   const H = wiz.head
-  const breathe = Math.sin(t / 2600) * R * 0.012
+  const breathe = breathing ? Math.sin(t / 2600) * R * 0.012 : 0
 
   ctx.save()
   ctx.translate(cx, cy + breathe)
@@ -147,8 +168,8 @@ export function drawPortrait(ctx, o) {
   }
 
   drawHairBack(ctx, R, wiz, hair)
-  drawNeck(ctx, R, wiz, sk)
-  drawShoulders(ctx, R, wiz, robe, trim)
+  if (neck) drawNeck(ctx, R, wiz, sk)
+  if (shoulders) drawShoulders(ctx, R, wiz, robe, trim)
   drawEars(ctx, R, wiz, sk)
 
   // ── Skin ──

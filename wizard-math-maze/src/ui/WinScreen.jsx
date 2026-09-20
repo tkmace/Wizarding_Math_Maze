@@ -59,7 +59,7 @@ export default function WinScreen({ profile, run, onAgain, onCastle, newRank, fo
                   borderRadius: 12, padding: '6px 2px 5px',
                   background: `${f.robe}22`, border: `1.5px solid ${f.trim}55`,
                 }}>
-                  <WizardPreview form={f} appearance={profile.appearance} size={66} animate={false} />
+                  <WizardPreview profile={profile} form={f} size={66} animate={false} />
                   <div style={{ color: f.trim, fontSize: 9.5, fontWeight: 900, lineHeight: 1.2, marginTop: 1 }}>
                     {f.title}
                   </div>

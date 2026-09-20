@@ -169,7 +169,7 @@ export default function Login({ onEnter }) {
                     padding: '11px 13px', borderRadius: 14, cursor: 'pointer',
                     background: C.panelHi, border: `2px solid ${p.name === lastName ? C.gold + '88' : C.lineHi}`,
                   }}>
-                    <WizardPreview form={sk} appearance={p.appearance} size={46} animate={false} />
+                    <WizardPreview profile={p} form={sk} size={46} animate={false} />
                     <span style={{ flex: 1, minWidth: 0 }}>
                       <span style={{ display: 'block', color: '#fff', fontWeight: 900, fontSize: 17, fontFamily: sans, overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</span>
                       <span style={{ display: 'block', color: C.dim, fontSize: 11, fontFamily: serif, letterSpacing: 1 }}>
@@ -194,7 +194,7 @@ export default function Login({ onEnter }) {
         {/* ── Passcode ── */}
         {mode === 'passcode' && target && (
           <>
-            <WizardPreview form={formById(target.equippedSkin)} appearance={target.appearance} size={86} style={{ margin: '0 auto' }} />
+            <WizardPreview profile={target} form={formById(target.equippedSkin)} size={86} style={{ margin: '0 auto' }} />
             <div style={{ color: '#fff', fontWeight: 900, fontSize: 20, marginBottom: 14, fontFamily: sans }}>{target.name}</div>
             <label style={label({ textAlign: 'left' })}>SECRET PASSCODE</label>
             <input

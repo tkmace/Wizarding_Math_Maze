@@ -1,13 +1,20 @@
 import { useEffect, useRef } from 'react'
 import { drawWizard } from '../engine/wizardSprite.js'
+import { lookFor } from '../game/wizards.js'
 
 /**
  * A live, animated wizard on a small canvas. Used for the hub portrait, the
  * wardrobe gallery and the rank-up choice screen, so the wizard she picks looks
  * exactly like the one she'll be guiding through the maze.
+ *
+ * Give it a `profile` and the figure wears her painted face (see drawHead in
+ * engine/portrait.js); without one it falls back to the older modular face, so
+ * a screen that only has a robe to show still draws somebody.
  */
-export default function WizardPreview({ form, appearance, size = 140, view = 'front', animate = true, greyscale = false, style }) {
+export default function WizardPreview({ profile, form, appearance, size = 140, view = 'front', animate = true, greyscale = false, style }) {
   const ref = useRef(null)
+  const app = appearance ?? profile?.appearance
+  const wizId = profile?.wizard
 
   useEffect(() => {
     const cv = ref.current
@@ -22,6 +29,7 @@ export default function WizardPreview({ form, appearance, size = 140, view = 'fr
       : Math.min(2, window.devicePixelRatio || 1)
     cv.width = Math.round(size * dpr)
     cv.height = Math.round(size * dpr)
+    const face = wizId || app ? lookFor({ wizard: wizId, appearance: app }) : null
 
     let raf
     const frame = t => {
@@ -31,7 +39,7 @@ export default function WizardPreview({ form, appearance, size = 140, view = 'fr
         x: cv.width / 2,
         yBase: cv.height * 0.94,
         h: cv.height * 0.82,
-        form, appearance,
+        form, appearance: app, face,
         t: animate ? t : 1200,
         moving: false,
         view,
@@ -40,7 +48,7 @@ export default function WizardPreview({ form, appearance, size = 140, view = 'fr
     }
     raf = requestAnimationFrame(frame)
     return () => cancelAnimationFrame(raf)
-  }, [form, appearance, size, view, animate])
+  }, [form, app, wizId, size, view, animate])
 
   return (
     <canvas

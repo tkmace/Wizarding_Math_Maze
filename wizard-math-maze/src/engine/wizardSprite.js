@@ -9,6 +9,7 @@
 // same character.
 
 import { resolveLook } from '../game/appearance.js'
+import { drawHead } from './portrait.js'
 
 const TAU = Math.PI * 2
 
@@ -118,9 +119,22 @@ function weave(ctx, drawPath, bb, seed, col) {
  * @param o.appearance skin tone / hair colour / hair length (see game/appearance.js)
  */
 export function drawWizard(ctx, o) {
-  const { x, yBase, h, form, t = 0, moving = false, view = 'back', lean = 0, appearance } = o
+  const { x, yBase, h, form, t = 0, moving = false, view = 'back', lean = 0, appearance, face } = o
   if (!form) return
   const look = resolveLook(appearance)
+
+  // A painted head on the robed body.
+  //
+  // `face` is a lookFor() result — one of the six wizards plus her colours. When
+  // a caller hands one over, the head below is drawn by engine/portrait.js
+  // instead of by the modular rig in this file, so the girl in the wardrobe is
+  // recognisably the same person as the girl in the picker. The old rig stays
+  // for callers that have no wizard to draw (the maze, where the figure is
+  // forty pixels tall and the painterly head costs far more than it shows).
+  //
+  // Only the front view. The painted head has no back of the head yet, and a
+  // face pasted onto a figure walking away is worse than no change at all.
+  const painted = face?.wiz && view === 'front'
 
   const robe = form.robe || '#6f6fae'
   const trim = form.trim || '#cfcff0'
@@ -415,6 +429,21 @@ export function drawWizard(ctx, o) {
 
   // ── Staff, held off to one side so it never covers the hat ──
   if (form.staff && form.staff !== 'none') drawStaff(ctx, h, form.staff, trim, t, stride)
+
+  if (painted) {
+    // The painted head brings its own hair, ears, brows and hat, and sits in
+    // the neck this file already drew — hence neck and shoulders off. It does
+    // not breathe either: the body is already bobbing, and two idle rhythms on
+    // one figure makes the head drift off the throat.
+    drawHead(ctx, {
+      cx: 0, cy: headY, R: headR * 1.02,
+      wiz: face.wiz, skin: face.skin, eye: face.eye, hair: face.hair,
+      form, t, neck: false, shoulders: false, breathe: false,
+    })
+    drawAura(ctx, h, form.aura, t, trim, 'over')
+    ctx.restore()
+    return
+  }
 
   // ── Hair behind the head, so long styles fall over the shoulders ──
   drawHair(ctx, h, headY, headR, look, view, 'back')

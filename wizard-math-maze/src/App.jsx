@@ -489,7 +489,7 @@ export default function App() {
 
       {screen === 'pick' && profile && pending.length > 0 && (
         <SkinChoice
-          rank={pending[0]} appearance={profile.appearance} onChoose={choose}
+          rank={pending[0]} profile={profile} appearance={profile.appearance} onChoose={choose}
           points={profile.totalPoints} owed={pending.length}
           fresh={newRank === pending[0]}
         />

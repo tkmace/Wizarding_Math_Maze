@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { drawCreature, drawBolt } from '../engine/creatureSprite.js'
 import { drawWizard } from '../engine/wizardSprite.js'
+import { lookFor } from '../game/wizards.js'
 import { encounterQuestion, duelPlan, answerChoices } from '../game/encounters.js'
 import { C, sans, serif, btn } from './theme.js'
 
@@ -22,6 +23,8 @@ import { C, sans, serif, btn } from './theme.js'
  */
 export default function SpellDuel({ creature, ops, diff, profile, form, appearance, onDone }) {
   const plan = useRef(duelPlan(diff, profile, ops)).current
+  // Her painted face, in the one fight she is actually in.
+  const face = useMemo(() => lookFor(profile, appearance), [profile?.wizard, appearance])
   const canvasRef = useRef(null)
   const [q, setQ] = useState(() => encounterQuestion(ops, diff, profile))
   const [phase, setPhase] = useState('fight')     // fight | won | lost
@@ -156,7 +159,7 @@ export default function SpellDuel({ creature, ops, diff, profile, form, appearan
 
       drawWizard(ctx, {
         x: W * 0.13, yBase: H * 0.97, h: H * 0.42,
-        form, appearance, t, moving: false, view: 'front',
+        form, appearance, face, t, moving: false, view: 'front',
       })
 
       if (d.bolt) drawBolt(ctx, W * 0.19, H * 0.66, creatureX, creatureY - ch * 0.4, d.bolt.p, q.color)

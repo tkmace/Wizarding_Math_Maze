@@ -1,3 +1,5 @@
+import { HAIR_COLORS, EYE_COLORS } from './appearance.js'
+
 // --- The six ------------------------------------------------------------------
 // A deliberate retreat from "any face with any hair with any nose".
 //
@@ -184,7 +186,7 @@ export const WIZARDS = [
     // lips, and slightly smaller eyes. Hair carries a lot of it, but hair comes
     // off under a hat — these do not.
     brow: { lift: 0.375, arch: 0.05, w: 0.116, tilt: -0.01, len: 0.35 },
-    head: { w: 1.00, cheek: 0.99, jaw: 0.88, chin: 1.18, tilt: 0.02, ridge: 1 },
+    head: { w: 0.98, cheek: 0.96, jaw: 0.82, chin: 1.19, tilt: 0.02, ridge: 1 },
     neck: { top: 0.42, bot: 0.66 },
     eyes: {
       out: 0.385, y: 0.075, rx: 0.172, ry: 0.122, tilt: 0.02,
@@ -367,3 +369,26 @@ export const WIZARDS = [
 
 export const wizardById = id => WIZARDS.find(w => w.id === id) || WIZARDS[0]
 export const DEFAULT_WIZARD = WIZARDS[0].id
+
+/**
+ * One profile in, one painted face out.
+ *
+ * Every screen that shows her — the picker, the castle, the wardrobe tiles, the
+ * duel, the Attunement — needs exactly this: which of the six she is, plus the
+ * three colours she is allowed to change. Having each screen work that out for
+ * itself is how a wizard ends up chestnut-haired in one place and copper in
+ * another, so it is worked out once, here.
+ *
+ * Shape falls back to the first wizard and colour to that wizard's own look, so
+ * a profile saved before any of this existed still draws somebody.
+ */
+export function lookFor(profile, appearanceOverride) {
+  const wiz = wizardById(profile?.wizard)
+  const a = appearanceOverride || profile?.appearance || {}
+  return {
+    wiz,
+    skin: paletteFor(a.skin ?? wiz.skin),
+    eye: (EYE_COLORS[a.eyeColor ?? wiz.eye] || EYE_COLORS[0]).hex,
+    hair: (HAIR_COLORS[a.hairColor ?? wiz.hair] || HAIR_COLORS[1]).hex,
+  }
+}

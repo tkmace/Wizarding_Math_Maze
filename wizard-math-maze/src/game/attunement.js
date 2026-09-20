@@ -1,5 +1,5 @@
 import { genQ, SENSE, OPS } from './math.js'
-import { genMaze, revealFrom, PATH, DOOR } from './maze.js'
+import { revealFrom, WALL, PATH, DOOR, START as CELL_START, END as CELL_END } from './maze.js'
 
 // --- The Attunement: placing a wizard on her first day -------------------------
 //
@@ -38,9 +38,6 @@ const STEP0 = 0.18          // first step, about two-thirds of a tier
 const SHRINK = 0.6          // how much the step collapses at each reversal
 const STEP_MIN = 0.03
 const STOP_REVERSALS = 5
-
-const DOOR_SHARE = 0.72     // how much of the floor is doors
-const DOOR_MIN = 18         // …but never fewer than the ceremony could need
 
 /**
  * How far below the measured level to place her.
@@ -190,55 +187,74 @@ export function attuneResult(s) {
 
 const round2 = v => Math.round(v * 100) / 100
 
-// --- The maze it happens in ---------------------------------------------------
+// --- The corridor it happens in -----------------------------------------------
 
 /**
- * A compact maze, thick with doors.
+ * One corridor, forward only, with a door at every step.
  *
- * The instinct is to make a placement maze BIGGER, since there are more
- * questions in it. The opposite is right: walking is the enjoyable part of a
- * maze but it is dead time for a measurement, and sixteen questions at normal
- * corridor lengths is a long sit for a six-year-old. So the maze is small and
- * the doors come every few steps — the same amount of maths, half the walking.
+ * This started as a maze, and the maze was wrong in three ways at once, all of
+ * which a child found in a single sitting:
  *
- * The doors carry no questions. A door's question has to be chosen at the moment
- * she opens it, because which question is worth asking depends on how she has
- * answered the ones before it — which is the whole idea. So the generated
- * questions are thrown away and the grid is kept for its shape.
+ *  - The DIFFICULTY looked random. A staircase goes up and down by design —
+ *    that is how it finds a threshold — but in a maze she also chooses which
+ *    door to open and in what order, so the up-and-down read as the castle
+ *    asking 2+2 and then 60+40 for no reason at all.
+ *  - It seemed never to end. With doors scattered through a grid there is
+ *    nothing to see that says how much is left.
+ *  - It could run out of reachable doors near her, so the last few questions
+ *    turned into a hunt.
  *
- * There is no exit gate and no way to fail. The ceremony ends when the staircase
- * has its answer, wherever in the maze she happens to be standing.
+ * A corridor fixes all three by construction: the next question is the next
+ * door, the way out is visibly ahead of her, and there is no navigating to do.
+ * It is still a walk through the castle rather than a worksheet, which was the
+ * only thing the maze was really buying.
+ *
+ * Laid out as a boustrophedon — along a row, down one, back along the next —
+ * so it turns corners and feels like somewhere rather than a straight line.
  */
-export function attuneMaze(ops, profile) {
-  const m = genMaze(ops, SENSE, profile, {}, 4)
-  const H = m.grid.length, W = m.grid[0].length
-  // Only the corner she starts in is kept clear, so her first step isn't a
-  // question. The ordinary maze also keeps the ground around the EXIT clear,
-  // which here would leave a door-free pocket in the far corner — and a child
-  // who wandered into it would be hunting for her next question instead of
-  // answering one. There is no gate to protect in this maze, so doors go
-  // everywhere else.
-  const near = (r, c) => r <= 2 && c <= 2
+export function attuneCorridor(ops, profile) {
+  const R = 4                          // rooms per side
+  const H = R * 2 + 1, W = R * 2 + 1
+  const grid = Array.from({ length: H }, () => Array(W).fill(WALL))
 
-  const open = []
-  for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) {
-    if ((m.grid[r][c] === PATH || m.grid[r][c] === DOOR) && !near(r, c)) open.push([r, c])
+  // The rooms, in the order she will walk them.
+  const order = []
+  for (let r = 0; r < R; r++) {
+    for (let i = 0; i < R; i++) {
+      const c = r % 2 === 0 ? i : R - 1 - i
+      order.push([r, c])
+    }
   }
-  // Not every cell. A door on literally every step is a worksheet with a
-  // corridor drawn round it; leaving some plain floor means she is still
-  // walking somewhere between questions, which is the point of using a maze.
-  open.sort(() => Math.random() - 0.5)
-  const doors = open.slice(0, Math.max(DOOR_MIN, Math.round(open.length * DOOR_SHARE)))
-  for (const [r, c] of open) m.grid[r][c] = PATH
-  for (const [r, c] of doors) m.grid[r][c] = DOOR
-  revealFrom(m.seen, m.grid, 1, 1)
+
+  const cell = ([r, c]) => [r * 2 + 1, c * 2 + 1]
+  for (const room of order) {
+    const [gr, gc] = cell(room)
+    grid[gr][gc] = DOOR
+  }
+  // Carve the wall between each pair, so the path is one line with no branches.
+  // These stay plain floor: one door per room means a question, then a few
+  // steps of walking, then the next. Making the joins doors too would double
+  // the count and leave her answering with no pause in between.
+  for (let i = 1; i < order.length; i++) {
+    const [ar, ac] = cell(order[i - 1])
+    const [br, bc] = cell(order[i])
+    grid[(ar + br) / 2][(ac + bc) / 2] = PATH
+  }
+
+  // She starts standing in the first room, so that one is not a question.
+  const [sr, sc] = cell(order[0])
+  grid[sr][sc] = CELL_START
+  const [er, ec] = cell(order[order.length - 1])
+  grid[er][ec] = CELL_END
+
+  const seen = Array.from({ length: H }, () => Array(W).fill(false))
+  revealFrom(seen, grid, sr, sc)
 
   return {
-    ...m,
-    dq: {},                  // filled one door at a time, as she reaches them
-    stones: {},              // no pickups: this is short and it is not about loot
-    doorTotal: doors.length,
+    grid, dq: {}, stones: {}, seen,
+    start: { row: sr, col: sc },
+    doorTotal: order.length - 1,
     pointsAvailable: 0,
-    pointsRequired: 0,       // the way out is never sealed
+    pointsRequired: 0,        // the way out is never sealed
   }
 }

@@ -14,7 +14,7 @@ import WizardPreview from './WizardPreview.jsx'
  * and it has to be obvious that those choices are something her old points
  * BOUGHT her rather than a form she has to fill in before she can play.
  */
-export default function SkinChoice({ rank, appearance, onChoose, points = 0, owed = 1, fresh = false }) {
+export default function SkinChoice({ rank, profile, appearance, onChoose, points = 0, owed = 1, fresh = false }) {
   const forms = formsAtRank(rank)
   const info = rankInfo(rank)
   const [sel, setSel] = useState(null)
@@ -75,7 +75,7 @@ export default function SkinChoice({ rank, appearance, onChoose, points = 0, owe
               background: on ? `${f.robe}33` : C.panelHi,
               boxShadow: on ? `0 0 22px ${f.trim}44` : 'none',
             }}>
-              <WizardPreview form={f} appearance={appearance} size={78} animate={on} />
+              <WizardPreview profile={profile} form={f} appearance={appearance} size={78} animate={on} />
               <span style={{ flex: 1, minWidth: 0 }}>
                 <span style={{ display: 'block', color: '#fff', fontWeight: 900, fontSize: 17.5, fontFamily: sans }}>
                   {f.title}

@@ -45,6 +45,11 @@ export default function RuneCatch({ creature, ops, diff, profile, onDone }) {
   const finish = useCallback(outcome => {
     if (s.over) return
     s.over = true
+    // Clear the stones. The question above the canvas is hidden as soon as the
+    // phase changes, but the canvas kept drawing whatever was last in
+    // `s.runes` — so the round finished showing four answers to nothing, which
+    // is the same complaint the duel had.
+    s.runes = []
     setPhase(outcome)
     setTimeout(() => onDone({ outcome, earned: s.earned, answers: s.answers }), 1200)
   }, [s, onDone])

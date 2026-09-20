@@ -1,24 +1,28 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import {
-  attuneMaze, beginAttunement, attuneNext, attuneRecord, attuneDone,
+  attuneCorridor, beginAttunement, attuneNext, attuneRecord, attuneDone,
   attuneResult, attuneProgress, attuneLength,
 } from '../game/attunement.js'
 import { warmPlaysFor, recordAnswer } from '../game/curriculum.js'
 import { senseTier, opByKey } from '../game/math.js'
-import { FACING_DELTA, WALL, DOOR, PATH, revealFrom } from '../game/maze.js'
+import { FACING_DELTA, WALL, DOOR, END, PATH, revealFrom } from '../game/maze.js'
 import { C, sans, serif, btn, panel } from './theme.js'
 import GameView from './GameView.jsx'
 import MathDoor from './MathDoor.jsx'
-import WizardPreview from './WizardPreview.jsx'
+import Portrait from './Portrait.jsx'
 
 /**
  * The Attunement — the castle taking a new wizard's measure.
  *
  * It is a placement test, and a child can smell a test from the next room. So
- * it is a maze, with doors, drawn by the same renderer as every other maze —
- * only smaller, with the doors closer together and nothing else in it. No
- * creatures, no rune stones, no sealed exit, and no way to do badly: she cannot
- * fail this, and she will not be told she got anything wrong.
+ * it is a walk through the castle, drawn by the same renderer as every maze —
+ * but a single corridor rather than a maze, with one door at every turn and
+ * nothing else in it. No creatures, no rune stones, no sealed exit, and no way
+ * to do badly: she cannot fail this, and she will not be told she got anything
+ * wrong.
+ *
+ * It WAS a maze, and the maze was wrong in three ways a child found in one
+ * sitting — see `attuneCorridor` for what a corridor fixes and why.
  *
  * The measurement is a staircase; `game/attunement.js` has the reasoning. What
  * lives here is the ceremony round it, and one rule the ordinary maze does not
@@ -49,10 +53,10 @@ export default function Attunement({ profile, ops, form, onDone, onCancel }) {
 
   const begin = useCallback(() => {
     session.current = beginAttunement(opList)
-    const m = attuneMaze(opList, profile)
+    const m = attuneCorridor(opList, profile)
     m.id = `attune-${Date.now()}`
     setMaze(m)
-    setPos({ row: 1, col: 1, facing: 0 })
+    setPos({ ...m.start, facing: 0 })
     setDoorQ(null); setDoorCell(null)
     setProgress(0)
     setPhase('walk')
@@ -106,8 +110,11 @@ export default function Attunement({ profile, ops, form, onDone, onCancel }) {
   const act = useCallback(action => {
     if (phaseRef.current !== 'walk' || doorRef.current) return
     const { row, col, facing } = posRef.current
-    if (action === 'turnLeft') { setPos({ row, col, facing: (facing + 3) % 4 }); return }
-    if (action === 'turnRight') { setPos({ row, col, facing: (facing + 1) % 4 }); return }
+    // Same reasoning as the door guard below: every move updates the ref it was
+    // read from, so two presses in one tick are two steps rather than one.
+    const go = p => { posRef.current = p; setPos(p) }
+    if (action === 'turnLeft') { go({ row, col, facing: (facing + 3) % 4 }); return }
+    if (action === 'turnRight') { go({ row, col, facing: (facing + 1) % 4 }); return }
 
     const [dr, dc] = action === 'forward' ? FACING_DELTA[facing] : FACING_DELTA[(facing + 2) % 4]
     const nr = row + dr, nc = col + dc
@@ -117,11 +124,27 @@ export default function Attunement({ profile, ops, form, onDone, onCancel }) {
     if (cell === DOOR) {
       const q = attuneNext(session.current)
       if (!q) { finish(); return }
+      // Close the door to any further input NOW, not at the next render.
+      //
+      // The guard at the top of this function reads a ref that React assigns
+      // while rendering, so two key events in the same tick — a held arrow key,
+      // an impatient double tap — both got through, and the second one rolled a
+      // SECOND question over the top of the first. She would then be answering
+      // the sum she could see while the staircase scored her against the one it
+      // had quietly swapped in, so a child answering correctly could be walked
+      // steadily DOWN to the easiest questions in the game. It showed up as the
+      // Attunement placing a confident answerer at the floor.
+      doorRef.current = q
       setDoorQ(q)
       setDoorCell({ row: nr, col: nc })
       return
     }
-    setPos({ row: nr, col: nc, facing })
+    // The way out. It used to do nothing at all — she could walk onto it and
+    // the ceremony carried on regardless, which is the worst kind of dead end:
+    // one that looks like an exit. Reaching it now finishes, on whatever the
+    // staircase has, because a staircase has a usable estimate at every step.
+    if (cell === END) { finish(); return }
+    go({ row: nr, col: nc, facing })
     revealFrom(maze.seen, maze.grid, nr, nc)
   }, [maze, finish])
 
@@ -137,6 +160,9 @@ export default function Attunement({ profile, ops, form, onDone, onCancel }) {
       revealFrom(m.seen, grid, cell.row, cell.col)
       return { ...m, grid }
     })
+    // Keep the ref that `act` reads in step with the move, or the first step
+    // after a door is computed from where she was standing before it.
+    posRef.current = { ...posRef.current, row: cell.row, col: cell.col }
     setPos(p => ({ ...p, row: cell.row, col: cell.col }))
   }, [])
 
@@ -222,7 +248,7 @@ function Invitation({ plan, ops, form, profile, onBegin, onCancel }) {
       </p>
 
       <div style={{ filter: `drop-shadow(0 0 22px ${form.trim}55)`, margin: '0 0 10px' }}>
-        <WizardPreview form={form} appearance={profile.appearance} size={150} style={{ margin: '0 auto' }} />
+        <Portrait profile={profile} form={form} size={170} style={{ margin: '0 auto' }} />
       </div>
 
       <div style={panel({ padding: '14px 16px', marginBottom: 12, textAlign: 'left' })}>
@@ -272,7 +298,7 @@ function Verdict({ result, form, profile, onClose }) {
       </p>
 
       <div style={{ filter: `drop-shadow(0 0 24px ${form.trim}66)`, margin: '0 0 12px' }}>
-        <WizardPreview form={form} appearance={profile.appearance} size={160} style={{ margin: '0 auto' }} />
+        <Portrait profile={profile} form={form} size={180} style={{ margin: '0 auto' }} />
       </div>
 
       <div style={{ display: 'grid', gap: 8, marginBottom: 14 }}>
