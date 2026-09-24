@@ -247,28 +247,52 @@ export function drawWizard(ctx, o) {
   volume(ctx, robePath, { x: -hem * 1.1, y: yShoulder - h * 0.05, w: hem * 2.2, h: -yShoulder + h * 0.06 })
   weave(ctx, robePath, { x: -hem, y: yShoulder, w: hem * 2, h: -yShoulder }, seed, robe)
 
-  // Folds. Three creases fanning from the waist to the hem, each with a lighter
-  // ridge beside it — the cheapest way to say "cloth" rather than "surface".
+  // Folds.
+  //
+  // A crease drawn as one thin dark line is a fold in paper. Cloth hanging from
+  // a waist is a series of soft VALLEYS, each with a lit ridge beside it on the
+  // light's side, and the ones on the shadow side are deeper because that is
+  // where the cloth turns away. Same treatment as the portrait's shoulders, so
+  // the two framings of the same wizard agree about what her robe is made of.
+  //
+  // Six of them rather than three, and they fan: a fold is anchored at the top
+  // and swings out as it falls, so the gaps between them widen towards the hem.
   ctx.save()
   robePath()
   ctx.clip()
   ctx.lineCap = 'round'
-  for (const f of [-0.62, -0.12, 0.44]) {
-    const x0 = waist * f, x1 = hem * (f * 1.25 + 0.04)
+  const folds = [
+    { f: -0.86, deep: 0.42, lit: 0.30 },
+    { f: -0.52, deep: 0.52, lit: 0.34 },
+    { f: -0.16, deep: 0.38, lit: 0.22 },
+    { f: 0.2, deep: 0.46, lit: 0.16 },
+    { f: 0.56, deep: 0.58, lit: 0.11 },
+    { f: 0.88, deep: 0.66, lit: 0.07 },
+  ]
+  const foldPath = d => {
+    const x0 = waist * d.f, x1 = hem * (d.f * 1.16 + 0.04)
     ctx.beginPath()
-    ctx.moveTo(x0, yWaist + h * 0.01)
-    ctx.quadraticCurveTo(x0 * 0.9 + x1 * 0.1, yWaist * 0.45, x1 + sway, -h * 0.012)
-    ctx.strokeStyle = shade(robe, -0.42)
-    ctx.globalAlpha = 0.5
-    ctx.lineWidth = Math.max(1, h * 0.009)
-    ctx.stroke()
-    ctx.translate(h * 0.012, 0)
-    ctx.strokeStyle = shade(robe, 0.3)
-    ctx.globalAlpha = 0.22
-    ctx.lineWidth = Math.max(1, h * 0.007)
-    ctx.stroke()
-    ctx.translate(-h * 0.012, 0)
+    ctx.moveTo(x0, yWaist + h * 0.012)
+    ctx.quadraticCurveTo(x0 * 0.82 + x1 * 0.18, yWaist * 0.42, x1 + sway, -h * 0.006)
   }
+  if (painted) ctx.filter = `blur(${Math.max(0.5, h * 0.005)}px)`
+  for (const d of folds) {
+    ctx.strokeStyle = shade(robe, -0.55)
+    ctx.globalAlpha = d.deep
+    ctx.lineWidth = Math.max(1, h * 0.022)
+    foldPath(d)
+    ctx.stroke()
+  }
+  ctx.translate(-h * 0.011, 0)
+  for (const d of folds) {
+    ctx.strokeStyle = shade(robe, 0.45)
+    ctx.globalAlpha = d.lit
+    ctx.lineWidth = Math.max(0.8, h * 0.011)
+    foldPath(d)
+    ctx.stroke()
+  }
+  ctx.filter = 'none'
+  ctx.globalAlpha = 1
   ctx.restore()
 
   // On the screens that show the painted head, the robe gets the painted
@@ -300,25 +324,67 @@ export function drawWizard(ctx, o) {
   robePath()
   outline(ctx, h, robe)
 
-  // Hem band, and a front placket (or back seam) for a sense of fabric.
-  ctx.fillStyle = trim
-  ctx.globalAlpha = 0.9
-  ctx.beginPath()
-  ctx.moveTo(-hem + sway, 0)
-  ctx.lineTo(hem + sway, 0)
-  ctx.lineTo(hem * 0.95 + sway, -h * 0.035)
-  ctx.lineTo(-hem * 0.95 + sway, -h * 0.035)
-  ctx.closePath()
-  ctx.fill()
-  ctx.globalAlpha = 0.42
-  ctx.beginPath()
-  ctx.moveTo(-h * 0.011, yShoulder)
-  ctx.lineTo(h * 0.011, yShoulder)
-  ctx.lineTo(h * 0.02 + sway, 0)
-  ctx.lineTo(-h * 0.02 + sway, 0)
-  ctx.closePath()
+  // ── Hem band ──
+  // A band of cloth turned up and stitched, which means three things you can
+  // see: the robe darkens just above it where the extra thickness casts down,
+  // the band itself catches the light across its face, and its lower lip is in
+  // shadow. A flat pale strip across the bottom — which is what this was — is a
+  // stripe of paint, and it was the last obviously vector thing on the figure.
+  ctx.save()
+  robePath()
+  ctx.clip()
+  const hemTop = -h * 0.042
+  const hemShadow = ctx.createLinearGradient(0, hemTop - h * 0.05, 0, hemTop)
+  hemShadow.addColorStop(0, 'rgba(10,4,24,0)')
+  hemShadow.addColorStop(1, 'rgba(10,4,24,0.34)')
+  ctx.fillStyle = hemShadow
+  ctx.fillRect(-hem * 1.2, hemTop - h * 0.05, hem * 2.4, h * 0.05)
+
+  const bandPath = () => {
+    ctx.beginPath()
+    ctx.moveTo(-hem * 1.02 + sway, h * 0.004)
+    ctx.lineTo(hem * 1.02 + sway, h * 0.004)
+    ctx.lineTo(hem * 0.96 + sway, hemTop)
+    ctx.quadraticCurveTo(0, hemTop - h * 0.008, -hem * 0.96 + sway, hemTop)
+    ctx.closePath()
+  }
+  bandPath()
+  const bg = ctx.createLinearGradient(-hem, 0, hem, 0)
+  bg.addColorStop(0, shade(trim, 0.18))
+  bg.addColorStop(0.42, trim)
+  bg.addColorStop(1, shade(trim, -0.42))
+  ctx.fillStyle = bg
+  ctx.globalAlpha = 0.92
   ctx.fill()
   ctx.globalAlpha = 1
+  // The stitch line along the top of the band, and the shadowed lower lip.
+  ctx.strokeStyle = `rgba(20,8,30,0.4)`
+  ctx.lineWidth = Math.max(0.6, h * 0.005)
+  ctx.beginPath()
+  ctx.moveTo(-hem * 0.94 + sway, hemTop + h * 0.006)
+  ctx.quadraticCurveTo(0, hemTop - h * 0.002, hem * 0.94 + sway, hemTop + h * 0.006)
+  ctx.stroke()
+  ctx.fillStyle = 'rgba(12,5,26,0.3)'
+  ctx.fillRect(-hem * 1.2, -h * 0.008, hem * 2.4, h * 0.012)
+
+  // ── The front opening ──
+  // Two edges of cloth overlapping, not a painted stripe: the near edge throws
+  // a shadow onto the far one and catches the light along its own fold.
+  ctx.strokeStyle = 'rgba(14,6,28,0.36)'
+  ctx.lineWidth = Math.max(1, h * 0.012)
+  ctx.beginPath()
+  ctx.moveTo(-h * 0.008, yShoulder)
+  ctx.lineTo(-h * 0.016 + sway, hemTop)
+  ctx.stroke()
+  ctx.strokeStyle = shade(robe, 0.34)
+  ctx.globalAlpha = 0.4
+  ctx.lineWidth = Math.max(0.7, h * 0.006)
+  ctx.beginPath()
+  ctx.moveTo(h * 0.004, yShoulder)
+  ctx.lineTo(h * 0.002 + sway, hemTop)
+  ctx.stroke()
+  ctx.globalAlpha = 1
+  ctx.restore()
 
   // ── Sleeves and hands ──
   // Short and stubby, to match the head. The arms swing OUTSIDE the robe
@@ -337,22 +403,79 @@ export function drawWizard(ctx, o) {
       ctx.closePath()
     }
     sleeve()
-    ctx.fillStyle = sgn < 0 ? shade(robe, -0.2) : shade(robe, 0.06)
+    // A sleeve is a tube, so it is lit like one: bright along the top of the
+    // arm, dark underneath, rather than one flat tone per side. The far sleeve
+    // stays darker overall because it is on the shadow side of the figure.
+    const sg = ctx.createLinearGradient(sgn * shoulder * 0.7, yShoulder, sgn * outer, handY)
+    sg.addColorStop(0, shade(robe, sgn < 0 ? -0.04 : -0.22))
+    sg.addColorStop(0.55, shade(robe, sgn < 0 ? -0.2 : -0.06))
+    sg.addColorStop(1, shade(robe, sgn < 0 ? -0.38 : -0.3))
+    ctx.fillStyle = sg
     ctx.fill()
     volume(ctx, sleeve, { x: sgn < 0 ? -outer * 1.1 : shoulder * 0.4, y: yShoulder, w: outer * 0.8, h: -yShoulder * 0.55 }, 0.8)
+    // Where the arm meets the body there is always a crease and always a
+    // shadow. Without it the sleeve is a shape butted against a bell.
+    ctx.save()
+    sleeve(); ctx.clip()
+    if (painted) {
+      grain(ctx, sgn < 0 ? -outer * 1.2 : 0, yShoulder, outer * 1.2, -yShoulder, seed + 7, 0.045)
+      ctx.filter = `blur(${Math.max(0.6, h * 0.008)}px)`
+    }
+    ctx.strokeStyle = 'rgba(12,5,26,0.42)'
+    ctx.lineWidth = h * 0.02
+    ctx.beginPath()
+    ctx.moveTo(sgn * shoulder * 0.62, yShoulder + h * 0.02)
+    ctx.quadraticCurveTo(sgn * (shoulder - h * 0.01), yWaist, sgn * shoulder * 0.55, handY)
+    ctx.stroke()
+    ctx.filter = 'none'
+    ctx.restore()
     sleeve()
     outline(ctx, h, robe, 0.8)
-    // Cuff, then the hand clear of the sleeve.
-    ctx.fillStyle = trim
-    ctx.globalAlpha = 0.85
+
+    // Cuff: a rolled band, darker underneath, with the sleeve's shadow falling
+    // across the top of the hand.
+    const cx0 = sgn * (outer - h * 0.026), cy0 = handY + h * 0.004
     ctx.beginPath()
-    ctx.ellipse(sgn * (outer - h * 0.026), handY + h * 0.004, h * 0.03, h * 0.014, sgn * 0.3, 0, TAU)
+    ctx.ellipse(cx0, cy0, h * 0.032, h * 0.016, sgn * 0.3, 0, TAU)
+    const cg2 = ctx.createLinearGradient(cx0, cy0 - h * 0.016, cx0, cy0 + h * 0.016)
+    cg2.addColorStop(0, shade(trim, 0.3))
+    cg2.addColorStop(1, shade(trim, -0.45))
+    ctx.fillStyle = cg2
     ctx.fill()
-    ctx.globalAlpha = 1
+
+    // The hand. A circle of flat skin colour is a bead on a string; what makes
+    // it a hand at this size is that it is slightly oval, tipped towards the
+    // body, darker where the cuff shades it, and lit on the outside edge.
+    const hx = sgn * (outer - h * 0.012), hy = handY + h * 0.031
+    const hr = h * 0.03
+    const skinBase = face?.skin?.base || look.skinHex
+    const skinShade = face?.skin?.shadow || shade(look.skinHex, -0.3)
+    const skinLit = face?.skin?.lit || shade(look.skinHex, 0.3)
     ctx.beginPath()
-    ctx.arc(sgn * (outer - h * 0.012), handY + h * 0.03, h * 0.028, 0, TAU)
-    ctx.fillStyle = look.skinHex
+    ctx.ellipse(hx, hy, hr, hr * 1.12, sgn * 0.26, 0, TAU)
+    const hgr = ctx.createRadialGradient(hx - sgn * hr * 0.3, hy - hr * 0.45, hr * 0.1, hx, hy + hr * 0.2, hr * 1.5)
+    hgr.addColorStop(0, skinLit)
+    hgr.addColorStop(0.45, skinBase)
+    hgr.addColorStop(1, skinShade)
+    ctx.fillStyle = hgr
     ctx.fill()
+    // The shadow the cuff throws, and the crease of the thumb.
+    ctx.save()
+    ctx.beginPath()
+    ctx.ellipse(hx, hy, hr, hr * 1.12, sgn * 0.26, 0, TAU)
+    ctx.clip()
+    const cs = ctx.createLinearGradient(0, hy - hr * 1.1, 0, hy)
+    cs.addColorStop(0, 'rgba(40,18,10,0.42)')
+    cs.addColorStop(1, 'rgba(40,18,10,0)')
+    ctx.fillStyle = cs
+    ctx.fillRect(hx - hr * 1.4, hy - hr * 1.4, hr * 2.8, hr * 1.5)
+    ctx.strokeStyle = 'rgba(60,30,18,0.3)'
+    ctx.lineWidth = Math.max(0.5, hr * 0.14)
+    ctx.beginPath()
+    ctx.moveTo(hx - sgn * hr * 0.75, hy - hr * 0.1)
+    ctx.quadraticCurveTo(hx - sgn * hr * 0.3, hy + hr * 0.35, hx - sgn * hr * 0.55, hy + hr * 0.85)
+    ctx.stroke()
+    ctx.restore()
   }
 
   // ── Neck, before the collar so the collar hides where it ends ──
@@ -416,10 +539,46 @@ export function drawWizard(ctx, o) {
     ctx.quadraticCurveTo(-capeW * 0.72, yShoulder + h * 0.086, -capeW, yShoulder + h * 0.022)
     ctx.closePath()
   }
+  // The shadow the cape throws down the front of the robe. Drawn BEFORE the
+  // cape, so the cape sits on top of its own shadow — which is the whole reason
+  // a shoulder cape reads as a separate garment rather than a painted yoke.
+  ctx.save()
+  robePath()
+  ctx.clip()
+  const capeShadow = ctx.createLinearGradient(0, yShoulder + h * 0.05, 0, yShoulder + h * 0.15)
+  capeShadow.addColorStop(0, 'rgba(10,4,24,0.4)')
+  capeShadow.addColorStop(1, 'rgba(10,4,24,0)')
+  ctx.fillStyle = capeShadow
+  ctx.fillRect(-capeW * 1.3, yShoulder + h * 0.04, capeW * 2.6, h * 0.12)
+  ctx.restore()
+
   cape()
-  ctx.fillStyle = shade(robe, 0.22)
+  // Lit across the top of the shoulder and falling away at the hem, rather than
+  // one flat tone: cloth over a shoulder is the most strongly curved surface on
+  // the whole figure and it should be the most strongly modelled.
+  const capeG = ctx.createLinearGradient(-capeW, yShoulder - h * 0.05, capeW, yShoulder + h * 0.1)
+  capeG.addColorStop(0, shade(robe, 0.34))
+  capeG.addColorStop(0.45, shade(robe, 0.2))
+  capeG.addColorStop(1, shade(robe, -0.16))
+  ctx.fillStyle = capeG
   ctx.fill()
   volume(ctx, cape, { x: -capeW * 1.2, y: yShoulder - h * 0.09, w: capeW * 2.4, h: h * 0.2 }, 0.9)
+  if (painted) {
+    ctx.save()
+    cape(); ctx.clip()
+    grain(ctx, -capeW * 1.2, yShoulder - h * 0.09, capeW * 2.4, h * 0.2, seed + 31, 0.05)
+    // Two gathers in the drape, where the cloth is pulled over the shoulders.
+    ctx.filter = `blur(${Math.max(0.5, h * 0.006)}px)`
+    ctx.strokeStyle = 'rgba(12,5,26,0.3)'
+    ctx.lineWidth = h * 0.012
+    for (const sgn of [-1, 1]) {
+      ctx.beginPath()
+      ctx.moveTo(sgn * capeW * 0.46, yShoulder - h * 0.04)
+      ctx.quadraticCurveTo(sgn * capeW * 0.6, yShoulder + h * 0.02, sgn * capeW * 0.56, yShoulder + h * 0.062)
+      ctx.stroke()
+    }
+    ctx.restore()
+  }
   cape()
   outline(ctx, h, robe, 0.8)
   ctx.strokeStyle = trim

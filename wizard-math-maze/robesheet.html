@@ -37,8 +37,7 @@ let r=row('Every hat, close up')
 kinds.forEach(k=>port(r,230,pick(k),'wren',k+' — '+pick(k).title))
 r=row('Robes on the figure')
 kinds.forEach(k=>sprite(r,190,pick(k),'wren',pick(k).title))
-r=row('A spread of robes')
-;['apprentice','frost','emberacolyte','tidecaller','stormcaller','archmage'].forEach(id=>{
-  const f=formById(id); if(f) port(r,190,f,'kestrel',f.title)})
+r=row('The figure, close up')
+;[0,6,12,18].forEach(i=>{const f=FORMS[i]; if(f) sprite(r,300,f,'wren',f.title)})
 window.__done=1
 </script></body></html>
