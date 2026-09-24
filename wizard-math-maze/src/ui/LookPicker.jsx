@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
   SKIN_TONES, HAIR_COLORS, HAIR_STYLES, blankAppearance,
-  EYE_SHAPES, EYE_COLORS, BEARD_STYLES,
+  EYE_COLORS, BEARD_STYLES,
 } from '../game/appearance.js'
 import { formById } from '../game/skins.js'
 import { nestById } from '../game/nests.js'
@@ -21,6 +21,9 @@ import NestCrest from './NestCrest.jsx'
  * actually wearing.
  */
 export default function LookPicker({ profile, onSave, onClose, onNest, onWizard }) {
+  // On the way in there is no castle to go back to yet, and a button offering
+  // to return to one she has never seen is a dead end with a cheerful label.
+  const first = !profile.nest
   const [look, setLook] = useState(() => ({ ...blankAppearance(), ...(profile.appearance || {}) }))
   const form = formById(profile.equippedSkin)
 
@@ -32,16 +35,18 @@ export default function LookPicker({ profile, onSave, onClose, onNest, onWizard 
     <div className="appear scroll" style={{ zIndex: 10, width: '100%', maxWidth: 470, padding: '8px 14px 24px' }}>
       {/* The way out lives at the top as well as the bottom — this page is long
           and scrolling to the end to get home is a chore on a tablet. */}
-      <button className="bh" onClick={onClose} style={btn('gold', { width: '100%', marginBottom: 12 })}>
-        Back to the Castle 🏰
-      </button>
+      {!first && (
+        <button className="bh" onClick={onClose} style={btn('gold', { width: '100%', marginBottom: 12 })}>
+          Back to the Castle 🏰
+        </button>
+      )}
       <h2 style={{
         fontFamily: serif, fontSize: 26, fontWeight: 900, color: C.gold,
         letterSpacing: 1.5, textAlign: 'center', margin: '6px 0 2px',
         textShadow: `0 0 18px ${C.gold}77`,
       }}>My Wizard</h2>
       <p style={{ color: C.dim, fontSize: 13, textAlign: 'center', margin: '0 0 14px', fontFamily: serif, letterSpacing: 1 }}>
-        This stays with you whatever robes you wear
+        {first ? 'Make her yours — all of it can change later' : 'This stays with you whatever robes you wear'}
       </p>
 
       <div style={{ textAlign: 'center', marginBottom: 12 }}>
@@ -163,10 +168,14 @@ export default function LookPicker({ profile, onSave, onClose, onNest, onWizard 
           fun screen into a police sketch, and the parts that actually read at
           the size a wizard is drawn are the skin, the hair and the eyes. The
           tables stay so a row can come back by adding one Chips line. */}
+      {/* The eye SHAPE row used to live here and did nothing at all. Each of
+          the six wizards has her eyes authored for her own spacing — that is
+          most of why they stopped looking like the same person — so the
+          portrait ignores a shape override, and a control that moves nothing
+          is worse than no control. Colour still works, because colour moves
+          nothing either. */}
       <div style={panel({ padding: '14px 16px', marginBottom: 14 })}>
-        <div style={label()}>EYES</div>
-        <Chips items={EYE_SHAPES} selected={look.eyes} onPick={i => set('eyes', i)} />
-        <div style={{ ...label(), marginTop: 12 }}>EYE COLOUR</div>
+        <div style={label()}>EYE COLOUR</div>
         <Swatches items={EYE_COLORS} selected={look.eyeColor} onPick={i => set('eyeColor', i)} colorOf={s => s.hex} size={40} />
 
         {/* Facial hair used to come with the ROBE — every rank above Archmage
@@ -185,7 +194,7 @@ export default function LookPicker({ profile, onSave, onClose, onNest, onWizard 
         That's me! ✨
       </button>
       <button className="bh" onClick={onClose} style={btn('ghost', { width: '100%', marginTop: 9, fontSize: 13 })}>
-        🏰 Back to the Castle — don't save
+        {first ? 'Skip for now →' : '🏰 Back to the Castle — don\'t save'}
       </button>
     </div>
   )
@@ -197,7 +206,7 @@ function surprise() {
   const r = list => list[Math.floor(Math.random() * list.length)].id
   return {
     skin: r(SKIN_TONES), hairColor: r(HAIR_COLORS), hairStyle: r(HAIR_STYLES),
-    eyes: r(EYE_SHAPES), eyeColor: r(EYE_COLORS),
+    eyeColor: r(EYE_COLORS),
   }
 }
 

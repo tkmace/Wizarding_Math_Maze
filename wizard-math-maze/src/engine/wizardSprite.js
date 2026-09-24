@@ -620,6 +620,7 @@ export function drawWizard(ctx, o) {
       cx: 0, cy: headY, R: headR * 1.02,
       wiz: face.wiz, skin: face.skin, eye: face.eye, hair: face.hair,
       form, t, neck: false, shoulders: false, breathe: false, trinkets,
+      beard: appearance?.beard || 0, hairLen: appearance?.hairStyle,
     })
     drawAura(ctx, h, form.aura, t, trim, 'over')
     ctx.restore()

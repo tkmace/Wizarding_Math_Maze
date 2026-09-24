@@ -39,11 +39,26 @@ function noise(a, b) {
 
 const clamp01 = v => (v < 0 ? 0 : v > 1 ? 1 : v)
 
+/**
+ * A colour, as three numbers.
+ *
+ * It accepts `rgb(r,g,b)` as well as `#rrggbb` because `shade()` RETURNS
+ * `rgb(...)`, and `rgba(shade(x, -0.3), 0.8)` is the natural thing to write.
+ * Parsing only hex made every one of those fall through to the grey fallback —
+ * silently, since grey on a dark panel looks like a deliberate muted tone. It
+ * had been quietly greying the collar's stitched trim and the hood's lining
+ * for a while before a moustache made it obvious.
+ */
 function parse(hex) {
-  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex))
-  if (!m) return [128, 128, 128]
-  const n = parseInt(m[1], 16)
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+  const str = String(hex)
+  const h = /^#?([0-9a-f]{6})$/i.exec(str)
+  if (h) {
+    const n = parseInt(h[1], 16)
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+  }
+  const r = /^rgba?\(\s*([0-9.]+)\s*,\s*([0-9.]+)\s*,\s*([0-9.]+)/i.exec(str)
+  if (r) return [+r[1] | 0, +r[2] | 0, +r[3] | 0]
+  return [128, 128, 128]
 }
 function rgba(hex, a) {
   const [r, g, b] = parse(hex)
@@ -180,6 +195,7 @@ export function drawHead(ctx, o) {
   const {
     cx, cy, R, wiz, skin, eye = '#5b3a24', hair = '#6b4326', form, t = 0,
     neck = true, shoulders = true, breathe: breathing = true, trinkets,
+    beard = 0, hairLen = null,
   } = o
   if (!wiz) return
   // Fall back to her usual tone rather than bailing. A missing palette used to
@@ -208,7 +224,15 @@ export function drawHead(ctx, o) {
     ctx.closePath()
   }
 
-  drawHairBack(ctx, R, wiz, hair)
+  // Hair length scales the wizard's OWN locks rather than swapping in a
+  // generic hairstyle. Each wizard's hair is a lock list drawn for her skull —
+  // replacing it with a shared "long" would undo the whole reason the six
+  // faces stopped looking like the same person — but stretching or clipping
+  // what is already hers costs nothing and keeps her character.
+  const lenK = hairLen == null ? 1 : [0.42, 0.72, 1, 1.42][hairLen] ?? 1
+  const wz = lenK === 1 ? wiz : lengthen(wiz, lenK)
+
+  drawHairBack(ctx, R, wz, hair)
   if (neck) drawNeck(ctx, R, wiz, sk)
   if (shoulders) drawShoulders(ctx, R, wiz, robe, trim)
   drawEars(ctx, R, wiz, sk)
@@ -228,6 +252,7 @@ export function drawHead(ctx, o) {
   drawBrows(ctx, R, wiz, hair)
   drawNose(ctx, R, wiz, sk)
   drawMouth(ctx, R, wiz, sk)
+  if (beard) drawBeard(ctx, R, wiz, hair, beard)
 
   // Rim light down the shadow side, clipped to the head so it hugs the edge.
   // This is what stops a head reading as a cut-out.
@@ -241,7 +266,7 @@ export function drawHead(ctx, o) {
   ctx.fillRect(-R * 1.2, -R * 1.2, R * 2.4, R * 2.8)
   ctx.restore()
 
-  drawHairFront(ctx, R, wiz, hair)
+  drawHairFront(ctx, R, wz, hair)
   if (form?.hat && form.hat !== 'none') drawHat(ctx, R, wiz, form.hat, robe, trim, t)
 
   // What she bought herself, over the top of what she was given. A headband
@@ -1241,6 +1266,115 @@ function drawHat(ctx, R, wiz, kind, robe, trim, t) {
   } else {
     crown(R * 1.95, R * 1.72, R * 0.16); band(R * 1.72)
     star(R * 0.2, brimY - R * 1.9, R * 0.44)
+  }
+  ctx.restore()
+}
+
+/**
+ * A longer or shorter version of one wizard's own hair.
+ *
+ * Only the falling parts move. The fringe is what sits on her forehead and it
+ * is the same length whether the rest reaches her collar or her waist, so
+ * stretching it would push her hair over her eyes — which is what happened the
+ * first time this was tried as a blanket multiplier.
+ */
+function lengthen(wiz, k) {
+  const p = wiz.hairPlan
+  if (!p) return wiz
+  const scale = list => (list || []).map(l => ({ ...l, len: l.len * k, sweep: l.sweep * (0.6 + 0.4 * k) }))
+  return {
+    ...wiz,
+    hairPlan: {
+      ...p,
+      back: p.back ? Math.max(0, p.back * k) : p.back,
+      side: scale(p.side),
+      curls: p.curls ? { ...p.curls, spread: (p.curls.spread ?? 1) } : p.curls,
+    },
+  }
+}
+
+/**
+ * A beard.
+ *
+ * Drawn as a MASS with a soft edge rather than a shape with an outline, for the
+ * same reason the hair is: hair has no border. It grows from the sideburns down
+ * the jaw and meets under the chin, so the silhouette follows the wizard's own
+ * jaw and chin numbers — a beard pasted on at a fixed width sits off the face
+ * on a narrow head and inside it on a broad one.
+ *
+ * `reach` is how far below the chin it hangs; a moustache alone is reach 0.
+ */
+function drawBeard(ctx, R, wiz, hair, style) {
+  const H = wiz.head
+  const J = R * H.jaw, C = R * H.cheek, CH = R * H.chin
+  const reach = [0, 0, 0.52, 1][style] ?? 0
+  const tash = style >= 1
+  const dark = shade(hair, -0.3)
+
+  ctx.save()
+  if (reach > 0) {
+    const drop = CH + R * reach * 0.62
+    const mass = () => {
+      ctx.beginPath()
+      // From the sideburn, down the jaw, round the chin and back up.
+      ctx.moveTo(-C * 0.92, -R * 0.06)
+      ctx.bezierCurveTo(-C * 0.96, R * 0.5, -J * 1.16, R * 0.9, -J * 0.74, drop * 0.86)
+      ctx.quadraticCurveTo(0, drop * 1.12, J * 0.74, drop * 0.86)
+      ctx.bezierCurveTo(J * 1.16, R * 0.9, C * 0.96, R * 0.5, C * 0.92, -R * 0.06)
+      // The upper edge runs along the cheek, above the jawline.
+      ctx.quadraticCurveTo(C * 0.7, R * 0.46, 0, R * 0.5)
+      ctx.quadraticCurveTo(-C * 0.7, R * 0.46, -C * 0.92, -R * 0.06)
+      ctx.closePath()
+    }
+    // Soft first, sharp over the top: the same two-pass trick the hair uses.
+    ctx.save()
+    ctx.filter = `blur(${Math.max(0.6, R * 0.035)}px)`
+    mass()
+    ctx.fillStyle = dark
+    ctx.fill()
+    ctx.restore()
+    mass()
+    const g = ctx.createLinearGradient(0, R * 0.3, 0, drop)
+    g.addColorStop(0, shade(hair, -0.18))
+    g.addColorStop(1, shade(hair, -0.52))
+    ctx.fillStyle = g
+    ctx.fill()
+    // Strands, so it reads as hair rather than a bib.
+    ctx.save()
+    mass()
+    ctx.clip()
+    ctx.strokeStyle = rgba(shade(hair, 0.3), 0.3)
+    ctx.lineWidth = Math.max(0.5, R * 0.014)
+    ctx.lineCap = 'round'
+    for (let i = 0; i < 11; i++) {
+      const f = (i / 10) * 2 - 1
+      ctx.beginPath()
+      ctx.moveTo(f * C * 0.8, R * 0.34)
+      ctx.quadraticCurveTo(f * J * 0.9, drop * 0.7, f * J * 0.6, drop * 0.98)
+      ctx.stroke()
+    }
+    grain(ctx, -R * 1.2, 0, R * 2.4, drop * 1.2, 53, 0.05)
+    ctx.restore()
+  }
+
+  if (tash) {
+    // Sitting ON the lip, not floating above it: it starts under the nose and
+    // its lower edge dips into the mouth line.
+    const my = wiz.mouth.y * R
+    ctx.beginPath()
+    ctx.moveTo(-R * 0.3, my - R * 0.17)
+    ctx.quadraticCurveTo(0, my - R * 0.26, R * 0.3, my - R * 0.17)
+    ctx.quadraticCurveTo(R * 0.36, my + R * 0.02, R * 0.2, my - R * 0.01)
+    ctx.quadraticCurveTo(0, my - R * 0.08, -R * 0.2, my - R * 0.01)
+    ctx.quadraticCurveTo(-R * 0.36, my + R * 0.02, -R * 0.3, my - R * 0.17)
+    ctx.closePath()
+    ctx.save()
+    ctx.filter = `blur(${Math.max(0.4, R * 0.018)}px)`
+    ctx.fillStyle = shade(hair, -0.34)
+    ctx.fill()
+    ctx.restore()
+    ctx.fillStyle = rgba(shade(hair, -0.1), 0.92)
+    ctx.fill()
   }
   ctx.restore()
 }

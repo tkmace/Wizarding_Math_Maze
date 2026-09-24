@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import {
   attuneCorridor, beginAttunement, attuneNext, attuneRecord, attuneDone,
-  attuneResult, attuneProgress, attuneLength,
+  attuneResult, attuneProgress, attuneLength, ATTUNE_POINTS,
 } from '../game/attunement.js'
 import { warmPlaysFor, recordAnswer } from '../game/curriculum.js'
 import { senseTier, opByKey, OPS } from '../game/math.js'
@@ -35,7 +35,7 @@ import Portrait from './Portrait.jsx'
  * exist here; the subset is short, and keeping it separate means the ceremony
  * cannot break the game loop that everything else depends on.
  */
-export default function Attunement({ profile, ops, form, onDone, onCancel }) {
+export default function Attunement({ profile, ops, form, chooser = true, onDone, onCancel }) {
   const [phase, setPhase] = useState('intro')      // intro | walk | done
   const session = useRef(null)
   const [maze, setMaze] = useState(null)
@@ -43,6 +43,7 @@ export default function Attunement({ profile, ops, form, onDone, onCancel }) {
   const [doorQ, setDoorQ] = useState(null)
   const [doorCell, setDoorCell] = useState(null)
   const [progress, setProgress] = useState(0)
+  const [found, setFound] = useState(0)          // rune stones picked up on the way
   const [result, setResult] = useState(null)
   const posRef = useRef(pos); posRef.current = pos
   const phaseRef = useRef(phase); phaseRef.current = phase
@@ -83,6 +84,7 @@ export default function Attunement({ profile, ops, form, onDone, onCancel }) {
     setPos({ ...m.start, facing: 0 })
     setDoorQ(null); setDoorCell(null)
     setProgress(0)
+    setFound(0)
     setPhase('walk')
   }, [opList, profile])
 
@@ -109,18 +111,23 @@ export default function Attunement({ profile, ops, form, onDone, onCancel }) {
       if (correct) right++
       next = { ...next, facts: rec.facts, plays: rec.plays }
     }
+    // Paid for the work, not for getting it right: the ceremony cannot be
+    // failed and should not quietly turn into a score at the last moment.
+    const earned = r.log.length * ATTUNE_POINTS
     const skill = { ...next.skill }
     const opPlays = { ...(next.opPlays || {}) }
     for (const [op, level] of Object.entries(r.skill)) {
       skill[op] = level
       opPlays[op] = Math.max(opPlays[op] || 0, warmPlaysFor(level))
     }
-    setResult({ ...r, right })
+    setResult({ ...r, right, earned, stones: found })
     setPhase('done')
     onDone({
       ...next,
       skill,
       opPlays,
+      totalPoints: (next.totalPoints || 0) + earned,
+      stones: (next.stones || 0) + found,
       attuned: Date.now(),
       // What has actually been measured, so the castle can offer to measure an
       // operation the first time she switches it on rather than leaving it at
@@ -132,7 +139,7 @@ export default function Attunement({ profile, ops, form, onDone, onCancel }) {
         wrong: (next.stats?.wrong || 0) + (r.log.length - right),
       },
     })
-  }, [profile, onDone])
+  }, [profile, onDone, found])
 
   // --- Movement, the short version -------------------------------------------
   const act = useCallback(action => {
@@ -174,6 +181,13 @@ export default function Attunement({ profile, ops, form, onDone, onCancel }) {
     if (cell === END) { finish(); return }
     go({ row: nr, col: nc, facing })
     revealFrom(maze.seen, maze.grid, nr, nc)
+    // A stone she walks over. Banked at the end with the rest of the reward,
+    // so a wizard who wanders off mid-ceremony is not paid for it.
+    const k = `${nr},${nc}`
+    if (maze.stones?.[k]) {
+      delete maze.stones[k]
+      setFound(n => n + 1)
+    }
   }, [maze, finish])
 
   const actRef = useRef(act); actRef.current = act
@@ -211,7 +225,7 @@ export default function Attunement({ profile, ops, form, onDone, onCancel }) {
   const onWrong = useCallback(() => answered(false, 0), [answered])
 
   if (phase === 'intro') {
-    return <Invitation plan={plan} ops={opList} onToggle={toggleOp}
+    return <Invitation plan={plan} ops={opList} onToggle={chooser ? toggleOp : null}
       form={form} profile={profile} onBegin={begin} onCancel={onCancel} />
   }
   if (phase === 'done' && result) return <Verdict result={result} form={form} profile={profile} onClose={onCancel} />
@@ -221,7 +235,7 @@ export default function Attunement({ profile, ops, form, onDone, onCancel }) {
     <>
       <GameView
         maze={maze} pos={pos} form={form} appearance={profile.appearance}
-        runPoints={0} total={profile.totalPoints || 0} stones={0}
+        runPoints={0} total={profile.totalPoints || 0} stones={(profile.stones || 0) + found}
         doorsLeft={0} effects={[]} gateMet
         showCompass={profile.settings?.showCompass}
         paused={!!doorQ}
@@ -295,13 +309,14 @@ function Invitation({ plan, ops, onToggle, form, profile, onBegin, onCancel }) {
         </p>
       </div>
 
-      {/* What to measure.
+      {/* What to measure. Hidden when she has just been asked on the way in —
+          two screens in a row wanting the same answer reads as a bug.
           Measuring several in ONE ceremony is much cheaper than it looks: a
           lane that has not started yet borrows its starting level from one
           that has finished, so subtraction begins near where addition landed
           rather than at the bottom. Three operations cost about the same as
           two. Four separate ceremonies would throw all of that away. */}
-      <div style={panel({ padding: '11px 12px', marginBottom: 12 })}>
+      {onToggle && <div style={panel({ padding: '11px 12px', marginBottom: 12 })}>
         <div style={{
           fontFamily: serif, fontSize: 11.5, letterSpacing: 2, color: C.dim,
           fontWeight: 900, textAlign: 'left', marginBottom: 8,
@@ -329,7 +344,7 @@ function Invitation({ plan, ops, onToggle, form, profile, onBegin, onCancel }) {
           Only pick the ones you have done before. Anything you leave off, the
           castle can measure later — it will offer when you first switch it on.
         </p>
-      </div>
+      </div>}
 
       <p style={{ color: C.faint, fontSize: 11.5, margin: '0 0 14px', lineHeight: 1.6 }}>
         Measuring {names.length === 1 ? names[0] : names.slice(0, -1).join(', ') + ' and ' + names.slice(-1)}.
@@ -367,6 +382,33 @@ function Verdict({ result, form, profile, onClose }) {
       <div style={{ filter: `drop-shadow(0 0 24px ${form.trim}66)`, margin: '0 0 12px' }}>
         <Portrait profile={profile} form={form} size={180} style={{ margin: '0 auto' }} />
       </div>
+
+      {/* Paid for the walk.
+          The ceremony is not scored and cannot be failed, but it is a dozen
+          questions of real work and it used to give nothing back at all. The
+          reward goes here rather than in the corridor's HUD, so it reads as
+          thanks at the end rather than as a score being kept. */}
+      {(result.earned > 0 || result.stones > 0) && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14,
+          padding: '10px 14px', marginBottom: 12, borderRadius: 15,
+          border: `2px solid ${C.gold}66`, background: `${C.gold}14`,
+        }}>
+          <span style={{ color: C.dim, fontSize: 12, fontFamily: serif, letterSpacing: 1 }}>
+            With thanks
+          </span>
+          {result.earned > 0 && (
+            <span style={{ color: C.gold, fontWeight: 900, fontSize: 17, fontFamily: sans }}>
+              +{result.earned}<span style={{ fontSize: 10, color: C.faint, marginLeft: 3, letterSpacing: 1 }}>PTS</span>
+            </span>
+          )}
+          {result.stones > 0 && (
+            <span style={{ color: C.teal, fontWeight: 900, fontSize: 17, fontFamily: sans }}>
+              🔮 +{result.stones}
+            </span>
+          )}
+        </div>
+      )}
 
       <div style={{ display: 'grid', gap: 8, marginBottom: 14 }}>
         {Object.entries(result.skill).map(([op, level]) => {

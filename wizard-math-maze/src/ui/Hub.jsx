@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { OPS, DIFFS, SENSE, senseTier, skillOf, opByKey } from '../game/math.js'
+import { OPS, DIFFS, SENSE, senseTier, skillOf } from '../game/math.js'
 import { formById, rankFor, nextRank, rankProgress, activePerks } from '../game/skins.js'
 import { nestById } from '../game/nests.js'
 import { C, sans, serif, btn, panel, label } from './theme.js'
@@ -8,14 +8,8 @@ import Portrait from './Portrait.jsx'
 import NestCrest from './NestCrest.jsx'
 
 /** The castle: choose what to practice, see your rank, head into a maze. */
-export default function Hub({ profile, ops, diff, onToggleOp, onSetDiff, onStart, onWardrobe, onShop, onReport, onLook, onNest, onAttune, onAttuneOps, onLogout, pendingPicks }) {
+export default function Hub({ profile, ops, diff, onToggleOp, onSetDiff, onStart, onWardrobe, onShop, onReport, onLook, onNest, onAttune, onLogout, pendingPicks }) {
   const form = formById(profile.equippedSkin)
-  // Switched on, but never measured. Only once she has been through the
-  // ceremony at all — a wizard who has not done it yet is about to be offered
-  // the whole thing anyway.
-  const unmeasured = profile.attuned
-    ? OPS.map(o => o.key).filter(k => ops.has(k) && !(profile.attunedOps || []).includes(k))
-    : []
   const rank = rankFor(profile.totalPoints)
   const next = nextRank(profile.totalPoints)
   const pct = rankProgress(profile.totalPoints)
@@ -178,31 +172,6 @@ export default function Hub({ profile, ops, diff, onToggleOp, onSetDiff, onStart
           })}
         </div>
 
-        {/* An operation she has just switched on that has never been measured.
-            The castle can place her in ten questions; left alone, Wizard's
-            Sense climbs at 0.045 an answer and takes a fortnight to find her.
-            The moment to offer is the moment it starts to matter — which is
-            now, not on the day she first opened the app. */}
-        {unmeasured.length > 0 && onAttuneOps && (
-          <button className="bh" onClick={() => onAttuneOps(unmeasured)} style={{
-            display: 'flex', alignItems: 'center', gap: 9, width: '100%',
-            marginTop: 9, padding: '10px 12px', borderRadius: 13,
-            border: `2px solid ${C.gold}77`, background: `${C.gold}14`,
-            cursor: 'pointer', textAlign: 'left',
-          }}>
-            <span style={{ fontSize: 18, color: C.gold }}>✦</span>
-            <span style={{ flex: 1 }}>
-              <span style={{ display: 'block', color: C.gold, fontFamily: sans, fontWeight: 900, fontSize: 13 }}>
-                Be measured at {listNames(unmeasured)}
-              </span>
-              <span style={{ display: 'block', color: C.faint, fontSize: 10.5, marginTop: 1 }}>
-                The castle has not taken your measure at{' '}
-                {unmeasured.length === 1 ? 'this one' : 'these'} yet — it takes a minute
-              </span>
-            </span>
-            <span style={{ color: C.gold, fontSize: 15, fontWeight: 900 }}>›</span>
-          </button>
-        )}
       </div>
 
       {/* Difficulty.
@@ -289,11 +258,4 @@ export default function Hub({ profile, ops, diff, onToggleOp, onSetDiff, onStart
 const linkStyle = {
   background: 'none', border: 'none', color: C.faint,
   fontSize: 11, cursor: 'pointer', textDecoration: 'underline', padding: 4,
-}
-
-/** "multiplication" · "multiplication and division" · "a, b and c". */
-function listNames(keys) {
-  const n = keys.map(k => opByKey(k).label.toLowerCase())
-  if (n.length === 1) return n[0]
-  return n.slice(0, -1).join(', ') + ' and ' + n.slice(-1)
 }

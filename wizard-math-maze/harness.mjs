@@ -27,6 +27,7 @@ export async function takeNest(page, nest = 'Bald Eagles') {
     await page.waitForTimeout(250)
     did = true
   }
+  if (await takePractice(page)) did = true
   if (await skipAttunement(page)) did = true
   return did
 }
@@ -42,6 +43,29 @@ export async function pickWizard(page, name = null) {
   if (name) await page.locator('button[aria-label="' + name + '"]').click()
   await page.locator('button', { hasText: /^This is me/ }).click()
   await page.waitForTimeout(250)
+  // A first pick leads straight into the rest of her look. Accept it as it
+  // comes — a test that is not about her face should not have to know the
+  // onboarding order.
+  await takeLook(page)
+  return true
+}
+
+/** Accept the look she was handed, for tests that aren't about it. */
+export async function takeLook(page) {
+  const b = page.locator('button', { hasText: /^That's me!/ })
+  await b.first().waitFor({ state: 'visible', timeout: 4000 }).catch(() => {})
+  if (!(await b.count())) return false
+  await b.first().click()
+  await page.waitForTimeout(250)
+  return true
+}
+
+/** Accept whatever practice list is offered on the way in. */
+export async function takePractice(page) {
+  const b = page.locator('button', { hasText: /^Onward ✦$/ })
+  if (!(await b.count())) return false
+  await b.first().click()
+  await page.waitForTimeout(300)
   return true
 }
 

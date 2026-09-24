@@ -24,6 +24,8 @@ import LookPicker from './ui/LookPicker.jsx'
 import NestPicker from './ui/NestPicker.jsx'
 import Encounter from './ui/Encounter.jsx'
 import Attunement from './ui/Attunement.jsx'
+import PracticePicker from './ui/PracticePicker.jsx'
+import TuningOffer from './ui/TuningOffer.jsx'
 import WizardPicker from './ui/WizardPicker.jsx'
 import { wizardById } from './game/wizards.js'
 import Coach from './ui/Coach.jsx'
@@ -51,6 +53,12 @@ export default function App() {
   // Which operations the next Attunement should measure. Null means "whatever
   // she is practising", which is what the ceremony has always used.
   const [attuneOps, setAttuneOps] = useState(null)
+  // True when she has just been asked what to practise, so the ceremony does
+  // not put the same question up a second time.
+  const [askedOps, setAskedOps] = useState(false)
+  // Where the verdict lets her out: back to the castle, or straight into the
+  // maze she was trying to start when the offer interrupted her.
+  const afterAttune = useRef('hub')
   const [doorCell, setDoorCell] = useState(null)
   const [run, setRun] = useState(blankRun)
   const runRef = useRef(run)
@@ -150,7 +158,19 @@ export default function App() {
   }, [screen, pending.length, profile])
 
   // --- Start a maze ----------------------------------------------------------
-  const startGame = useCallback(() => {
+  /**
+   * Operations she is about to play that the castle has never measured.
+   *
+   * Only once she has been through the Attunement at all — a wizard who has
+   * not is on her way to the whole ceremony anyway.
+   */
+  const untuned = useCallback(() => {
+    if (!profile?.attuned) return []
+    const done = profile.attunedOps || []
+    return [...ops].filter(k => !done.includes(k))
+  }, [profile, ops])
+
+  const playNow = useCallback(() => {
     const m = genMaze(ops, diff, profile, perks)
     m.id = ++mazeSeq.current
     setMaze(m)
@@ -164,6 +184,16 @@ export default function App() {
     setScreen('game')
     teach('maze')
   }, [ops, diff, profile, perks, teach])
+
+  const startGame = useCallback(() => {
+    // The moment she walks in with something new is the moment to offer to
+    // measure it. Asked here rather than on the hub, where the question would
+    // arrive while she was thinking about something else.
+    const fresh = untuned()
+    if (fresh.length) { setAttuneOps(fresh); setScreen('tuning'); return }
+    playNow()
+  }, [untuned, playNow])
+
 
   const toggleOp = useCallback(k => setOps(prev => {
     const n = new Set(prev)
@@ -476,25 +506,39 @@ export default function App() {
       ? profile.appearance
       : { ...profile.appearance, skin: wiz.skin, hairColor: wiz.hair, eyeColor: wiz.eye }
     commit({ ...profile, wizard: id, appearance })
-    // Back to the castle, and the arrival effect carries her on to the nest if
-    // she still needs one. One place decides the running order.
-    setScreen('hub')
+    // A brand new wizard goes straight on to the rest of her look — skin, hair,
+    // colour, beard — rather than being handed one of six and marched off to
+    // the nests. Everything about her, decided in one sitting.
+    // Coming back to change face later just returns to the castle.
+    setScreen(profile.wizard ? 'hub' : 'look')
   }, [profile, commit])
 
   const saveNest = useCallback(id => {
-    // Choosing a nest for the FIRST time is the first half of the Attunement,
-    // so she goes straight on to the second rather than being dropped in the
-    // castle and expected to find it. Changing nests later is just changing
-    // nests — it does not drag her back through the ceremony.
+    // Choosing a nest for the FIRST time leads into the rest of the arrival:
+    // what she wants to practise, and then the ceremony that measures it.
+    // Changing nests later is just changing nests.
     const arriving = !hasNest(profile) && !profile.attuned
     commit({ ...profile, nest: id })
-    setScreen(arriving ? 'attune' : 'hub')
+    setScreen(arriving ? 'practice' : 'hub')
+  }, [profile, commit])
+
+  /**
+   * She has said what she wants to practise. Save it, and take her measure at
+   * exactly that — the ceremony does not ask again, because she has just been
+   * asked, and two screens in a row wanting the same answer reads as a bug.
+   */
+  const savePractice = useCallback(list => {
+    commit({ ...profile, settings: { ...profile.settings, ops: list } })
+    setAttuneOps(list)
+    setAskedOps(true)
+    setScreen('attune')
   }, [profile, commit])
 
   const saveLook = useCallback(look => {
     commit({ ...profile, appearance: look })
     setScreen('hub')
   }, [profile, commit])
+
 
   const choose = useCallback(id => {
     const rank = pending[0]
@@ -540,8 +584,7 @@ export default function App() {
           onReport={() => setScreen('report')}
           onLook={() => setScreen('look')}
           onNest={() => setScreen('nest')}
-          onAttune={() => { setAttuneOps(null); setScreen('attune') }}
-          onAttuneOps={list => { setAttuneOps(list); setScreen('attune') }}
+          onAttune={() => { setAttuneOps(null); setAskedOps(false); setScreen('attune') }}
           onLogout={() => { setProfile(null); setScreen('login') }}
         />
       )}
@@ -594,11 +637,29 @@ export default function App() {
           onClose={profile.wizard ? () => setScreen('hub') : null}
         />
       )}
+      {screen === 'tuning' && profile && attuneOps && (
+        <TuningOffer
+          ops={attuneOps}
+          onTune={() => { setAskedOps(true); afterAttune.current = 'maze'; setScreen('attune') }}
+          onSkip={() => { setAttuneOps(null); playNow() }}
+        />
+      )}
+
+      {screen === 'practice' && profile && (
+        <PracticePicker profile={profile} initial={[...ops]} onDone={savePractice} />
+      )}
+
       {screen === 'attune' && profile && (
         <Attunement
           profile={profile} ops={attuneOps || ops} form={form}
+          chooser={!askedOps}
           onDone={commit}
-          onCancel={() => { setAttuneOps(null); setScreen('hub') }}
+          onCancel={() => {
+            const next = afterAttune.current
+            afterAttune.current = 'hub'
+            setAttuneOps(null); setAskedOps(false)
+            if (next === 'maze') playNow(); else setScreen('hub')
+          }}
         />
       )}
       {screen === 'look' && profile && (

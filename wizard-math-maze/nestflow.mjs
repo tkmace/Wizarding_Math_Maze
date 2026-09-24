@@ -32,9 +32,11 @@ await page.screenshot({path:`${OUT}/nest-picker.png`,fullPage:true})
 
 await page.locator('button',{hasText:'Harpy Eagles'}).click(); await page.waitForTimeout(300)
 await page.locator('button',{hasText:'Join the Harpy Eagles'}).click()
-// The nest is the first half of the Attunement now, so the ceremony's own
-// invitation comes next. This test is about nests; decline it.
-await page.waitForSelector('text=The Attunement',{timeout:15000})
+// The nest leads on to the practice question and then the ceremony. This test
+// is about nests, so take the default list and decline the ceremony.
+await page.waitForSelector('text=What shall we practise',{timeout:15000})
+await page.locator('button',{hasText:/^Onward ✦$/}).click()
+await page.waitForSelector('text=Let the castle take your measure',{timeout:15000})
 await page.locator('button',{hasText:'Not now — take me to the castle'}).click()
 await page.waitForSelector('text=WHAT SHALL WE PRACTICE',{timeout:15000})
 console.log('2. the crest follows her to the castle')

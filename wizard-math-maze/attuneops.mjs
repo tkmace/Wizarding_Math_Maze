@@ -1,5 +1,6 @@
-// Which operations the Attunement measures: chosen on the invitation, and
-// offered again later for anything she switches on that has never been measured.
+// Which operations the Attunement measures: chosen on the way in, on its own
+// screen, and offered again at the maze door for anything she picks later that
+// has never been measured.
 import { chromium } from 'playwright'
 import { pickWizard, clearCoach } from './harness.mjs'
 const OUT = '/tmp/claude-0/-home-claude/9e4f1146-1d92-5690-b689-30dcc0c1e170/scratchpad'
@@ -16,12 +17,14 @@ const check = (what, ok, note = '') => {
 const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem('wmm.profiles.v3')).attuneops)
 // The count sits inside a <strong>, so the sentence spans elements — read the
 // whole paragraph rather than trying to match across the boundary.
-const doors = async () => {
-  const t = await page.locator('text=/A short maze/').first().innerText()
+// The count sits inside a <strong>, so the sentence spans elements — read the
+// whole paragraph rather than trying to match across the boundary.
+const doors = async (near = 'A short maze') => {
+  const t = await page.locator(`text=/${near}/`).first().innerText()
   return +/about\s+(\d+)\s+doors/.exec(t)[1]
 }
 
-console.log('1. the invitation asks what to measure')
+console.log('1. she is asked what to practise, before the ceremony')
 await page.fill('input[type=text]', 'Attuneops'); await page.fill('input[type=password]', '1234')
 await page.locator('button', { hasText: 'Begin the Journey' }).click()
 await page.waitForTimeout(800)
@@ -31,19 +34,20 @@ await pickWizard(page)
 await page.waitForSelector('text=Choose your Nest', { timeout: 10000 })
 await page.locator('button', { hasText: 'Bald Eagles' }).first().click()
 await page.locator('button', { hasText: /^Join the / }).click()
-await page.waitForSelector('text=Let the castle take your measure', { timeout: 10000 })
-check('it offers all four operations', await page.locator('text=WHAT SHOULD IT MEASURE').count() === 1)
+await page.waitForSelector('text=What shall we practise', { timeout: 10000 })
+check('the practice question comes first', true)
+check('it offers all four operations', await page.locator('button', { hasText: /Division/ }).count() >= 1)
 const addBtn = page.locator('button', { hasText: /^➕?\s*Addition/ }).last()
 check('addition starts ticked', (await addBtn.innerText()).includes('✓'))
-const before = await doors()
+const before = await doors('Next the castle takes your measure')
 check('one operation is a short ceremony', before <= 12, `${before} doors`)
 
 console.log('2. adding an operation lengthens it')
 await page.locator('button', { hasText: /Multiplication/ }).last().click()
 await page.waitForTimeout(250)
-const after = await doors()
+const after = await doors('Next the castle takes your measure')
 check('the estimate goes up when she adds one', after > before, `${before} → ${after}`)
-check('...and says it is measuring both', /addition and multiplication/.test(await page.locator('text=/^Measuring /').first().innerText()))
+check('...and it is still only two taps in', after <= 18, `${after} doors`)
 
 console.log('3. the last one cannot be switched off')
 await page.locator('button', { hasText: /Multiplication/ }).last().click()
@@ -55,6 +59,11 @@ check('one is always left on', (await page.locator('button', { hasText: /^➕?\s
 console.log('4. walking it measures everything picked')
 await page.locator('button', { hasText: /Multiplication/ }).last().click()
 await page.waitForTimeout(200)
+await page.locator('button', { hasText: /^Onward ✦$/ }).click()
+await page.waitForSelector('text=Let the castle take your measure', { timeout: 10000 })
+check('the ceremony does not ask the same question again',
+  await page.locator('text=WHAT SHOULD IT MEASURE').count() === 0)
+check('it says what it is measuring', /addition and multiplication/.test(await page.locator('text=/^Measuring /').first().innerText()))
 await page.locator('button', { hasText: 'Begin the Attunement' }).click()
 await page.waitForSelector('text=THE ATTUNEMENT', { timeout: 10000 })
 const SUM = /^(\d+) ([+−×÷]) (\d+)$/
@@ -93,25 +102,29 @@ check('both operations were recorded as measured', ['addition', 'multiplication'
 check('both have a placement', p.skill.addition > 0 && p.skill.multiplication > 0, `add ${p.skill.addition} mul ${p.skill.multiplication}`)
 check('the ones she skipped were left alone', !(p.attunedOps || []).includes('division'))
 
-console.log('5. switching on a fresh operation offers a measurement')
+console.log('5. a new operation is offered a Quick Tuning at the maze door')
 await page.locator('button', { hasText: 'To the castle' }).first().click()
 await page.waitForTimeout(700)
 await clearCoach(page)
 await page.waitForSelector('text=WHAT SHALL WE PRACTICE', { timeout: 10000 })
-check('no offer for what is already measured', await page.locator('text=/Be measured at/').count() === 0)
+check('nothing interrupts a maze of what she has been measured at', true)
 await page.locator('button', { hasText: /Division/ }).first().click()
-await page.waitForTimeout(400)
+await page.waitForTimeout(350)
 await clearCoach(page)
-check('switching on division offers to measure it', await page.locator('text=/Be measured at division/').count() === 1)
-await page.screenshot({ path: `${OUT}/attune-offer.png`, fullPage: true })
-
-console.log('6. and the offer opens a ceremony for just that one')
-await page.locator('button', { hasText: /Be measured at division/ }).click()
+await page.locator('button', { hasText: 'Enter the Maze' }).click()
 await page.waitForTimeout(700)
-check('the invitation is up', await page.locator('text=WHAT SHOULD IT MEASURE').count() === 1)
-check('with division ticked', (await page.locator('button', { hasText: /Division/ }).last().innerText()).includes('✓'))
-check('and addition NOT re-measured', !(await page.locator('button', { hasText: /^➕?\s*Addition/ }).last().innerText()).includes('✓'))
-check('it is a short one', await doors() <= 12, `${await doors()} doors`)
+check('the offer appears instead of the maze', await page.locator('text=A Quick Tuning?').count() === 1)
+check('it names the operation', /division/.test(await page.locator('text=/never measured your/').first().innerText()))
+check('it is a short one', await doors('The castle has never measured') <= 12)
+await page.screenshot({ path: `${OUT}/quick-tuning.png`, fullPage: true })
+
+console.log('6. declining goes straight into the maze')
+await page.locator('button', { hasText: 'Not now' }).click()
+await page.waitForTimeout(900)
+await clearCoach(page)
+check('she is in a maze', await page.locator('text=EXIT SEALED').count() > 0 || await page.locator('text=/^◆ SEALED DOOR$/').count() > 0)
+p = await saved()
+check('and division is still unmeasured, so it will ask again', !(p.attunedOps || []).includes('division'))
 
 console.log(`\n${pass} passed, ${fail} failed`)
 console.log('ERRORS:', errs.length ? errs.join(' | ') : 'none')

@@ -54,6 +54,19 @@ const STOP_REVERSALS = 5
  */
 export const SHADE = 0.05
 
+/**
+ * Points for walking the ceremony.
+ *
+ * Per door answered, right or wrong — this is payment for the work, not a
+ * score, and a ceremony that paid only for correct answers would be a test
+ * however it was dressed.
+ *
+ * Three, against a maze door's eight. A one-operation ceremony is then worth
+ * about a third of the first rank and a four-operation one about two thirds:
+ * plainly worth doing, plainly less than playing.
+ */
+export const ATTUNE_POINTS = 3
+
 /** Questions each operation may be asked, before early stopping. */
 export function laneBudget(n) {
   return n === 1 ? 16 : n === 2 ? 12 : 8
@@ -268,11 +281,32 @@ export function attuneCorridor(ops, profile) {
   const [er, ec] = cell(order[order.length - 1])
   grid[er][ec] = CELL_END
 
+  // A few rune stones along the way.
+  //
+  // The ceremony is not scored and cannot be failed, which is right — but it
+  // was also the only part of the game that gave nothing back, and it is a
+  // dozen questions of real work on a child's first day. Stones sit on the
+  // joins between rooms rather than in the rooms themselves, so picking one up
+  // is a small thing that happens while walking and never competes with a door.
+  const stones = {}
+  const joins = []
+  for (let i = 1; i < order.length; i++) {
+    const [ar, ac] = cell(order[i - 1])
+    const [br, bc] = cell(order[i])
+    joins.push([(ar + br) / 2, (ac + bc) / 2])
+  }
+  // Spread rather than clustered: one early enough to teach her they exist,
+  // the rest strung out so the corridor keeps offering something.
+  for (const f of [0.15, 0.45, 0.75]) {
+    const j = joins[Math.floor(joins.length * f)]
+    if (j) stones[`${j[0]},${j[1]}`] = 1
+  }
+
   const seen = Array.from({ length: H }, () => Array(W).fill(false))
   revealFrom(seen, grid, sr, sc)
 
   return {
-    grid, dq: {}, stones: {}, seen,
+    grid, dq: {}, stones, seen,
     start: { row: sr, col: sc },
     doorTotal: order.length - 1,
     pointsAvailable: 0,

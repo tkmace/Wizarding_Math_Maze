@@ -35,6 +35,7 @@ export default function Portrait({ profile, form, size = 200, animate = true, rF
     // because it moves nothing — a lock sits in the same place whether it is
     // copper or silver.
     const { wiz, skin, eye, hair } = lookFor(profile)
+    const a = profile?.appearance || {}
     const trinkets = wornTrinkets(profile)
 
     let raf
@@ -46,6 +47,7 @@ export default function Portrait({ profile, form, size = 200, animate = true, rF
         cy: cv.height * cyFrac,
         R: cv.height * rFrac,
         wiz, skin, eye, hair, form, trinkets,
+        beard: a.beard || 0, hairLen: a.hairStyle,
         t: animate ? t : 1200,
       })
       if (animate) raf = requestAnimationFrame(frame)
@@ -53,7 +55,8 @@ export default function Portrait({ profile, form, size = 200, animate = true, rF
     raf = requestAnimationFrame(frame)
     return () => cancelAnimationFrame(raf)
   }, [profile?.wizard, profile?.appearance?.skin, profile?.appearance?.eyeColor,
-      profile?.appearance?.hairColor, wornKey, form, size, animate, rFrac, cyFrac])
+      profile?.appearance?.hairColor, profile?.appearance?.beard,
+      profile?.appearance?.hairStyle, wornKey, form, size, animate, rFrac, cyFrac])
 
   return (
     <canvas

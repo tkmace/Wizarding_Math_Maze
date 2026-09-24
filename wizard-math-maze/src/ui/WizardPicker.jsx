@@ -95,8 +95,9 @@ export default function WizardPicker({ profile, form, onChoose, onClose }) {
       </div>
 
       <p style={{ color: C.faint, fontSize: 11.5, textAlign: 'center', margin: '0 0 12px', lineHeight: 1.6 }}>
-        You can change your skin, eyes and hair colour any time from My Wizard —
-        and you can come back and be someone else, too.
+        {first
+          ? 'Next you choose her hair, skin and colours — and you can come back and be someone else any time.'
+          : 'You can change your skin, hair and colours any time from My Wizard — and you can come back and be someone else, too.'}
       </p>
 
       <button className="bh" onClick={() => onChoose(chosen.id)}

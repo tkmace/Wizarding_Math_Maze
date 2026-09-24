@@ -7,7 +7,7 @@
 // door, and that the placement must still be able to CLIMB afterwards rather
 // than being pinned by the beginner ceiling.
 import { chromium } from 'playwright'
-import { pickWizard } from './harness.mjs'
+import { pickWizard, takePractice } from './harness.mjs'
 import http from 'http'; import fs from 'fs'; import path from 'path'
 const ROOT = '/home/claude/wmm/dist'
 const M = { '.html': 'text/html', '.js': 'text/javascript', '.webmanifest': 'application/manifest+json' }
@@ -32,13 +32,18 @@ await page.goto('http://localhost:4236/', { waitUntil: 'networkidle' })
 await page.fill('input[type=text]', 'Linden'); await page.fill('input[type=password]', '1234')
 await page.locator('button', { hasText: 'Begin the Journey' }).click()
 
-console.log('1. a new wizard is offered it, after her nest')
+console.log('1. a new wizard is offered it, after her nest and her practice list')
 await pickWizard(page)
 await page.waitForSelector('text=Choose your Nest', { timeout: 15000 })
 await page.locator('button', { hasText: 'Golden Eagles' }).first().click()
 await page.locator('button', { hasText: /^Join the / }).click()
-await page.waitForSelector('text=The Attunement', { timeout: 15000 })
-check('the invitation follows the nest', true)
+await page.waitForSelector('text=What shall we practise', { timeout: 15000 })
+check('she is asked what to practise first', true)
+await takePractice(page)
+await page.waitForSelector('text=Let the castle take your measure', { timeout: 15000 })
+check('the invitation follows it', true)
+check('and does not ask the same question twice',
+  await page.locator('text=WHAT SHOULD IT MEASURE').count() === 0)
 check('it can be declined', await page.locator('button', { hasText: 'Not now' }).count() === 1)
 check('it says how long it is', /\d+ doors/.test(await page.locator('text=/about/').first().innerText()))
 await page.screenshot({ path: `${OUT}/attune-invite.png`, fullPage: true })
@@ -148,6 +153,9 @@ await page.screenshot({ path: `${OUT}/attune-verdict.png`, fullPage: true })
 
 const p = await saved()
 check('marked as attuned', !!p?.attuned)
+check('the walk was paid for in points', (p?.totalPoints || 0) >= 3 * (p?.plays || 0), `${p?.totalPoints} pts for ${p?.plays} doors`)
+check('and there were runes to pick up', (p?.stones || 0) > 0, `${p?.stones} runes`)
+check('the verdict said thank you', await page.locator('text=With thanks').count() === 1)
 check('every door was legible to the walker', unreadable === 0, `${unreadable} unread`)
 // `plays` is the truth about how many questions were asked; the loop above can
 // double-count a door whose answer didn't register first time.

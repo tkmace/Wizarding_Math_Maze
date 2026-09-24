@@ -13,13 +13,14 @@ import { formById } from '/src/game/skins.js'
 const out=document.getElementById('out')
 function row(title){const h=document.createElement('h3');h.textContent=title;out.append(h)
   const r=document.createElement('div');r.className='row';out.append(r);return r}
-function port(r,size,form,wizId,ids,label){
+function port(r,size,form,wizId,ids,label,look){
   const d=document.createElement('div');d.className='c'
   const cv=document.createElement('canvas');cv.width=size*2;cv.height=size*2
   cv.style.width=size+'px';cv.style.height=size+'px';d.append(cv)
   const f=lookFor({wizard:wizId})
   drawPortrait(cv.getContext('2d'),{cx:size,cy:size*2*0.46,R:size*2*0.26,
-    wiz:f.wiz,skin:f.skin,eye:f.eye,hair:f.hair,form,trinkets:ids,t:2400})
+    wiz:f.wiz,skin:f.skin,eye:f.eye,hair:f.hair,form,trinkets:ids,t:2400,
+    beard:look?.beard||0,hairLen:look?.hairStyle})
   if(label){const t=document.createElement('div');t.textContent=label;d.append(t)}
   r.append(d)
 }
@@ -33,7 +34,13 @@ function sprite(r,size,form,wizId,ids,label){
   r.append(d)
 }
 const F=formById('apprentice')
-let r=row('One at a time')
+let r=row('Beards and hair length')
+;[0,1,2,3].forEach(b=>port(r,190,F,'wren',[],'beard '+b,{beard:b}))
+;[0,1,2,3].forEach(h=>port(r,190,F,'wren',[],'hair '+h,{hairStyle:h}))
+r=row('Beards on the six')
+;['wren','kestrel','rook','lark','finch','pip'].forEach(w=>port(r,180,F,w,[],w,{beard:3}))
+
+r=row('One at a time')
 TRINKETS.forEach(t=>port(r,200,F,'wren',[t.id],t.name))
 r=row('All six at once')
 port(r,240,F,'wren',TRINKETS.map(t=>t.id),'everything')
