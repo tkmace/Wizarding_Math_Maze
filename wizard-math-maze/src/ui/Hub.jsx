@@ -8,7 +8,7 @@ import Portrait from './Portrait.jsx'
 import NestCrest from './NestCrest.jsx'
 
 /** The castle: choose what to practice, see your rank, head into a maze. */
-export default function Hub({ profile, ops, diff, onToggleOp, onSetDiff, onStart, onWardrobe, onReport, onScroll, onLook, onNest, onAttune, onLogout, pendingPicks }) {
+export default function Hub({ profile, ops, diff, onToggleOp, onSetDiff, onStart, onWardrobe, onShop, onReport, onLook, onNest, onAttune, onLogout, pendingPicks }) {
   const form = formById(profile.equippedSkin)
   const rank = rankFor(profile.totalPoints)
   const next = nextRank(profile.totalPoints)
@@ -65,7 +65,30 @@ export default function Hub({ profile, ops, diff, onToggleOp, onSetDiff, onStart
             {profile.totalPoints.toLocaleString()}
             <span style={{ fontSize: 11, color: C.faint, marginLeft: 5, letterSpacing: 1 }}>PTS</span>
           </span>
-          <span style={{ color: C.teal, fontSize: 13, fontWeight: 900 }}>🔮 {profile.stones || 0}</span>
+          {/* The purse.
+              Runes buy things now — hints, curios, robes — so the count has to
+              look like money rather than a statistic. It was 13px of teal text
+              beside a 26px points figure, which made it read as a second score
+              nobody could spend. A bordered pill you can press, that takes you
+              to the shop, says what it is without a word of explanation. */}
+          <button className="bh" onClick={onShop} style={{
+            display: 'flex', alignItems: 'center', gap: 7,
+            padding: '6px 11px 6px 9px', borderRadius: 13,
+            border: `2px solid ${C.teal}`, background: `${C.teal}1c`,
+            cursor: onShop ? 'pointer' : 'default',
+            boxShadow: `0 0 14px ${C.teal}2e`,
+          }}>
+            <span style={{ fontSize: 19, lineHeight: 1 }}>🔮</span>
+            <span style={{ textAlign: 'left', lineHeight: 1.05 }}>
+              <span style={{ display: 'block', color: '#fff', fontSize: 19, fontWeight: 900, fontFamily: sans }}>
+                {profile.stones || 0}
+              </span>
+              <span style={{ display: 'block', color: C.teal, fontSize: 8.5, fontWeight: 900, letterSpacing: 1.2 }}>
+                RUNES
+              </span>
+            </span>
+            {onShop && <span style={{ color: C.teal, fontSize: 15, fontWeight: 900 }}>›</span>}
+          </button>
         </div>
         <div style={{ height: 9, background: '#0a0a2c', borderRadius: 9, overflow: 'hidden', border: `1px solid ${C.line}` }}>
           <div style={{
@@ -209,8 +232,7 @@ export default function Hub({ profile, ops, diff, onToggleOp, onSetDiff, onStart
       </div>
 
       {/* Switching wizard is something a household with two children does every
-          session, so it's a card like the rest rather than fine print. The
-          Wizard Scroll stays a link — it's a once-in-a-while thing. */}
+          session, so it's a card like the rest rather than fine print. */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8 }}>
         <button className="bh" onClick={onReport} style={btn('ghost', { fontSize: 13 })}>
           📊 My Progress
@@ -221,7 +243,6 @@ export default function Hub({ profile, ops, diff, onToggleOp, onSetDiff, onStart
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginTop: 16, flexWrap: 'wrap' }}>
-        <button onClick={onScroll} style={linkStyle}>📜 Wizard Scroll</button>
         {/* A wizard grows, and one who was measured badly should not be stuck
             with it. A link rather than a card: doing it twice in one afternoon
             is not the idea. */}

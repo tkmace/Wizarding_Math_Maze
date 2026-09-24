@@ -19,7 +19,6 @@ import Wardrobe from './ui/Wardrobe.jsx'
 import Shop from './ui/Shop.jsx'
 import WinScreen from './ui/WinScreen.jsx'
 import ParentReport from './ui/ParentReport.jsx'
-import ScrollPanel from './ui/ScrollPanel.jsx'
 import SkinChoice from './ui/SkinChoice.jsx'
 import LookPicker from './ui/LookPicker.jsx'
 import NestPicker from './ui/NestPicker.jsx'
@@ -47,6 +46,8 @@ export default function App() {
   posRef.current = pos
 
   const [doorQ, setDoorQ] = useState(null)
+  // Where the shop was opened from, so its way out goes back there.
+  const shopFrom = useRef('wardrobe')
   const [doorCell, setDoorCell] = useState(null)
   const [run, setRun] = useState(blankRun)
   const runRef = useRef(run)
@@ -532,8 +533,8 @@ export default function App() {
           onToggleOp={toggleOp} onSetDiff={setDiff}
           onStart={startGame}
           onWardrobe={() => { setScreen('wardrobe'); teach('wardrobe') }}
+          onShop={() => { shopFrom.current = 'hub'; setScreen('shop') }}
           onReport={() => setScreen('report')}
-          onScroll={() => setScreen('scroll')}
           onLook={() => setScreen('look')}
           onNest={() => setScreen('nest')}
           onAttune={() => setScreen('attune')}
@@ -563,18 +564,17 @@ export default function App() {
 
       {screen === 'wardrobe' && profile && (
         <Wardrobe profile={profile} onEquip={equip} onBuy={buy}
-          onShop={() => setScreen('shop')} onClose={() => setScreen('hub')} />
+          onShop={() => { shopFrom.current = 'wardrobe'; setScreen('shop') }}
+          onClose={() => setScreen('hub')} />
       )}
 
       {screen === 'shop' && profile && (
         <Shop profile={profile} onBuy={buyTrinket} onWear={wearTrinket}
-          onClose={() => setScreen('wardrobe')} />
+          from={shopFrom.current}
+          onClose={() => setScreen(shopFrom.current)} />
       )}
       {screen === 'report' && profile && (
         <ParentReport profile={profile} onClose={() => setScreen('hub')} />
-      )}
-      {screen === 'scroll' && profile && (
-        <ScrollPanel profile={profile} onClose={() => setScreen('hub')} />
       )}
       {screen === 'nest' && profile && (
         <NestPicker

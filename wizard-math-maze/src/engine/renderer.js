@@ -118,9 +118,17 @@ export function renderFrame(ctx, s) {
     drawDoor(ctx, d, W, H, horizonY, time, q, aheadKey === cellKey(d.mapY, d.mapX), fade)
   }
 
-  // ── Sprites ─────────────────────────────────────────────────────────────────
-  drawStones(ctx, s, W, H, horizonY, zbuf, fov)
+  // ── Sprites, far to near ────────────────────────────────────────────────────
+  // Everything here is occlusion-tested against the WALLS, which is why a stone
+  // behind a corner is hidden — but nothing was testing the sprites against
+  // each other, and the exit was simply painted last. So a Great Rune sitting
+  // in the corridor in front of the way out disappeared behind a doorway ten
+  // squares further off. Splitting the stones either side of the exit's own
+  // depth costs one extra pass and puts them in the right order.
+  const exitZ = exitDepth(s, W, H, horizonY, fov)
+  drawStones(ctx, s, W, H, horizonY, zbuf, fov, exitZ, Infinity)
   drawExitGlow(ctx, s, W, H, horizonY, zbuf, s.gateMet !== false, fov)
+  drawStones(ctx, s, W, H, horizonY, zbuf, fov, 0, exitZ)
 
   // ── The ambush ──────────────────────────────────────────────────────────────
   // Something leaping into the corridor, a beat before the pop-up takes over.
@@ -508,7 +516,21 @@ function project(s, W, H, horizonY, wx, wy, fov = FOV) {
   }
 }
 
-function drawStones(ctx, s, W, H, horizonY, zbuf, fov) {
+/** How far off the way out is, so the stones can be sorted around it. */
+function exitDepth(s, W, H, horizonY, fov) {
+  const grid = s.grid
+  for (let r = 0; r < grid.length; r++) {
+    for (let c = 0; c < grid[0].length; c++) {
+      if (grid[r][c] !== END) continue
+      const p = project(s, W, H, horizonY, c + 0.5, r + 0.5, fov)
+      return p ? p.perp : Infinity
+    }
+  }
+  return Infinity
+}
+
+/** `minZ`/`maxZ` restrict the pass to stones in a slice of depth. */
+function drawStones(ctx, s, W, H, horizonY, zbuf, fov, minZ = 0, maxZ = Infinity) {
   if (!s.stones) return
   const items = Object.keys(s.stones).map(k => {
     const [r, c] = k.split(',').map(Number)
@@ -518,6 +540,7 @@ function drawStones(ctx, s, W, H, horizonY, zbuf, fov) {
   for (const it of items) {
     const p = project(s, W, H, horizonY, it.c + 0.5, it.r + 0.5, fov)
     if (!p) continue
+    if (p.perp < minZ || p.perp >= maxZ) continue
     const sz = p.size * (it.great ? 0.27 : 0.17)
     const bob = Math.sin(s.time / 520 + it.r + it.c) * p.size * 0.03
     const cxp = p.x, cyp = horizonY + p.size * 0.26 + bob

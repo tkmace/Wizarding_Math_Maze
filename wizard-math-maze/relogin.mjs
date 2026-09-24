@@ -64,12 +64,8 @@ await page.screenshot({path:`${OUT}/21-report-veteran.png`, fullPage:true})
 await page.locator('button', { hasText: 'Back to the Castle' }).first().click(); await page.waitForTimeout(400)
 await page.locator('button', { hasText: 'Wardrobe' }).click(); await page.waitForTimeout(500)
 await page.screenshot({path:`${OUT}/22-wardrobe.png`, fullPage:true})
-await page.locator('button', { hasText: 'Back to the Castle' }).first().click(); await page.waitForTimeout(400)
-await page.locator('button', { hasText: 'Wizard Scroll' }).click(); await page.waitForTimeout(500)
-await page.screenshot({path:`${OUT}/23-scroll.png`, fullPage:true})
-
 // Wrong passcode must be rejected
-await page.locator('button', { hasText: 'Back to the Castle' }).first().click(); await page.waitForTimeout(300)
+await page.locator('button', { hasText: 'Back to the Castle' }).first().click(); await page.waitForTimeout(400)
 await page.locator('button', { hasText: 'Switch wizard' }).click(); await page.waitForTimeout(400)
 await page.locator('button', { hasText: 'Camille' }).click(); await page.waitForTimeout(300)
 await page.locator('input[type=password]').fill('9999')

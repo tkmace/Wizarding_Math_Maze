@@ -1,0 +1,47 @@
+<!doctype html><html><head><meta charset="utf-8"><title>rune order</title>
+<style>body{margin:0;background:#0b0a22;color:#c8a4ff;font:11px system-ui}
+h3{margin:10px 0 3px 10px;font-size:12px;color:#f9ca74}
+canvas{display:block;margin:0 0 6px 10px;border:1px solid #2a2a55}</style></head>
+<body><div id="out"></div>
+<script type="module">
+import { renderFrame } from '/src/engine/renderer.js'
+import { WALL, PATH, END } from '/src/game/maze.js'
+import { formById } from '/src/game/skins.js'
+import { blankAppearance } from '/src/game/appearance.js'
+const W=10,Hh=5
+const grid=Array.from({length:Hh},()=>Array(W).fill(WALL))
+for(let c=1;c<W-1;c++) grid[2][c]=PATH
+grid[2][W-2]=END
+const out=document.getElementById('out')
+// Count pixels of a colour family inside the middle band of the frame.
+function count(ctx,w,h,test){
+  const d=ctx.getImageData(0,Math.floor(h*0.3),w,Math.floor(h*0.45)).data
+  let n=0
+  for(let i=0;i<d.length;i+=4) if(test(d[i],d[i+1],d[i+2])) n++
+  return n
+}
+const goldish=(r,g,b)=> r>200 && g>140 && g<230 && b<120
+const tealish=(r,g,b)=> b>180 && g>170 && r<150
+function shot(title,stones,px){
+  const h=document.createElement('h3');h.textContent=title;out.append(h)
+  const cv=document.createElement('canvas');cv.width=760;cv.height=400
+  cv.style.width='380px';cv.style.height='200px';out.append(cv)
+  const ctx=cv.getContext('2d')
+  renderFrame(ctx,{grid,dq:{},stones,px,py:2.5,angle:0,
+    playerRow:2,playerCol:Math.floor(px),facing:0,doorAhead:null,time:4000,
+    form:formById('apprentice'),appearance:blankAppearance(),moving:false,
+    effects:[],gateMet:true,lean:0})
+  return ctx
+}
+// The rune sits at column 6; the exit is at column 8. Standing at 2.5 the rune
+// is nearer than the exit, so it must be in front of it.
+const a=shot('great rune in front of the exit',{'2,6':5},2.5)
+const bctx=shot('control: no rune at all, same view',{},2.5)
+const c=shot('ordinary stone in front of the exit',{'2,6':1},2.5)
+window.__gold={
+  infront: count(a,760,400,goldish),
+  behind: count(bctx,760,400,goldish),
+  plain: count(c,760,400,tealish),
+}
+window.__done=true
+</script></body></html>

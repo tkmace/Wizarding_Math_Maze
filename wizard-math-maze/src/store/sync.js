@@ -70,48 +70,6 @@ export async function pull(name, passcode) {
   } catch { return null }
 }
 
-/**
- * Is there unclaimed progress under this name from the old v1 database?
- * Resolves { found, name, totalPoints, equippedSkin } or null.
- */
-export async function findLegacy(name) {
-  if (!syncEnabled() || !name) return null
-  try {
-    const res = await fetch(`${BASE}/profile?legacy=${encodeURIComponent(name)}`, { cache: 'no-store' })
-    if (res.status === 503) { unavailable = true; return null }
-    if (!res.ok) return null
-    const body = await res.json()
-    return body?.found ? body : null
-  } catch { return null }
-}
-
-/**
- * Claim that old progress onto this profile. The server decides the award and
- * marks the row single-shot, so this resolves to the authoritative profile —
- * or null if someone else got there first.
- */
-export async function claimLegacy(profile, legacyName) {
-  if (!syncEnabled() || !profile?.name) return null
-  try {
-    const t = await token(profile.name, profile.passcode)
-    const { passcode, ...safe } = profile
-    const res = await fetch(`${BASE}/profile`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: t, profile: safe, claimLegacy: legacyName }),
-    })
-    if (!res.ok) return null
-    const body = await res.json()
-    if (!body?.claimed) return null
-    return { profile: { ...body.profile, passcode: profile.passcode }, claimed: body.claimed }
-  } catch { return null }
-}
-
-/**
- * Reconcile two copies of the same wizard. Whichever has answered more
- * questions wins the scalar fields; fact tables are unioned so practice done on
- * either device is never thrown away, and counters take the higher value.
- */
 export function mergeProfiles(local, remote) {
   if (!remote) return local
   if (!local) return remote

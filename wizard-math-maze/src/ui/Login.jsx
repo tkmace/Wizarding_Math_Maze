@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
-import { listProfiles, loadProfile, createProfile, importScroll, getLastPlayer, profileExists, saveProfile } from '../store/storage.js'
-import { syncEnabled, pull as cloudPull, mergeProfiles, findLegacy, claimLegacy } from '../store/sync.js'
-import { formById, rankFor, mapLegacySkin } from '../game/skins.js'
+import { listProfiles, loadProfile, createProfile, getLastPlayer, profileExists, saveProfile } from '../store/storage.js'
+import { syncEnabled, pull as cloudPull, mergeProfiles } from '../store/sync.js'
+import { formById, rankFor } from '../game/skins.js'
 import WizardPreview from './WizardPreview.jsx'
 import NestCrest from './NestCrest.jsx'
 import Keypad from './Keypad.jsx'
@@ -18,11 +18,9 @@ export default function Login({ onEnter }) {
   const [target, setTarget] = useState(null)
   const [name, setName] = useState('')
   const [code, setCode] = useState('')
-  const [scroll, setScroll] = useState('')
   const [err, setErr] = useState('')
   const [shake, setShake] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [legacy, setLegacy] = useState(null)
   const codeRef = useRef(null)
 
   const nope = msg => { setErr(msg); setShake(true); setTimeout(() => setShake(false), 450) }
@@ -63,11 +61,7 @@ export default function Login({ onEnter }) {
         saveProfile(remote)
         return onEnter(remote)
       }
-      // Nothing under that token — but there may be points waiting under this
-      // NAME from the old version, whose passcodes are long forgotten.
-      const old = await findLegacy(n)
       setBusy(false)
-      if (old) { setLegacy(old); setMode('legacy'); return }
     }
 
     const res = createProfile(n, code)
@@ -75,50 +69,9 @@ export default function Login({ onEnter }) {
     onEnter(res.profile)
   }
 
-  /** Take the old points onto a freshly created profile. */
-  const takeLegacy = async () => {
-    const n = name.trim()
-    const made = createProfile(n, code)
-    if (!made.ok) return nope('A wizard already has that name — pick another!')
-
-    setBusy(true)
-    const result = await claimLegacy(made.profile, n)
-    setBusy(false)
-
-    if (!result) {
-      // Someone claimed it in the meantime. The fresh profile still stands.
-      saveProfile(made.profile)
-      return onEnter(made.profile)
-    }
-
-    // Restore the old robe too. v1's six skins map onto the new form ladder, and
-    // we only honour it if the claimed points actually reach that form's rank —
-    // nobody inherits a rank they haven't earned.
-    const wanted = mapLegacySkin(result.claimed.equippedSkin)
-    const form = formById(wanted)
-    const earned = rankFor(result.profile.totalPoints).rank >= form.rank
-    // Rank 0 is the starting robe, not a choice, so it never goes in `chosen`.
-    const restored = earned
-      ? {
-        ...result.profile, equippedSkin: wanted,
-        chosen: form.rank > 0
-          ? { ...(result.profile.chosen || {}), [form.rank]: wanted }
-          : { ...(result.profile.chosen || {}) },
-      }
-      : { ...result.profile, equippedSkin: 'apprentice' }
-    saveProfile(restored)
-    onEnter(restored)
-  }
-
   const startFresh = () => {
     const res = createProfile(name.trim(), code)
     if (!res.ok) return nope('A wizard already has that name — pick another!')
-    onEnter(res.profile)
-  }
-
-  const restore = () => {
-    const res = importScroll(scroll)
-    if (!res.ok) return nope('That scroll is unreadable ✨')
     onEnter(res.profile)
   }
 
@@ -184,10 +137,6 @@ export default function Login({ onEnter }) {
             </div>
             <button className="bh" onClick={() => { setMode('new'); setName(''); setCode(''); setErr('') }}
               style={btn('gold', { width: '100%' })}>＋ New Wizard</button>
-            <button className="bh" onClick={() => { setMode('scroll'); setErr('') }}
-              style={{ marginTop: 10, background: 'none', border: 'none', color: C.faint, fontSize: 11, cursor: 'pointer', textDecoration: 'underline' }}>
-              I have a Wizard Scroll from another device
-            </button>
           </>
         )}
 
@@ -252,57 +201,6 @@ export default function Login({ onEnter }) {
           </>
         )}
 
-        {/* ── Reclaim progress from the old version ── */}
-        {mode === 'legacy' && legacy && (
-          <>
-            <div style={{ fontSize: 40, marginBottom: 4 }}>📜</div>
-            <div style={{ fontFamily: serif, fontSize: 14, letterSpacing: 2, color: C.gold, fontWeight: 900, marginBottom: 10 }}>
-              AN OLD SCROLL BEARS YOUR NAME
-            </div>
-            <div style={{
-              background: '#0a0a2c', border: `2px solid ${C.gold}66`, borderRadius: 14,
-              padding: '14px 12px', marginBottom: 14,
-            }}>
-              <div style={{ color: '#fff', fontWeight: 900, fontSize: 19, fontFamily: sans }}>{legacy.name}</div>
-              <div style={{ color: C.gold, fontWeight: 900, fontSize: 26, fontFamily: sans, marginTop: 4 }}>
-                {legacy.totalPoints.toLocaleString()}
-                <span style={{ fontSize: 11, color: C.faint, marginLeft: 5, letterSpacing: 1 }}>PTS</span>
-              </div>
-              <div style={{ color: C.dim, fontSize: 11, marginTop: 6, fontFamily: serif, letterSpacing: 1 }}>
-                {formById(mapLegacySkin(legacy.equippedSkin)).title}
-              </div>
-            </div>
-            <p style={{ color: C.dim, fontSize: 12, lineHeight: 1.7, margin: '0 0 14px' }}>
-              If this is you, claim it and the passcode you just chose becomes your new one.
-              Old passcodes weren’t carried over.
-            </p>
-            {err && <Err>{err}</Err>}
-            <button className="bh" onClick={takeLegacy} disabled={busy}
-              style={btn('gold', { width: '100%', opacity: busy ? 0.7 : 1 })}>
-              {busy ? <><span className="spinner">✨</span> Claiming…</> : 'That’s me — claim it! 🪄'}
-            </button>
-            <button className="bh" onClick={startFresh} disabled={busy}
-              style={btn('ghost', { width: '100%', marginTop: 9, fontSize: 13 })}>
-              Not me — start fresh
-            </button>
-          </>
-        )}
-
-        {/* ── Import scroll ── */}
-        {mode === 'scroll' && (
-          <>
-            <label style={label({ textAlign: 'left' })}>PASTE YOUR WIZARD SCROLL</label>
-            <textarea
-              value={scroll} onChange={e => { setScroll(e.target.value); setErr('') }}
-              placeholder="WMM3-…" rows={4}
-              style={inputStyle({ fontSize: 11, fontFamily: 'monospace', resize: 'vertical' })}
-            />
-            {err && <Err>{err}</Err>}
-            <button className="bh" onClick={restore} style={btn('teal', { width: '100%', marginTop: 4 })}>Unroll the Scroll 📜</button>
-            <button className="bh" onClick={() => { setMode(profiles.length ? 'pick' : 'new'); setErr('') }}
-              style={{ marginTop: 10, background: 'none', border: 'none', color: C.faint, fontSize: 12, cursor: 'pointer' }}>← back</button>
-          </>
-        )}
       </div>
     </div>
   )

@@ -1,13 +1,14 @@
 import { neon } from '@neondatabase/serverless'
 
 /**
- * Cloud mirror for a wizard's progress, plus the one-time claim path for
- * players migrated from the old v1 database.
+ * Cloud mirror for a wizard's progress.
  *
  *   GET  /api/profile?token=<hex>   -> { profile } | 404
- *   GET  /api/profile?legacy=<name> -> { found, name, totalPoints, equippedSkin }
- *   PUT  /api/profile               <- { token, profile, claimLegacy? }
- *                                   -> { profile, claimed }
+ *   PUT  /api/profile               <- { token, profile } -> { profile }
+ *
+ * The one-time claim path for players carried over from the old v1 database
+ * has been removed: everyone who was coming across has come across. The
+ * `legacy_players` table is untouched and can be dropped whenever you like.
  *
  * The token is PBKDF2(passcode, salt="wmm:<name>") computed in the browser. The
  * passcode never reaches this function, so the token is both the lookup key and
@@ -16,7 +17,6 @@ import { neon } from '@neondatabase/serverless'
 
 const TOKEN_RE = /^[0-9a-f]{64}$/
 const MAX_BYTES = 64 * 1024      // a profile with years of fact history is ~20 kB
-const nameKey = s => String(s).trim().toLowerCase().slice(0, 40)
 
 export default async function handler(req, res) {
   if (!process.env.DATABASE_URL) {
@@ -27,20 +27,6 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
-      // ── Is there unclaimed v1 progress under this name? ──
-      if (req.query.legacy) {
-        const rows = await sql`
-          select name, total_points, equipped_skin
-            from legacy_players
-           where name_key = ${nameKey(req.query.legacy)}
-             and claimed_by is null
-        `
-        res.setHeader('Cache-Control', 'no-store')
-        return res.status(200).json(rows.length
-          ? { found: true, name: rows[0].name, totalPoints: rows[0].total_points, equippedSkin: rows[0].equipped_skin }
-          : { found: false })
-      }
-
       const { token } = req.query
       if (!TOKEN_RE.test(token || '')) return res.status(400).json({ error: 'bad token' })
 
@@ -53,7 +39,7 @@ export default async function handler(req, res) {
 
     if (req.method === 'PUT') {
       const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body
-      const { token, profile, claimLegacy } = body || {}
+      const { token, profile } = body || {}
       if (!TOKEN_RE.test(token || '')) return res.status(400).json({ error: 'bad token' })
       if (!profile || typeof profile !== 'object' || !profile.name) {
         return res.status(400).json({ error: 'bad profile' })
@@ -65,51 +51,21 @@ export default async function handler(req, res) {
       // refuse to persist one even if a future client forgets to.
       delete profile.passcode
 
-      // ── Claim old points, if asked ──
-      // The award is decided here, not by the client, and the UPDATE's
-      // `claimed_by is null` makes it single-shot: if two people race on the
-      // same name, exactly one UPDATE returns a row.
-      let claimed = null
-      if (claimLegacy) {
-        const rows = await sql`
-          update legacy_players
-             set claimed_by = ${token}, claimed_at = now()
-           where name_key = ${nameKey(claimLegacy)}
-             and claimed_by is null
-          returning total_points, equipped_skin
-        `
-        if (rows.length) {
-          claimed = { totalPoints: rows[0].total_points, equippedSkin: rows[0].equipped_skin }
-          profile.totalPoints = (profile.totalPoints || 0) + claimed.totalPoints
-          profile.legacyClaimed = claimed.totalPoints
-        }
-      }
-
       const plays = Number.isFinite(profile.plays) ? Math.trunc(profile.plays) : 0
 
       // Plain last-writer-wins would let a stale tab clobber a newer device, so
       // a write only lands if it represents at least as much play as what's
-      // already stored. A claim bypasses it, since claimed points aren't plays.
-      if (claimed) {
-        await sql`
-          insert into profiles (token, name, data, plays, updated_at)
-          values (${token}, ${String(profile.name).slice(0, 40)}, ${profile}, ${plays}, now())
-          on conflict (token) do update
-            set data = excluded.data, name = excluded.name,
-                plays = greatest(excluded.plays, profiles.plays), updated_at = now()
-        `
-      } else {
-        await sql`
-          insert into profiles (token, name, data, plays, updated_at)
-          values (${token}, ${String(profile.name).slice(0, 40)}, ${profile}, ${plays}, now())
-          on conflict (token) do update
-            set data = excluded.data, name = excluded.name,
-                plays = excluded.plays, updated_at = now()
-            where excluded.plays >= profiles.plays
-        `
-      }
+      // already stored.
+      await sql`
+        insert into profiles (token, name, data, plays, updated_at)
+        values (${token}, ${String(profile.name).slice(0, 40)}, ${profile}, ${plays}, now())
+        on conflict (token) do update
+          set data = excluded.data, name = excluded.name,
+              plays = excluded.plays, updated_at = now()
+          where excluded.plays >= profiles.plays
+      `
 
-      return res.status(200).json({ profile, claimed })
+      return res.status(200).json({ profile })
     }
 
     res.setHeader('Allow', 'GET, PUT')

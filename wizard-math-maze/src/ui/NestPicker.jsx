@@ -19,6 +19,7 @@ import NestCrest from './NestCrest.jsx'
 export default function NestPicker({ current, onChoose, onClose }) {
   const [sel, setSel] = useState(current || null)
   const chosen = nestById(sel)
+  const staying = !!chosen && chosen.id === current
 
   return (
     <div className="appear scroll" style={{ zIndex: 10, width: '100%', maxWidth: 470, padding: '8px 14px 24px', textAlign: 'center' }}>
@@ -66,6 +67,7 @@ export default function NestPicker({ current, onChoose, onClose }) {
             {chosen.name}
           </strong>
           {' '}— {chosen.colorName.toLowerCase()}. {chosen.motto}.
+          {staying && <span style={{ color: C.gold }}> Your nest already.</span>}
         </div>
       )}
 
@@ -74,7 +76,13 @@ export default function NestPicker({ current, onChoose, onClose }) {
           width: '100%', marginTop: 14, fontSize: 17, minHeight: 54,
           opacity: chosen ? 1 : 0.45, cursor: chosen ? 'pointer' : 'default',
         })}>
-        {chosen ? `Join the ${chosen.name} 🪶` : 'Pick a nest'}
+        {/* A wizard who comes back to this page and looks at her OWN nest is
+            not joining anything — she is deciding whether to stay. Offering
+            her "Join the Sea Eagles" when she has been a Sea Eagle all term
+            reads as though the choice had been forgotten. */}
+        {!chosen ? 'Pick a nest'
+          : staying ? `Stay with the ${chosen.name} 🪶`
+          : `Join the ${chosen.name} 🪶`}
       </button>
 
       {onClose && (

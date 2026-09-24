@@ -10,7 +10,8 @@ export const C = {
   gold: '#f9ca74',
   goldHi: '#ffeec2',
   amber: '#f0932b',
-  good: '#7ee8a2',
+  good: '#7ee8a2',          // locked in
+  rising: '#a8e86a',        // getting there — green, because growing is good
   bad: '#ff5f6d',
   teal: '#5ad9ff',
 }

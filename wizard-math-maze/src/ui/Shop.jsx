@@ -38,7 +38,7 @@ const FRAME = {
   wand:       { rFrac: 0.26, cyFrac: 0.46 },
 }
 
-export default function Shop({ profile, onBuy, onWear, onClose }) {
+export default function Shop({ profile, onBuy, onWear, onClose, from = 'wardrobe' }) {
   const runes = profile.stones || 0
   const worn = profile.wearing || []
   const form = formById(profile.equippedSkin)
@@ -50,7 +50,7 @@ export default function Shop({ profile, onBuy, onWear, onClose }) {
       title="The Curiosity Shop"
       subtitle={`${owned.length} of ${TRINKETS.length} curios · 🔮 ${runes} rune${runes === 1 ? '' : 's'}`}
       onClose={onClose}
-      closeLabel="Back to the Wardrobe 🧥"
+      closeLabel={from === 'hub' ? 'Back to the Castle 🏰' : 'Back to the Wardrobe 🧥'}
     >
       <div style={{ display: 'grid', gap: 10 }}>
         {TRINKETS.map(tr => {

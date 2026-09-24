@@ -173,10 +173,18 @@ function drawEagle(ctx, w, h, n, t) {
   // and everything else is drawn over its roots.
   if (n.crest > 0.05) {
     const up = R * (0.28 + n.crest * 0.62)
-    feather(-R * 0.06, -R * 0.84, -1.70, up, R * 0.17, n.nape)
-    if (n.crest > 0.45) {
-      feather(R * 0.22, -R * 0.84, -1.34, up * 0.96, R * 0.16, dark)
-      feather(R * 0.50, -R * 0.66, -1.06, up * 0.82, R * 0.14, n.nape)
+    // Two kinds of crown, and the angle is the whole difference. A harpy's
+    // stands straight off the skull and splays; a golden eagle's lies back
+    // along the nape towards the tail, which is why hers looked wrong standing
+    // up — she was wearing a harpy's hairstyle.
+    const roots = n.lay
+      ? [[R * 0.10, -R * 0.86], [R * 0.34, -R * 0.78], [R * 0.56, -R * 0.62]]
+      : [[-R * 0.06, -R * 0.84], [R * 0.22, -R * 0.84], [R * 0.50, -R * 0.66]]
+    const angles = n.lay ? [-0.98, -0.74, -0.50] : [-1.62, -1.34, -1.06]
+    const lens = n.lay ? [0.86, 0.78, 0.66] : [1, 0.96, 0.82]
+    for (let i = 0; i < 3; i++) {
+      feather(roots[i][0], roots[i][1], angles[i], up * lens[i],
+              R * (0.17 - i * 0.015), i === 1 ? dark : n.nape)
     }
   }
 
