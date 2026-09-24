@@ -48,6 +48,9 @@ export default function App() {
   const [doorQ, setDoorQ] = useState(null)
   // Where the shop was opened from, so its way out goes back there.
   const shopFrom = useRef('wardrobe')
+  // Which operations the next Attunement should measure. Null means "whatever
+  // she is practising", which is what the ceremony has always used.
+  const [attuneOps, setAttuneOps] = useState(null)
   const [doorCell, setDoorCell] = useState(null)
   const [run, setRun] = useState(blankRun)
   const runRef = useRef(run)
@@ -537,7 +540,8 @@ export default function App() {
           onReport={() => setScreen('report')}
           onLook={() => setScreen('look')}
           onNest={() => setScreen('nest')}
-          onAttune={() => setScreen('attune')}
+          onAttune={() => { setAttuneOps(null); setScreen('attune') }}
+          onAttuneOps={list => { setAttuneOps(list); setScreen('attune') }}
           onLogout={() => { setProfile(null); setScreen('login') }}
         />
       )}
@@ -592,9 +596,9 @@ export default function App() {
       )}
       {screen === 'attune' && profile && (
         <Attunement
-          profile={profile} ops={ops} form={form}
+          profile={profile} ops={attuneOps || ops} form={form}
           onDone={commit}
-          onCancel={() => setScreen('hub')}
+          onCancel={() => { setAttuneOps(null); setScreen('hub') }}
         />
       )}
       {screen === 'look' && profile && (

@@ -4,7 +4,7 @@ import {
   attuneResult, attuneProgress, attuneLength,
 } from '../game/attunement.js'
 import { warmPlaysFor, recordAnswer } from '../game/curriculum.js'
-import { senseTier, opByKey } from '../game/math.js'
+import { senseTier, opByKey, OPS } from '../game/math.js'
 import { FACING_DELTA, WALL, DOOR, END, PATH, revealFrom } from '../game/maze.js'
 import { C, sans, serif, btn, panel } from './theme.js'
 import GameView from './GameView.jsx'
@@ -48,8 +48,32 @@ export default function Attunement({ profile, ops, form, onDone, onCancel }) {
   const phaseRef = useRef(phase); phaseRef.current = phase
   const doorRef = useRef(doorQ); doorRef.current = doorQ
 
-  const opList = useMemo(() => [...ops], [ops])
+  // Which operations this ceremony will measure.
+  //
+  // It used to be whatever she had switched on in the castle — which on a
+  // first run is the blank profile's `['addition']`, because the Attunement
+  // arrives BEFORE she has ever seen the practice list. So every new wizard
+  // was measured at addition and left at the beginner's default for the other
+  // three, which is the exact problem this ceremony exists to solve, solved
+  // one quarter of the way.
+  //
+  // She picks now, on the invitation, starting from what she has on.
+  const [picked, setPicked] = useState(() => {
+    const from = [...ops].filter(k => OPS.some(o => o.key === k))
+    return from.length ? from : ['addition']
+  })
+  const opList = useMemo(
+    () => OPS.map(o => o.key).filter(k => picked.includes(k)),
+    [picked])
   const plan = useMemo(() => attuneLength(opList), [opList])
+
+  const toggleOp = useCallback(key => {
+    setPicked(cur => cur.includes(key)
+      // Never all the way off: a ceremony that measures nothing has nothing to
+      // tell her, and the button would sit there disabled with no explanation.
+      ? (cur.length > 1 ? cur.filter(k => k !== key) : cur)
+      : [...cur, key])
+  }, [])
 
   const begin = useCallback(() => {
     session.current = beginAttunement(opList)
@@ -98,6 +122,10 @@ export default function Attunement({ profile, ops, form, onDone, onCancel }) {
       skill,
       opPlays,
       attuned: Date.now(),
+      // What has actually been measured, so the castle can offer to measure an
+      // operation the first time she switches it on rather than leaving it at
+      // the beginner's default for a fortnight.
+      attunedOps: [...new Set([...(next.attunedOps || []), ...Object.keys(r.skill)])],
       stats: {
         ...next.stats,
         correct: (next.stats?.correct || 0) + right,
@@ -182,7 +210,10 @@ export default function Attunement({ profile, ops, form, onDone, onCancel }) {
   const onCorrect = useCallback(ms => answered(true, ms), [answered])
   const onWrong = useCallback(() => answered(false, 0), [answered])
 
-  if (phase === 'intro') return <Invitation plan={plan} ops={opList} form={form} profile={profile} onBegin={begin} onCancel={onCancel} />
+  if (phase === 'intro') {
+    return <Invitation plan={plan} ops={opList} onToggle={toggleOp}
+      form={form} profile={profile} onBegin={begin} onCancel={onCancel} />
+  }
   if (phase === 'done' && result) return <Verdict result={result} form={form} profile={profile} onClose={onCancel} />
   if (!maze) return null
 
@@ -234,7 +265,7 @@ function Meter({ value }) {
   )
 }
 
-function Invitation({ plan, ops, form, profile, onBegin, onCancel }) {
+function Invitation({ plan, ops, onToggle, form, profile, onBegin, onCancel }) {
   const names = [...ops].map(k => opByKey(k).label.toLowerCase())
   return (
     <div className="appear scroll" style={{ zIndex: 10, width: '100%', maxWidth: 420, padding: '8px 14px 24px', textAlign: 'center' }}>
@@ -261,6 +292,42 @@ function Invitation({ plan, ops, form, profile, onBegin, onCancel }) {
           You cannot lose this, and you will not be marked. When it is over, every
           maze after it will be pitched at you — so nobody wastes your time asking
           things you already know.
+        </p>
+      </div>
+
+      {/* What to measure.
+          Measuring several in ONE ceremony is much cheaper than it looks: a
+          lane that has not started yet borrows its starting level from one
+          that has finished, so subtraction begins near where addition landed
+          rather than at the bottom. Three operations cost about the same as
+          two. Four separate ceremonies would throw all of that away. */}
+      <div style={panel({ padding: '11px 12px', marginBottom: 12 })}>
+        <div style={{
+          fontFamily: serif, fontSize: 11.5, letterSpacing: 2, color: C.dim,
+          fontWeight: 900, textAlign: 'left', marginBottom: 8,
+        }}>WHAT SHOULD IT MEASURE?</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 7 }}>
+          {OPS.map(o => {
+            const on = ops.includes(o.key)
+            return (
+              <button key={o.key} className="bh" onClick={() => onToggle(o.key)} style={{
+                display: 'flex', alignItems: 'center', gap: 7, padding: '9px 10px',
+                borderRadius: 12, cursor: 'pointer', minHeight: 44,
+                border: `2px solid ${on ? o.color : C.lineHi}`,
+                background: on ? `${o.color}1f` : C.panelHi,
+                color: on ? '#fff' : C.faint,
+                fontWeight: 900, fontSize: 12.5, fontFamily: sans,
+              }}>
+                <span style={{ fontSize: 17 }}>{o.icon}</span>
+                <span style={{ flex: 1, textAlign: 'left' }}>{o.label}</span>
+                {on && <span style={{ color: o.color, fontSize: 12 }}>✓</span>}
+              </button>
+            )
+          })}
+        </div>
+        <p style={{ color: C.faint, fontSize: 10.5, margin: '9px 2px 0', lineHeight: 1.55, textAlign: 'left' }}>
+          Only pick the ones you have done before. Anything you leave off, the
+          castle can measure later — it will offer when you first switch it on.
         </p>
       </div>
 

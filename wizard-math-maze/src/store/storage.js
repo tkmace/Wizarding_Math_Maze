@@ -46,6 +46,7 @@ export function blankProfile(name, passcode) {
     opPlays: {},                   // answers per operation — holds the adaptive
                                    // climb down while it has nothing to read yet
     seen: {},                      // first-run explanations already shown
+    attunedOps: [],                // operations the Attunement has measured
     stones: 0,
     plays: 0,
     facts: {},
@@ -81,6 +82,12 @@ export function migrate(p) {
     appearance: { ...blankAppearance(), ...(p.appearance || {}) },
     opPlays: { ...(p.opPlays || {}) },
     seen: { ...(p.seen || {}) },
+    // A wizard measured before this field existed was measured at whatever she
+    // had switched on at the time, so that is the honest guess. Without it she
+    // would be offered a measurement for every operation she already has one
+    // for, which is worse than not offering at all.
+    attunedOps: Array.isArray(p.attunedOps) ? [...p.attunedOps]
+      : (p.attuned ? [...(p.settings?.ops || ['addition'])] : []),
   }
 
   // Someone with a real history behind her does not need to be told what a door
