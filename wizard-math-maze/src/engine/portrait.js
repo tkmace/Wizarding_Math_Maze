@@ -27,6 +27,7 @@
 //     "painted rather than vector" than any amount of extra geometry.
 
 import { paletteFor } from '../game/wizards.js'
+import { drawTrinkets } from './trinkets.js'
 
 const TAU = Math.PI * 2
 
@@ -178,7 +179,7 @@ export function drawPortrait(ctx, o) {
 export function drawHead(ctx, o) {
   const {
     cx, cy, R, wiz, skin, eye = '#5b3a24', hair = '#6b4326', form, t = 0,
-    neck = true, shoulders = true, breathe: breathing = true,
+    neck = true, shoulders = true, breathe: breathing = true, trinkets,
   } = o
   if (!wiz) return
   // Fall back to her usual tone rather than bailing. A missing palette used to
@@ -242,6 +243,10 @@ export function drawHead(ctx, o) {
 
   drawHairFront(ctx, R, wiz, hair)
   if (form?.hat && form.hat !== 'none') drawHat(ctx, R, wiz, form.hat, robe, trim, t)
+
+  // What she bought herself, over the top of what she was given. A headband
+  // goes over hair and a pendant hangs over a collar, so this is last.
+  drawTrinkets(ctx, { R, ids: trinkets, wiz, form, t })
 
   grain(ctx, -R * 2.0, -R * 2.6, R * 4.0, R * 5.2, (wiz.id || '').length * 13 + 7)
   ctx.restore()

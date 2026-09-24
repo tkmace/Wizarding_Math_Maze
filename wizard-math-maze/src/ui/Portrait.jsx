@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { drawPortrait } from '../engine/portrait.js'
 import { lookFor } from '../game/wizards.js'
+import { wornTrinkets } from '../game/trinkets.js'
 
 /**
  * A wizard, face on, at a size where you can see her.
@@ -10,8 +11,18 @@ import { lookFor } from '../game/wizards.js'
  * crop there would be showing the wrong thing. This is for the screens that are
  * about the person: the castle, the Attunement, the duel.
  */
-export default function Portrait({ profile, form, size = 200, animate = true, style }) {
+/**
+ * `rFrac` and `cyFrac` are the framing: how big the head is as a fraction of
+ * the canvas, and where its centre sits. The shop uses them to crop in on
+ * whichever part of her a curio actually touches — a pendant is four pixels
+ * across in the standard framing at tile size, which makes six identical
+ * thumbnails and a shop nobody believes.
+ */
+export default function Portrait({ profile, form, size = 200, animate = true, rFrac = 0.26, cyFrac = 0.46, style }) {
   const ref = useRef(null)
+  // A plain string, so swapping a trinket redraws without the effect depending
+  // on an array identity that changes on every render.
+  const wornKey = (profile?.wearing || []).join(',')
 
   useEffect(() => {
     const cv = ref.current
@@ -24,6 +35,7 @@ export default function Portrait({ profile, form, size = 200, animate = true, st
     // because it moves nothing — a lock sits in the same place whether it is
     // copper or silver.
     const { wiz, skin, eye, hair } = lookFor(profile)
+    const trinkets = wornTrinkets(profile)
 
     let raf
     const frame = t => {
@@ -31,9 +43,9 @@ export default function Portrait({ profile, form, size = 200, animate = true, st
       ctx.clearRect(0, 0, cv.width, cv.height)
       drawPortrait(ctx, {
         cx: cv.width / 2,
-        cy: cv.height * 0.46,
-        R: cv.height * 0.26,
-        wiz, skin, eye, hair, form,
+        cy: cv.height * cyFrac,
+        R: cv.height * rFrac,
+        wiz, skin, eye, hair, form, trinkets,
         t: animate ? t : 1200,
       })
       if (animate) raf = requestAnimationFrame(frame)
@@ -41,7 +53,7 @@ export default function Portrait({ profile, form, size = 200, animate = true, st
     raf = requestAnimationFrame(frame)
     return () => cancelAnimationFrame(raf)
   }, [profile?.wizard, profile?.appearance?.skin, profile?.appearance?.eyeColor,
-      profile?.appearance?.hairColor, form, size, animate])
+      profile?.appearance?.hairColor, wornKey, form, size, animate, rFrac, cyFrac])
 
   return (
     <canvas

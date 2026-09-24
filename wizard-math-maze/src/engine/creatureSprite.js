@@ -2,6 +2,8 @@
 // Drawn the same way as the wizards: pure canvas from a handful of data fields,
 // so a new creature costs a config line and there is nothing to host.
 
+import { grain } from './portrait.js'
+
 const TAU = Math.PI * 2
 
 export const CREATURES = [
@@ -81,11 +83,31 @@ export function drawCreature(ctx, o) {
         ctx.closePath()
       }
       wing()
-      ctx.fillStyle = shadeC(c.body, -0.4)
+      // Membrane, not leather: darker where it is stretched thin between the
+      // fingers and lighter towards the body, with the light coming through it.
+      const wg = ctx.createLinearGradient(sgn * h * 0.18, -h * 0.3, sgn * h * 0.8, -h * 0.9)
+      wg.addColorStop(0, shadeC(c.body, -0.28))
+      wg.addColorStop(1, shadeC(c.body, -0.52))
+      ctx.fillStyle = wg
       ctx.fill()
       volume(ctx, wing, { x: sgn < 0 ? -h * 0.85 : 0, y: -h * 0.95, w: h * 0.85, h: h * 0.8 }, 0.8)
+      ctx.save()
+      wing(); ctx.clip()
+      grain(ctx, -h, -h, h * 2, h * 1.2, 13, 0.05)
+      ctx.restore()
       wing()
       outline(ctx, h, c.body, 0.8)
+      // The leading edge is bone under skin and catches the light along its
+      // whole length; the trailing edge does not.
+      ctx.save()
+      ctx.filter = `blur(${Math.max(0.5, h * 0.006)}px)`
+      ctx.strokeStyle = `rgba(255,255,255,${0.22 * fade})`
+      ctx.lineWidth = Math.max(1, h * 0.012)
+      ctx.beginPath()
+      ctx.moveTo(sgn * h * 0.19, -h * 0.57)
+      ctx.quadraticCurveTo(sgn * h * 0.52, -h * (tip + 0.05), sgn * h * 0.77, -h * tip)
+      ctx.stroke()
+      ctx.restore()
       // Membrane ribs
       ctx.save()
       wing(); ctx.clip()
@@ -180,6 +202,7 @@ export function drawCreature(ctx, o) {
   ctx.fillStyle = c.body
   ctx.fill()
   volume(ctx, body, { x: -h * 0.5, y: -h * 0.85, w: h, h: h * 0.9 })
+  surface(ctx, c, h, t, body, fade)
   body()
   outline(ctx, h, c.body)
 
@@ -247,9 +270,29 @@ export function drawCreature(ctx, o) {
         ctx.closePath()
       }
       horn()
-      ctx.fillStyle = c.accent
+      // Dark where it leaves the skull, bright at the point. A horn lit evenly
+      // is a plastic traffic cone; the whole read is in the gradient.
+      const hg = ctx.createLinearGradient(sgn * h * 0.1, -h * 0.68, sgn * h * 0.22, -h * 1.02)
+      hg.addColorStop(0, shadeC(c.accent, -0.45))
+      hg.addColorStop(0.55, c.accent)
+      hg.addColorStop(1, shadeC(c.accent, 0.4))
+      ctx.fillStyle = hg
       ctx.fill()
-      volume(ctx, horn, { x: sgn < 0 ? -h * 0.35 : 0, y: -h * 1.05, w: h * 0.35, h: h * 0.35 }, 0.9)
+      ctx.save()
+      horn(); ctx.clip()
+      grain(ctx, -h * 0.4, -h * 1.1, h * 0.8, h * 0.45, 29, 0.055)
+      // Growth rings, which is what separates horn from a shape.
+      ctx.globalAlpha = Math.max(0, fade) * 0.3
+      ctx.strokeStyle = shadeC(c.accent, -0.5)
+      ctx.lineWidth = Math.max(0.6, h * 0.007)
+      for (let i = 1; i < 4; i++) {
+        const f = i / 4
+        ctx.beginPath()
+        ctx.moveTo(sgn * h * (0.14 + 0.1 * f), -h * (0.70 + 0.3 * f))
+        ctx.lineTo(sgn * h * (0.06 + 0.08 * f), -h * (0.73 + 0.3 * f))
+        ctx.stroke()
+      }
+      ctx.restore()
       horn()
       outline(ctx, h, c.accent, 0.7)
     }
@@ -417,4 +460,150 @@ function shadeC(hex, amt) {
     return Math.max(0, Math.min(255, Math.round(out)))
   })
   return `rgb(${ch[0]},${ch[1]},${ch[2]})`
+}
+
+/**
+ * The material pass: what each creature is actually MADE of.
+ *
+ * Up to here every creature is a silhouette with one gradient across it, which
+ * is why four very different animals all read as the same plastic toy in four
+ * colours. The wizards got past that with modelling, texture and a rim light,
+ * and the same three do the work here — plus the part that matters most for a
+ * monster, which is that stone, slime, fur and hide catch light in four
+ * completely different ways:
+ *
+ *   imp    hide, matte, mottled with soot, lit from within at the belly
+ *   slime  translucent, so the light goes THROUGH it and pools at the bottom
+ *   bat    fur, which has no hard edge at all — the silhouette breaks up
+ *   golem  chalk, flat facets and dust, with the light snapping between planes
+ *
+ * All of it is clipped to the body, so none of it can leak onto the background
+ * the way an unclipped shadow once did on the wizards' hats.
+ */
+function surface(ctx, c, h, t, body, fade = 1) {
+  ctx.save()
+  body()
+  ctx.clip()
+
+  // The light, from the upper left, for every creature.
+  const lit = ctx.createLinearGradient(-h * 0.45, -h * 0.85, h * 0.45, -h * 0.05)
+  lit.addColorStop(0, 'rgba(255,255,255,0.20)')
+  lit.addColorStop(0.45, 'rgba(255,255,255,0)')
+  lit.addColorStop(1, 'rgba(10,4,24,0.34)')
+  ctx.fillStyle = lit
+  ctx.fillRect(-h, -h * 1.1, h * 2, h * 1.2)
+
+  // ...and the ground it is standing on, throwing a little of it back up.
+  const bounce = ctx.createLinearGradient(0, h * 0.02, 0, -h * 0.22)
+  bounce.addColorStop(0, 'rgba(255,214,170,0.18)')
+  bounce.addColorStop(1, 'rgba(255,214,170,0)')
+  ctx.fillStyle = bounce
+  ctx.fillRect(-h, -h * 0.3, h * 2, h * 0.34)
+
+  const seed = (c.id || '').length * 17 + 3
+
+  if (c.shape === 'slime') {
+    // Light goes in and comes back out lower down. That pooled glow near the
+    // bottom is the entire difference between jelly and a painted dome.
+    const deep = ctx.createRadialGradient(0, -h * 0.16, h * 0.02, 0, -h * 0.16, h * 0.42)
+    deep.addColorStop(0, `rgba(255,255,255,${0.34 * fade})`)
+    deep.addColorStop(0.55, `rgba(255,255,255,${0.09 * fade})`)
+    deep.addColorStop(1, 'rgba(255,255,255,0)')
+    ctx.fillStyle = deep
+    ctx.fillRect(-h, -h * 1.1, h * 2, h * 1.2)
+    // Bubbles suspended in it, drifting up.
+    ctx.globalAlpha = 0.3 * fade
+    ctx.strokeStyle = '#ffffff'
+    ctx.lineWidth = Math.max(0.6, h * 0.006)
+    for (let i = 0; i < 5; i++) {
+      const bx = (noiseC(i, seed) - 0.5) * h * 0.5
+      const drift = ((t / 2600) + i / 5) % 1
+      const by = -h * (0.08 + drift * 0.6)
+      const br = h * (0.012 + 0.022 * noiseC(i + 9, seed))
+      ctx.beginPath()
+      ctx.arc(bx, by, br, 0, TAU)
+      ctx.stroke()
+    }
+    ctx.globalAlpha = fade
+  } else if (c.shape === 'golem') {
+    // Chalk: flat planes that snap from light to dark, and dust in the grain.
+    ctx.fillStyle = 'rgba(255,255,255,0.13)'
+    ctx.beginPath()
+    ctx.moveTo(-h * 0.42, -h * 0.58)
+    ctx.lineTo(-h * 0.2, -h * 0.8)
+    ctx.lineTo(-h * 0.04, -h * 0.8)
+    ctx.lineTo(-h * 0.3, -h * 0.2)
+    ctx.closePath()
+    ctx.fill()
+    ctx.fillStyle = 'rgba(8,4,20,0.2)'
+    ctx.beginPath()
+    ctx.moveTo(h * 0.16, -h * 0.8)
+    ctx.lineTo(h * 0.42, -h * 0.58)
+    ctx.lineTo(h * 0.35, 0)
+    ctx.lineTo(h * 0.1, 0)
+    ctx.closePath()
+    ctx.fill()
+    grain(ctx, -h * 0.5, -h * 0.9, h, h, seed, 0.1)
+  } else if (c.shape === 'bat') {
+    grain(ctx, -h * 0.45, -h * 0.85, h * 0.9, h * 0.9, seed, 0.06)
+    // Fur: short strokes all round the silhouette, inside the clip, so the
+    // outline stops being a drawn line and starts being an animal.
+    ctx.globalAlpha = 0.34 * fade
+    ctx.strokeStyle = shadeC(c.body, -0.5)
+    ctx.lineCap = 'round'
+    ctx.filter = `blur(${Math.max(0.4, h * 0.005)}px)`
+    for (let i = 0; i < 40; i++) {
+      const a = (i / 40) * TAU + noiseC(i, seed) * 0.08
+      const rx = h * 0.31, ry = h * 0.36
+      const x0 = Math.cos(a) * rx, y0 = Math.sin(a) * ry
+      // Uneven lengths and weights. Forty identical spikes at even spacing is
+      // stitching round the edge of a cushion, which is what the first pass at
+      // this looked like.
+      const k = 0.88 + 0.07 * noiseC(i + 4, seed)
+      ctx.lineWidth = Math.max(0.5, h * (0.005 + 0.004 * noiseC(i + 11, seed)))
+      ctx.beginPath()
+      ctx.moveTo(x0 * k, -h * 0.42 + y0 * k)
+      ctx.lineTo(x0 * 1.01, -h * 0.42 + y0 * 1.01)
+      ctx.stroke()
+    }
+    ctx.filter = 'none'
+    ctx.globalAlpha = fade
+  } else {
+    grain(ctx, -h * 0.5, -h * 0.9, h, h * 0.95, seed, 0.07)
+    // Soot, in three soft patches rather than a pattern.
+    ctx.globalAlpha = 0.22 * fade
+    ctx.fillStyle = '#2a1008'
+    ctx.filter = `blur(${Math.max(1, h * 0.02)}px)`
+    for (const [bx, by, br] of [[-0.22, -0.62, 0.1], [0.26, -0.5, 0.08], [-0.05, -0.2, 0.12]]) {
+      ctx.beginPath()
+      ctx.ellipse(h * bx, h * by, h * br, h * br * 0.7, 0.4, 0, TAU)
+      ctx.fill()
+    }
+    ctx.filter = 'none'
+    ctx.globalAlpha = fade
+    // An ember burning somewhere inside it.
+    const emb = ctx.createRadialGradient(0, -h * 0.2, h * 0.01, 0, -h * 0.2, h * 0.3)
+    emb.addColorStop(0, `rgba(255,170,60,${(0.22 + 0.08 * Math.sin(t / 600)) * fade})`)
+    emb.addColorStop(1, 'rgba(255,120,30,0)')
+    ctx.fillStyle = emb
+    ctx.fillRect(-h, -h * 0.9, h * 2, h)
+  }
+
+  // The rim light, last and along the lit edge only. Same trick as the robes:
+  // it is what stops a silhouette reading as a sticker on the background.
+  ctx.filter = `blur(${Math.max(0.6, h * 0.01)}px)`
+  ctx.strokeStyle = `rgba(255,255,255,${0.3 * fade})`
+  ctx.lineWidth = Math.max(1, h * 0.022)
+  ctx.save()
+  ctx.translate(h * 0.012, h * 0.012)
+  body()
+  ctx.stroke()
+  ctx.restore()
+  ctx.restore()
+}
+
+/** Cheap deterministic noise, so a creature's blemishes stay put frame to frame. */
+function noiseC(a, b) {
+  const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453
+  return s - Math.floor(s)
 }

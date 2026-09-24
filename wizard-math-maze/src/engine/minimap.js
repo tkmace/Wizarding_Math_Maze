@@ -52,10 +52,14 @@ export function renderMinimap(ctx, { grid, dq, seen, stones, row, col, facing, t
         ctx.fillText('★', x + cs / 2, y + cs / 2 + 0.5)
         ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'
       }
-      if (stones?.[cellKey(r, c)] && cs >= 6) {
-        ctx.fillStyle = '#5ad9ff'
+      const stone = stones?.[cellKey(r, c)]
+      if (stone && cs >= 6) {
+        // The great one is gold and twice the size, so a glance at the map
+        // says where the detour is worth taking.
+        const great = stone !== true && stone > 1
+        ctx.fillStyle = great ? '#ffcb45' : '#5ad9ff'
         ctx.beginPath()
-        ctx.arc(x + cs / 2, y + cs / 2, Math.max(1.2, cs * 0.18), 0, Math.PI * 2)
+        ctx.arc(x + cs / 2, y + cs / 2, Math.max(1.2, cs * (great ? 0.3 : 0.18)), 0, Math.PI * 2)
         ctx.fill()
       }
     }

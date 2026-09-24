@@ -110,158 +110,233 @@ export function drawCrest(ctx, o) {
 /**
  * The head, in profile, facing left — the heraldic convention and the one angle
  * where a hooked beak and a brow ridge do all the work.
+ *
+ * What makes a mascot eagle read as an EAGLE rather than a bird:
+ *
+ *  - the nape is a mass of individual pointed feathers, layered like roof
+ *    tiles, not a smooth outline with spikes stuck to it. This is most of the
+ *    picture and nearly all of the character.
+ *  - the eye is SMALL and hard, set close behind the beak. A big round eye with
+ *    a highlight is a cartoon chick; the same head with a small almond eye
+ *    under a heavy brow is a raptor.
+ *  - the brow is a solid black wedge, not a grey bar floating over the eye.
+ *  - the beak is long, deep at the cere, and hooks to a point BELOW the jaw,
+ *    with the mouth line running back under the eye.
+ *
+ * Flat fills and hard ink, deliberately: this is heraldry on a badge that has
+ * to survive being 44px wide, which is the opposite problem from the painted
+ * faces and wants the opposite treatment.
  */
 function drawEagle(ctx, w, h, n, t) {
-  const cx = w * 0.10, cy = h * 0.50          // the eye sits near the shield's centre
-  const R = w * 0.245                         // skull radius
+  // Set so the beak clears the left edge and the ruff has room to spill to the
+  // right without touching the border. The head is smaller than it looks: most
+  // of the mass in the shield is feathers, which is true of the bird as well.
+  const cx = w * 0.05, cy = h * 0.455
+  const R = w * 0.225
   const ink = n.ink
-  const line = Math.max(1, w * 0.032)
+  const line = Math.max(1.1, w * 0.030)
 
   ctx.save()
   ctx.translate(cx, cy)
 
-  /** One feather: a leaf swept back from `base` along `a`. */
-  const feather = (bx, by, a, len, wide, fill) => {
-    const nx = -Math.sin(a) * wide, ny = Math.cos(a) * wide
-    const tx = bx + Math.cos(a) * len, ty = by + Math.sin(a) * len
-    ctx.beginPath()
-    ctx.moveTo(bx + nx, by + ny)
-    ctx.quadraticCurveTo(bx + Math.cos(a) * len * 0.62 + nx * 0.7,
-                         by + Math.sin(a) * len * 0.62 + ny * 0.7, tx, ty)
-    ctx.quadraticCurveTo(bx + Math.cos(a) * len * 0.62 - nx * 0.7,
-                         by + Math.sin(a) * len * 0.62 - ny * 0.7, bx - nx, by - ny)
-    ctx.closePath()
-    ctx.fillStyle = fill
-    ctx.fill()
+  const stroke = (lw = 1) => {
     ctx.strokeStyle = ink
-    ctx.lineWidth = line * 0.7
+    ctx.lineWidth = line * lw
     ctx.stroke()
   }
 
-  // ── Crown feathers ─────────────────────────────────────────────────────────
-  // The harpy's double crest stands straight up; the bald eagle has almost
-  // nothing. This is the difference you can still see at badge size.
-  if (n.crest > 0.05) {
-    const up = R * (0.34 + n.crest * 0.90)
-    feather(-R * 0.04, -R * 0.70, -1.46, up, R * 0.21, n.nape)
-    if (n.crest > 0.5) feather(R * 0.34, -R * 0.62, -1.08, up * 0.88, R * 0.19, shade(n.nape, -0.12))
+  /**
+   * One feather: a pointed leaf from `base`, swept along `a`, widest a third of
+   * the way out. Drawn tip-last so a row of them overlaps like tiles.
+   */
+  const feather = (bx, by, a, len, wide, fill, lw = 0.62) => {
+    const ca = Math.cos(a), sa = Math.sin(a)
+    const nx = -sa * wide, ny = ca * wide
+    ctx.beginPath()
+    ctx.moveTo(bx + nx, by + ny)
+    ctx.quadraticCurveTo(bx + ca * len * 0.55 + nx * 1.05, by + sa * len * 0.55 + ny * 1.05,
+                         bx + ca * len, by + sa * len)
+    ctx.quadraticCurveTo(bx + ca * len * 0.55 - nx * 1.05, by + sa * len * 0.55 - ny * 1.05,
+                         bx - nx, by - ny)
+    ctx.closePath()
+    ctx.fillStyle = fill
+    ctx.fill()
+    stroke(lw)
   }
 
-  // ── Nape feathers ──────────────────────────────────────────────────────────
-  // Swept back and down off the skull — a ruff, not a sunburst.
-  for (let i = 0; i < 4; i++) {
-    const f = i / 3
-    const a = -0.34 + f * 1.24
-    const bx = Math.cos(a) * R * 0.74, by = Math.sin(a) * R * 0.74
-    feather(bx, by, a, R * (0.56 - f * 0.10), R * (0.22 - f * 0.04),
-            i % 2 ? n.nape : shade(n.nape, -0.12))
+  const dark = shade(n.nape, -0.18)
+
+  // ── The crest ──────────────────────────────────────────────────────────────
+  // A harpy wears two long feathers standing straight off the crown and splayed
+  // apart; a golden eagle has a short stiff ruff; a bald eagle has none at all.
+  // This is the one difference still legible at badge size, so it goes in first
+  // and everything else is drawn over its roots.
+  if (n.crest > 0.05) {
+    const up = R * (0.28 + n.crest * 0.62)
+    feather(-R * 0.06, -R * 0.84, -1.70, up, R * 0.17, n.nape)
+    if (n.crest > 0.45) {
+      feather(R * 0.22, -R * 0.84, -1.34, up * 0.96, R * 0.16, dark)
+      feather(R * 0.50, -R * 0.66, -1.06, up * 0.82, R * 0.14, n.nape)
+    }
   }
+
+  // ── The nape ───────────────────────────────────────────────────────────────
+  // Two rows sweeping from the crown round to the throat, the lower ones longer
+  // so the ruff hangs rather than radiating. Back row first, in the darker
+  // tone, so the front row reads as sitting on top of it.
+  const ruff = (r0, lenK, wideK, tone, lw, count = 8) => {
+    for (let i = 0; i < count; i++) {
+      const f = i / (count - 1)
+      const a = -0.78 + f * 2.08                    // where on the skull it grows
+      // Where it POINTS is not where it grows. Feathers laid back along the
+      // neck all sweep the same way, towards the shoulder; letting each one
+      // point straight out from the skull turns the ruff into a sunburst, and
+      // the bird into a lion.
+      const dir = a * 0.55 + 0.12
+      const bx = Math.cos(a) * R * r0, by = Math.sin(a) * R * r0
+      const len = R * lenK * (0.78 + 0.46 * Math.sin(Math.PI * f))
+      feather(bx, by, dir, len, R * wideK * (1 - f * 0.22),
+              i % 2 ? tone : shade(tone, -0.1), lw)
+    }
+  }
+  // Rooted OUTSIDE the skull, or the whole ruff hides behind it — which is
+  // exactly what the first attempt did, leaving a bald head with a few spikes.
+  // Fewer, chunkier feathers on a small badge. Ten feathers and two rows is a
+  // texture at 150px and a smudge at 44px, where the outlines alone are wider
+  // than the gaps between them.
+  const small = w < 64
+  ruff(1.08, 0.56, small ? 0.22 : 0.17, shade(n.nape, -0.34), 0.5, small ? 6 : 10)
+  if (!small) ruff(0.90, 0.48, 0.16, n.nape, 0.55, 9)
 
   // ── Skull ──────────────────────────────────────────────────────────────────
-  // A wedge: flat across the crown, widest at the back, tapering forward into
-  // the beak and down into the throat. A circle here reads as an owl.
+  // Flat along the crown, deepest at the back, tapering into the beak. The
+  // throat runs down and forward so the ruff appears to grow out of it.
   ctx.beginPath()
-  ctx.moveTo(-R * 0.86, -R * 0.34)                                   // brow, above the beak
-  ctx.bezierCurveTo(-R * 0.66, -R * 0.86, R * 0.14, -R * 0.96, R * 0.64, -R * 0.56)
-  ctx.bezierCurveTo(R * 1.00, -R * 0.24, R * 0.98, R * 0.42, R * 0.62, R * 0.80)
-  ctx.bezierCurveTo(R * 0.26, R * 1.14, -R * 0.34, R * 0.96, -R * 0.62, R * 0.46)
-  ctx.bezierCurveTo(-R * 0.76, R * 0.20, -R * 0.90, R * 0.00, -R * 0.86, -R * 0.34)
+  ctx.moveTo(-R * 0.92, -R * 0.30)
+  ctx.bezierCurveTo(-R * 0.70, -R * 0.96, R * 0.20, -R * 1.06, R * 0.72, -R * 0.52)
+  ctx.bezierCurveTo(R * 1.02, -R * 0.14, R * 0.94, R * 0.48, R * 0.52, R * 0.86)
+  ctx.bezierCurveTo(R * 0.10, R * 1.14, -R * 0.44, R * 0.86, -R * 0.66, R * 0.40)
+  ctx.bezierCurveTo(-R * 0.82, R * 0.14, -R * 0.96, -R * 0.02, -R * 0.92, -R * 0.30)
   ctx.closePath()
   const hg = ctx.createLinearGradient(-R * 0.6, -R, R * 0.9, R)
-  hg.addColorStop(0, shade(n.head, 0.18))
-  hg.addColorStop(0.55, n.head)
-  hg.addColorStop(1, shade(n.head, -0.26))
+  hg.addColorStop(0, shade(n.head, 0.16))
+  hg.addColorStop(0.58, n.head)
+  hg.addColorStop(1, shade(n.head, -0.22))
   ctx.fillStyle = hg
   ctx.fill()
-  ctx.strokeStyle = ink
-  ctx.lineWidth = line
-  ctx.stroke()
+  stroke(1)
+
+  // A few feather marks where the skull meets the ruff, so the join is not a
+  // bare edge. Short strokes, curving back: barbs, not scratches.
+  ctx.save()
+  ctx.globalAlpha = 0.16
+  ctx.strokeStyle = shade(n.head, -0.45)
+  ctx.lineWidth = line * 0.45
+  for (let i = 0; i < 5; i++) {
+    const a = -0.5 + i * 0.44
+    ctx.beginPath()
+    ctx.moveTo(Math.cos(a) * R * 0.30, Math.sin(a) * R * 0.30 + R * 0.1)
+    ctx.quadraticCurveTo(Math.cos(a) * R * 0.56, Math.sin(a) * R * 0.56 + R * 0.12,
+                         Math.cos(a + 0.2) * R * 0.74, Math.sin(a + 0.2) * R * 0.74 + R * 0.1)
+    ctx.stroke()
+  }
+  ctx.restore()
 
   // ── Beak ───────────────────────────────────────────────────────────────────
-  // Long, deep at the base, hooking to a point well below the jawline. This is
-  // the shape that says "eagle" at any size, so it is given room.
+  const bx0 = -R * 0.80, by0 = -R * 0.40
   ctx.beginPath()
-  ctx.moveTo(-R * 0.78, -R * 0.42)
-  ctx.bezierCurveTo(-R * 1.36, -R * 0.40, -R * 1.74, -R * 0.02, -R * 1.62, R * 0.62)
-  ctx.bezierCurveTo(-R * 1.58, R * 0.26, -R * 1.30, R * 0.10, -R * 0.96, R * 0.12)
-  ctx.lineTo(-R * 0.74, R * 0.02)
+  ctx.moveTo(bx0, by0)
+  ctx.bezierCurveTo(-R * 1.42, -R * 0.42, -R * 1.86, R * 0.06, -R * 1.70, R * 0.80)   // down to the hook
+  ctx.bezierCurveTo(-R * 1.66, R * 0.32, -R * 1.34, R * 0.12, -R * 0.98, R * 0.14)    // back under
+  ctx.lineTo(-R * 0.72, R * 0.02)
   ctx.closePath()
-  const bg = ctx.createLinearGradient(-R * 1.7, -R * 0.5, -R * 0.7, R * 0.6)
-  bg.addColorStop(0, shade(n.beak, 0.34))
-  bg.addColorStop(1, shade(n.beak, -0.30))
+  const bg = ctx.createLinearGradient(-R * 1.8, -R * 0.5, -R * 0.7, R * 0.7)
+  bg.addColorStop(0, shade(n.beak, 0.30))
+  bg.addColorStop(0.6, n.beak)
+  bg.addColorStop(1, shade(n.beak, -0.34))
   ctx.fillStyle = bg
   ctx.fill()
-  ctx.strokeStyle = ink
-  ctx.lineWidth = line
-  ctx.stroke()
+  stroke(1)
 
-  // Lower mandible, a slim wedge tucked under the hook.
+  // Lower mandible, tucked under the hook.
   ctx.beginPath()
-  ctx.moveTo(-R * 0.76, R * 0.06)
-  ctx.quadraticCurveTo(-R * 1.24, R * 0.18, -R * 1.14, R * 0.46)
-  ctx.quadraticCurveTo(-R * 0.96, R * 0.34, -R * 0.70, R * 0.32)
+  ctx.moveTo(-R * 0.74, R * 0.06)
+  ctx.quadraticCurveTo(-R * 1.34, R * 0.22, -R * 1.22, R * 0.54)
+  ctx.quadraticCurveTo(-R * 1.00, R * 0.38, -R * 0.66, R * 0.34)
   ctx.closePath()
-  ctx.fillStyle = shade(n.beak, -0.36)
+  ctx.fillStyle = shade(n.beak, -0.38)
   ctx.fill()
-  ctx.strokeStyle = ink
-  ctx.lineWidth = line * 0.8
-  ctx.stroke()
+  stroke(0.8)
 
-  // The cere and one nostril — stops the beak reading as a flat wedge.
+  // The mouth line, running back past the eye. Half the scowl is here: it puts
+  // a hard horizontal under the eye that the brow can close against.
   ctx.beginPath()
-  ctx.moveTo(-R * 0.80, -R * 0.40)
-  ctx.quadraticCurveTo(-R * 1.02, -R * 0.30, -R * 1.04, R * 0.00)
-  ctx.strokeStyle = 'rgba(0,0,0,.28)'
-  ctx.lineWidth = line * 0.7
-  ctx.stroke()
+  ctx.moveTo(-R * 1.28, R * 0.20)
+  ctx.quadraticCurveTo(-R * 0.96, R * 0.10, -R * 0.52, R * 0.02)
+  stroke(0.75)
+
+  // Cere and nostril.
   ctx.beginPath()
-  ctx.arc(-R * 0.94, -R * 0.18, Math.max(0.7, R * 0.08), 0, TAU)
-  ctx.fillStyle = 'rgba(0,0,0,.50)'
+  ctx.moveTo(-R * 0.84, -R * 0.38)
+  ctx.quadraticCurveTo(-R * 1.08, -R * 0.26, -R * 1.10, R * 0.04)
+  ctx.save()
+  ctx.globalAlpha = 0.34
+  stroke(0.7)
+  ctx.restore()
+  ctx.beginPath()
+  ctx.ellipse(-R * 0.99, -R * 0.16, Math.max(0.8, R * 0.09), Math.max(0.6, R * 0.06), -0.4, 0, TAU)
+  ctx.fillStyle = 'rgba(0,0,0,.55)'
   ctx.fill()
 
   // ── Eye ────────────────────────────────────────────────────────────────────
-  const ex = -R * 0.26, ey = -R * 0.20, er = R * 0.26
+  // Small, almond, tipped down towards the beak.
+  const ex = -R * 0.34, ey = -R * 0.20, er = R * 0.20
+  ctx.save()
+  ctx.translate(ex, ey)
+  ctx.rotate(0.22)
   ctx.beginPath()
-  ctx.arc(ex, ey, er, 0, TAU)
-  ctx.fillStyle = '#fffaf0'
+  ctx.moveTo(-er * 1.25, 0)
+  ctx.quadraticCurveTo(-er * 0.2, -er * 0.92, er * 1.2, -er * 0.16)
+  ctx.quadraticCurveTo(er * 0.1, er * 0.78, -er * 1.25, 0)
+  ctx.closePath()
+  ctx.fillStyle = '#fdf7e8'
   ctx.fill()
-  ctx.strokeStyle = ink
-  ctx.lineWidth = line * 0.7
-  ctx.stroke()
-
+  ctx.save()
+  ctx.clip()
   ctx.beginPath()
-  ctx.arc(ex - er * 0.14, ey + er * 0.04, er * 0.62, 0, TAU)
+  ctx.arc(-er * 0.12, -er * 0.04, er * 0.72, 0, TAU)
   ctx.fillStyle = n.eye
   ctx.fill()
   ctx.beginPath()
-  ctx.arc(ex - er * 0.16, ey + er * 0.06, er * 0.32, 0, TAU)
-  ctx.fillStyle = '#140d04'
+  ctx.arc(-er * 0.18, 0, er * 0.40, 0, TAU)
+  ctx.fillStyle = '#120b03'
   ctx.fill()
   ctx.beginPath()
-  ctx.arc(ex - er * 0.40, ey - er * 0.38, er * 0.19, 0, TAU)
-  ctx.fillStyle = 'rgba(255,255,255,.95)'
+  ctx.arc(-er * 0.42, -er * 0.34, er * 0.16, 0, TAU)
+  ctx.fillStyle = 'rgba(255,255,255,.9)'
   ctx.fill()
+  ctx.restore()
+  ctx.beginPath()
+  ctx.moveTo(-er * 1.25, 0)
+  ctx.quadraticCurveTo(-er * 0.2, -er * 0.92, er * 1.2, -er * 0.16)
+  ctx.quadraticCurveTo(er * 0.1, er * 0.78, -er * 1.25, 0)
+  ctx.closePath()
+  stroke(0.6)
+  ctx.restore()
 
   // ── Brow ───────────────────────────────────────────────────────────────────
-  // The shelf of bone that gives every eagle its glare: a wedge running from
-  // the back of the head down over the eye toward the beak. Steepen it and the
-  // bird scowls, level it and it merely watches — which is the whole difference
-  // between a bald eagle and a sea eagle here.
-  const dip = er * (0.04 + n.brow * 0.40)
+  // A solid wedge of ink from the back of the skull, over the eye, down to a
+  // point at the cere. `brow` sets how far it dips over the eye, which is the
+  // whole difference between a bald eagle's glare and a sea eagle's stare.
+  const dip = er * (0.12 + n.brow * 0.52)
   ctx.beginPath()
-  ctx.moveTo(ex + er * 1.48, ey - er * 1.04)                    // thick at the skull
-  ctx.quadraticCurveTo(ex + er * 0.10, ey - er * 1.42, ex - er * 1.92, ey - er * 0.62)
-  ctx.quadraticCurveTo(ex - er * 1.30, ey - er * 0.62, ex - er * 1.74, ey - er * 0.40)
-  ctx.quadraticCurveTo(ex - er * 0.30, ey - er * 0.94 + dip, ex + er * 1.52, ey - er * 0.52)
+  ctx.moveTo(ex + er * 1.90, ey - er * 1.30)
+  ctx.quadraticCurveTo(ex + er * 0.20, ey - er * 1.80, ex - er * 2.30, ey - er * 0.52)
+  ctx.quadraticCurveTo(ex - er * 1.10, ey - er * 0.42 - dip * 0.2, ex - er * 0.20, ey - er * 0.70 + dip)
+  ctx.quadraticCurveTo(ex + er * 1.05, ey - er * 1.02, ex + er * 1.94, ey - er * 0.64)
   ctx.closePath()
-  ctx.fillStyle = shade(n.head, -0.40)                          // a shadow, not a line
+  ctx.fillStyle = shade(n.ink, 0.06)
   ctx.fill()
-  ctx.save()
-  ctx.globalAlpha = 0.5
-  ctx.strokeStyle = ink
-  ctx.lineWidth = line * 0.55
-  ctx.stroke()
-  ctx.restore()
 
   ctx.restore()
 }

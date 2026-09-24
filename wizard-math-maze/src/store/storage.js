@@ -38,6 +38,8 @@ export function blankProfile(name, passcode) {
     equippedSkin: STARTER,
     chosen: {},                    // rank -> chosen form id, one pick per rank
     bought: [],                    // form ids bought with rune stones
+    trinkets: [],                  // curios bought in the shop, hers for good
+    wearing: [],                   // which of those she has on right now
     appearance: randomAppearance(),// face and hair — hers, kept across every form
     nest: null,                    // one of the four nests, chosen on first run
     skill: blankSkill(),           // per-operation 0..1, drives Wizard's Sense
@@ -73,6 +75,8 @@ export function migrate(p) {
     facts: p.facts || {},
     chosen: { ...(p.chosen || {}) },
     bought: Array.isArray(p.bought) ? [...p.bought] : [],
+    trinkets: Array.isArray(p.trinkets) ? [...p.trinkets] : [],
+    wearing: Array.isArray(p.wearing) ? [...p.wearing] : [],
     skill: { ...blankSkill(), ...(p.skill || {}) },
     appearance: { ...blankAppearance(), ...(p.appearance || {}) },
     opPlays: { ...(p.opPlays || {}) },

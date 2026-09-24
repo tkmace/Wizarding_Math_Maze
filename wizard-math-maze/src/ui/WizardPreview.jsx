@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { drawWizard } from '../engine/wizardSprite.js'
 import { lookFor } from '../game/wizards.js'
+import { wornTrinkets } from '../game/trinkets.js'
 
 /**
  * A live, animated wizard on a small canvas. Used for the hub portrait, the
@@ -15,6 +16,7 @@ export default function WizardPreview({ profile, form, appearance, size = 140, v
   const ref = useRef(null)
   const app = appearance ?? profile?.appearance
   const wizId = profile?.wizard
+  const wornKey = (profile?.wearing || []).join(',')
 
   useEffect(() => {
     const cv = ref.current
@@ -30,6 +32,7 @@ export default function WizardPreview({ profile, form, appearance, size = 140, v
     cv.width = Math.round(size * dpr)
     cv.height = Math.round(size * dpr)
     const face = wizId || app ? lookFor({ wizard: wizId, appearance: app }) : null
+    const trinkets = wornTrinkets(profile)
 
     let raf
     const frame = t => {
@@ -39,7 +42,7 @@ export default function WizardPreview({ profile, form, appearance, size = 140, v
         x: cv.width / 2,
         yBase: cv.height * 0.94,
         h: cv.height * 0.82,
-        form, appearance: app, face,
+        form, appearance: app, face, trinkets,
         t: animate ? t : 1200,
         moving: false,
         view,
@@ -48,7 +51,7 @@ export default function WizardPreview({ profile, form, appearance, size = 140, v
     }
     raf = requestAnimationFrame(frame)
     return () => cancelAnimationFrame(raf)
-  }, [form, app, wizId, size, view, animate])
+  }, [form, app, wizId, wornKey, size, view, animate])
 
   return (
     <canvas

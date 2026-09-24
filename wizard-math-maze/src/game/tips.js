@@ -69,7 +69,8 @@ export const TIPS = {
     title: 'A rune stone',
     lines: [
       'Rune stones are scattered through the mazes. Spend one at a door for a **hint**.',
-      'Or save them up — the wardrobe sells robes for runes.',
+      'Or save them up — the **Curiosity Shop** in the wardrobe sells wands, pendants and stranger things, and the wardrobe itself sells robes.',
+      'Somewhere in every maze there is one **Great Rune**, worth five on its own. It glows gold, and it is never on the easy path.',
     ],
     cta: 'Mine now',
   },
@@ -78,7 +79,7 @@ export const TIPS = {
     title: 'The wardrobe',
     lines: [
       'Every so often your points earn you a new rank, and a **choice of three robes**. The one you pick is yours forever, and its magic helps you in the maze.',
-      'The two you pass over can be bought later with rune stones.',
+      'The two you pass over can be bought later with rune stones — and the **Curiosity Shop** at the top of this page sells smaller things, from eight runes.',
     ],
     cta: 'Let me look',
   },

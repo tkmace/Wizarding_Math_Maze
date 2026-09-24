@@ -39,7 +39,11 @@ const boxText = () => page.evaluate(() => {
   const el = els.find(d => d.title === 'Tap to clear')
   return el ? el.textContent.trim() : null
 })
-const doorOpen = () => page.locator('button', { hasText: '✓' }).count().then(n => n > 0)
+// The door panel itself, not "a button with a tick on it" — the castle's own
+// operation chips carry a tick, so the old test could decide it had reached a
+// door while still standing in the hub and then fail four assertions about a
+// keypad that was never on screen.
+const doorOpen = () => page.locator('text=/^◆ SEALED DOOR$/').count().then(n => n > 0)
 const clearEncounter = async i => {
   // A first-run explanation sits on top of everything it explains, so it has to
   // go before anything underneath it can be clicked.
@@ -90,7 +94,9 @@ const check = (name, ok, detail = '') => {
 console.log('1. holding ▲ into a door')
 if (!await walkToDoor(true)) { console.log('   never reached a door'); }
 else {
-  await page.waitForTimeout(250)
+  // Wait for the box, rather than for a length of time and a hope.
+  await page.locator('div[title="Tap to clear"]').first()
+    .waitFor({ state: 'visible', timeout: 5000 }).catch(() => {})
   check('answer box starts empty', await boxText() === '?', JSON.stringify(await boxText()))
 
   // ── 2. Typing gives exactly the digits typed ──────────────────────────────

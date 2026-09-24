@@ -512,12 +512,13 @@ function drawStones(ctx, s, W, H, horizonY, zbuf, fov) {
   if (!s.stones) return
   const items = Object.keys(s.stones).map(k => {
     const [r, c] = k.split(',').map(Number)
-    return { r, c, k }
+    const v = s.stones[k]
+    return { r, c, k, great: v !== true && v > 1 }
   })
   for (const it of items) {
     const p = project(s, W, H, horizonY, it.c + 0.5, it.r + 0.5, fov)
     if (!p) continue
-    const sz = p.size * 0.17
+    const sz = p.size * (it.great ? 0.27 : 0.17)
     const bob = Math.sin(s.time / 520 + it.r + it.c) * p.size * 0.03
     const cxp = p.x, cyp = horizonY + p.size * 0.26 + bob
     const half = sz * 0.9
@@ -529,26 +530,43 @@ function drawStones(ctx, s, W, H, horizonY, zbuf, fov) {
     if (!cols.length) continue
 
     ctx.save()
-    clipColumns(ctx, cols, cyp - sz * 2, cyp + sz * 2)
-    const gl = ctx.createRadialGradient(cxp, cyp, 0, cxp, cyp, sz * 1.9)
-    gl.addColorStop(0, 'rgba(140,255,230,0.85)')
-    gl.addColorStop(0.4, 'rgba(90,200,255,0.35)')
-    gl.addColorStop(1, 'rgba(90,200,255,0)')
-    ctx.fillStyle = gl
-    ctx.fillRect(cxp - sz * 2, cyp - sz * 2, sz * 4, sz * 4)
+    clipColumns(ctx, cols, cyp - sz * 2.4, cyp + sz * 2.4)
 
-    // Faceted gem
+    // The Great Rune wears its worth: bigger, gold instead of blue, turning on
+    // the spot, and throwing a halo you can see from two corridors away. A
+    // detour has to be visible from where the decision to take it is made.
+    const halo = it.great ? sz * 2.6 : sz * 1.9
+    const gl = ctx.createRadialGradient(cxp, cyp, 0, cxp, cyp, halo)
+    if (it.great) {
+      const pulse = 0.65 + 0.35 * Math.abs(Math.sin(s.time / 460))
+      gl.addColorStop(0, `rgba(255,236,170,${0.95 * pulse})`)
+      gl.addColorStop(0.35, `rgba(255,186,64,${0.45 * pulse})`)
+      gl.addColorStop(1, 'rgba(255,170,40,0)')
+    } else {
+      gl.addColorStop(0, 'rgba(140,255,230,0.85)')
+      gl.addColorStop(0.4, 'rgba(90,200,255,0.35)')
+      gl.addColorStop(1, 'rgba(90,200,255,0)')
+    }
+    ctx.fillStyle = gl
+    ctx.fillRect(cxp - halo, cyp - halo, halo * 2, halo * 2)
+
+    // Faceted gem. The great one narrows and widens as it turns.
+    const wob = it.great ? 0.30 + 0.34 * Math.abs(Math.cos(s.time / 900)) : 0.62
     ctx.beginPath()
     ctx.moveTo(cxp, cyp - sz)
-    ctx.lineTo(cxp + sz * 0.62, cyp)
+    ctx.lineTo(cxp + sz * wob, cyp)
     ctx.lineTo(cxp, cyp + sz)
-    ctx.lineTo(cxp - sz * 0.62, cyp)
+    ctx.lineTo(cxp - sz * wob, cyp)
     ctx.closePath()
     const gg = ctx.createLinearGradient(cxp - sz, cyp - sz, cxp + sz, cyp + sz)
-    gg.addColorStop(0, '#e6fffb'); gg.addColorStop(0.5, '#5ad9ff'); gg.addColorStop(1, '#1f6fb8')
+    if (it.great) {
+      gg.addColorStop(0, '#fffbe8'); gg.addColorStop(0.5, '#ffcb45'); gg.addColorStop(1, '#b06a10')
+    } else {
+      gg.addColorStop(0, '#e6fffb'); gg.addColorStop(0.5, '#5ad9ff'); gg.addColorStop(1, '#1f6fb8')
+    }
     ctx.fillStyle = gg
     ctx.fill()
-    ctx.strokeStyle = '#dffaff'
+    ctx.strokeStyle = it.great ? '#fff3cc' : '#dffaff'
     ctx.lineWidth = Math.max(0.8, sz * 0.08)
     ctx.stroke()
     ctx.restore()

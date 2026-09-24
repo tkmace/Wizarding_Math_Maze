@@ -119,7 +119,7 @@ function weave(ctx, drawPath, bb, seed, col) {
  * @param o.appearance skin tone / hair colour / hair length (see game/appearance.js)
  */
 export function drawWizard(ctx, o) {
-  const { x, yBase, h, form, t = 0, moving = false, view = 'back', lean = 0, appearance, face } = o
+  const { x, yBase, h, form, t = 0, moving = false, view = 'back', lean = 0, appearance, face, trinkets } = o
   if (!form) return
   const look = resolveLook(appearance)
 
@@ -460,7 +460,7 @@ export function drawWizard(ctx, o) {
     drawHead(ctx, {
       cx: 0, cy: headY, R: headR * 1.02,
       wiz: face.wiz, skin: face.skin, eye: face.eye, hair: face.hair,
-      form, t, neck: false, shoulders: false, breathe: false,
+      form, t, neck: false, shoulders: false, breathe: false, trinkets,
     })
     drawAura(ctx, h, form.aura, t, trim, 'over')
     ctx.restore()

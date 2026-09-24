@@ -11,7 +11,7 @@ import WizardPreview from './WizardPreview.jsx'
  * are still hers to chase — with rune stones rather than points, and always
  * later than the free choice was (see runeCost in game/skins.js).
  */
-export default function Wardrobe({ profile, onEquip, onBuy, onClose }) {
+export default function Wardrobe({ profile, onEquip, onBuy, onShop, onClose }) {
   const reached = rankFor(profile.totalPoints).rank
   const chosen = profile.chosen || {}
   const worn = profile.equippedSkin
@@ -25,6 +25,28 @@ export default function Wardrobe({ profile, onEquip, onBuy, onClose }) {
       onClose={onClose}
     >
       <div style={{ display: 'grid', gap: 14 }}>
+        {/* The other place runes go. Up here rather than at the foot of the
+            page, because the wardrobe is long and a shop nobody scrolls to is
+            a shop nobody visits. */}
+        {onShop && (
+          <button className="bh" onClick={onShop} style={{
+            width: '100%', padding: '11px 12px', borderRadius: 14,
+            border: `2px solid ${C.teal}`, background: `${C.teal}1c`,
+            color: C.teal, fontFamily: serif, fontWeight: 900, fontSize: 15,
+            letterSpacing: 0.5, cursor: 'pointer', textAlign: 'left',
+            display: 'flex', alignItems: 'center', gap: 9,
+          }}>
+            <span style={{ fontSize: 20 }}>🛍️</span>
+            <span style={{ flex: 1 }}>
+              The Curiosity Shop
+              <span style={{ display: 'block', color: C.faint, fontSize: 10.5, fontWeight: 400, fontFamily: sans, letterSpacing: 0 }}>
+                Wands, pendants and stranger things — from 🔮 8
+              </span>
+            </span>
+            <span style={{ fontSize: 16 }}>›</span>
+          </button>
+        )}
+
         {RANKS.map(r => {
           const forms = r.rank === 0 ? [formById('apprentice')] : formsAtRank(r.rank)
           const pickedId = r.rank === 0 ? 'apprentice' : chosen[r.rank]

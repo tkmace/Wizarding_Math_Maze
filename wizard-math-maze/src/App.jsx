@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { genMaze, revealFrom, WALL, PATH, DOOR, END, FACING_DELTA, cellKey } from './game/maze.js'
 import { recordAnswer } from './game/curriculum.js'
 import { roundPts, SENSE } from './game/math.js'
+import { trinketById, buyTrinketState, ownsTrinket } from './game/trinkets.js'
 import { formById, rankFor, pendingRanks, activePerks, buyState, STARTER } from './game/skins.js'
 import { rollEncounter, encounterReward, duelIsTimed } from './game/encounters.js'
 import { hasNest } from './game/nests.js'
@@ -15,6 +16,7 @@ import Hub from './ui/Hub.jsx'
 import GameView from './ui/GameView.jsx'
 import MathDoor from './ui/MathDoor.jsx'
 import Wardrobe from './ui/Wardrobe.jsx'
+import Shop from './ui/Shop.jsx'
 import WinScreen from './ui/WinScreen.jsx'
 import ParentReport from './ui/ParentReport.jsx'
 import ScrollPanel from './ui/ScrollPanel.jsx'
@@ -215,9 +217,12 @@ export default function App() {
 
     const k = cellKey(nr, nc)
     if (maze.stones?.[k]) {
+      // A stone's entry is what it is WORTH. Older saved mazes stored `true`,
+      // which is one.
+      const worth = maze.stones[k] === true ? 1 : (maze.stones[k] || 1)
       delete maze.stones[k]
-      commit({ ...profile, stones: (profile.stones || 0) + 1 })
-      say('🔮 +1 Rune Stone')
+      commit({ ...profile, stones: (profile.stones || 0) + worth })
+      say(worth > 1 ? `✨ THE GREAT RUNE ✨\n🔮 +${worth} rune stones` : '🔮 +1 Rune Stone', worth > 1 ? 2600 : 1500)
       teach('rune')
     }
 
@@ -432,6 +437,32 @@ export default function App() {
     syncUp()
   }, [profile, commit, syncUp])
 
+  /**
+   * Buy a curio from the shop, and put it on straight away.
+   *
+   * Re-priced here rather than trusted from the button, exactly like buying a
+   * robe: a stale render must not be able to hand out a free wand.
+   */
+  const buyTrinket = useCallback(id => {
+    const tr = trinketById(id)
+    const b = buyTrinketState(profile, tr)
+    if (!b.can) return
+    commit({
+      ...profile,
+      stones: (profile.stones || 0) - b.cost,
+      trinkets: [...(profile.trinkets || []), id],
+      wearing: [...(profile.wearing || []), id],
+    })
+    syncUp()
+  }, [profile, commit, syncUp])
+
+  /** Put one on or take it off. Anything she owns can be worn with anything else. */
+  const wearTrinket = useCallback((id, on) => {
+    if (on && !ownsTrinket(profile, id)) return
+    const worn = (profile.wearing || []).filter(x => x !== id)
+    commit({ ...profile, wearing: on ? [...worn, id] : worn })
+  }, [profile, commit])
+
   const saveWizard = useCallback(id => {
     const wiz = wizardById(id)
     // On a FIRST pick she gets the colouring she was just looking at, so the
@@ -531,7 +562,13 @@ export default function App() {
       )}
 
       {screen === 'wardrobe' && profile && (
-        <Wardrobe profile={profile} onEquip={equip} onBuy={buy} onClose={() => setScreen('hub')} />
+        <Wardrobe profile={profile} onEquip={equip} onBuy={buy}
+          onShop={() => setScreen('shop')} onClose={() => setScreen('hub')} />
+      )}
+
+      {screen === 'shop' && profile && (
+        <Shop profile={profile} onBuy={buyTrinket} onWear={wearTrinket}
+          onClose={() => setScreen('wardrobe')} />
       )}
       {screen === 'report' && profile && (
         <ParentReport profile={profile} onClose={() => setScreen('hub')} />

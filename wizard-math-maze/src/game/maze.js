@@ -57,6 +57,36 @@ export function findMinDoorPath(grid) {
  * Door questions come from the curriculum engine, so a maze quietly weights
  * itself toward the facts this player keeps missing.
  */
+/** What the one special rune in each maze is worth. */
+export const GREAT_RUNE = 5
+
+/**
+ * The reachable cell from `cells` that is furthest from (r0,c0) by actual
+ * walking distance — not by straight line, which in a maze is nearly meaningless.
+ */
+function farthestFrom(g, r0, c0, cells) {
+  if (!cells?.length) return null
+  const H = g.length, W = g[0].length
+  const dist = Array.from({ length: H }, () => Array(W).fill(-1))
+  dist[r0][c0] = 0
+  const q = [[r0, c0]]
+  for (let i = 0; i < q.length; i++) {
+    const [r, c] = q[i]
+    for (const [dr, dc] of DIRS4) {
+      const nr = r + dr, nc = c + dc
+      if (nr < 0 || nr >= H || nc < 0 || nc >= W) continue
+      if (g[nr][nc] === WALL || dist[nr][nc] >= 0) continue
+      dist[nr][nc] = dist[r][c] + 1
+      q.push([nr, nc])
+    }
+  }
+  let best = null, bestD = -1
+  for (const [r, c] of cells) {
+    if (dist[r][c] > bestD) { bestD = dist[r][c]; best = [r, c] }
+  }
+  return bestD > 0 ? best : null
+}
+
 export function genMaze(ops, dk, profile, perks = {}, rooms = 6) {
   const R = rooms, C = rooms, H = R * 2 + 1, W = C * 2 + 1
   const g = Array.from({ length: H }, () => Array(W).fill(WALL))
@@ -119,11 +149,24 @@ export function genMaze(ops, dk, profile, perks = {}, rooms = 6) {
     addDoor(r, c)
   }
 
-  // Rune stones: scattered pickups, each worth one visual hint at a door.
+  // ── Rune stones ────────────────────────────────────────────────────────────
+  // Each key maps to what that stone is WORTH, not to `true`. Four a maze was
+  // too thin once there was anything to spend them on: the cheapest thing in
+  // the shop took two mazes and the cheapest robe took five, so picking one up
+  // was an event with no consequence attached.
   const stones = {}
-  const stoneCount = 4 + (perks.stones || 0)
-  const stoneSpots = open.filter(([r, c]) => g[r][c] === PATH).slice(0, stoneCount)
-  for (const [r, c] of stoneSpots) stones[key(r, c)] = true
+  const stoneCount = 6 + (perks.stones || 0)
+  const flat = open.filter(([r, c]) => g[r][c] === PATH)
+  for (const [r, c] of flat.slice(0, stoneCount)) stones[key(r, c)] = 1
+
+  // The Great Rune: one a maze, worth five, and put as far from the door she
+  // came in by as this maze allows. It is the only pickup worth a detour, which
+  // is the point — a maze where the only reason to leave the shortest path is
+  // one more ordinary stone is a maze nobody explores.
+  const far = farthestFrom(g, 1, 1, flat.slice(stoneCount))
+  if (far) stones[key(far[0], far[1])] = GREAT_RUNE
+
+
 
   // "True sight": a few doors show their numbers legibly from a distance
   // instead of the usual blur. This is the Seer perk made visible.
