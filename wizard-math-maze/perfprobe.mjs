@@ -1,5 +1,5 @@
-import { chromium } from 'playwright'
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox', '--disable-dev-shm-usage'] })
+import { SHOTS, DIST, launch } from './testenv.mjs'
+const b = await launch()
 const page = await b.newPage({ viewport: { width: 430, height: 900 }, deviceScaleFactor: 2 })
 await page.goto('http://localhost:4241/portraitsheet.html', { waitUntil: 'networkidle' })
 const out = await page.evaluate(async () => {

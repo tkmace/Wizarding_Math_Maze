@@ -1,7 +1,7 @@
-import { chromium } from 'playwright'
 import http from 'http'; import fs from 'fs'; import path from 'path'
 import { takeNest, clearCoach } from './harness.mjs'
-const ROOT='/home/claude/wmm/dist'
+import { SHOTS, DIST, launch } from './testenv.mjs'
+const ROOT = DIST
 const M={'.html':'text/html','.js':'text/javascript','.webmanifest':'application/manifest+json'}
 const srv=http.createServer((q,r)=>{const u=new URL(q.url,'http://x')
   if(u.pathname==='/api/profile'){r.writeHead(503);return r.end('{}')}
@@ -9,8 +9,8 @@ const srv=http.createServer((q,r)=>{const u=new URL(q.url,'http://x')
   if(!fs.existsSync(f)){r.writeHead(404);return r.end()}
   r.writeHead(200,{'Content-Type':M[path.extname(f)]||'application/octet-stream'}); fs.createReadStream(f).pipe(r)})
 await new Promise(r=>srv.listen(4220,r))
-const OUT='/tmp/claude-0/-home-claude/9e4f1146-1d92-5690-b689-30dcc0c1e170/scratchpad'
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--no-sandbox','--disable-dev-shm-usage']})
+const OUT = SHOTS
+const b=await launch()
 const errs=[]
 const ctx=await b.newContext({viewport:{width:430,height:960},deviceScaleFactor:2,hasTouch:true})
 const page=await ctx.newPage()
@@ -77,9 +77,14 @@ for(let i=0;i<500&&!found;i++){
 }
 if(found){
   await page.waitForTimeout(500)
+  // The first encounter of a wizard's life brings a card explaining it, and
+  // the card sits ON TOP of the button this clicks. Clear it first, or the
+  // click retries for thirty seconds against a tip nobody dismissed.
+  await clearCoach(page)
   await page.screenshot({path:`${OUT}/86-encounter-intro-big.png`})
   const isDuel=await page.locator('text=Raise your wand').count()>0
   await page.locator('button',{hasText:/Raise your wand|Catch the runes/}).click(); await page.waitForTimeout(800)
+  await clearCoach(page)
   await page.screenshot({path:`${OUT}/87-duel-mc.png`})
   if(isDuel){
     const opts=await page.locator('button').filter({hasText:/^\d+$/}).count()

@@ -5,13 +5,10 @@
 // ▲, the win screen ate the pointer-up, and the interval went on firing moves
 // into the maze that came after. These three checks are that bug, from three
 // directions.
-import { chromium } from 'playwright'
 import http from 'http'
+import { SHOTS, DIST, launch } from './testenv.mjs'
 
-const b = await chromium.launch({
-  executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
-  args: ['--no-sandbox', '--disable-dev-shm-usage'],
-})
+const b = await launch()
 const page = await b.newPage({ viewport: { width: 430, height: 700 } })
 const errs = []; page.on('pageerror', e => errs.push(e.message))
 await page.goto('http://localhost:4241/controlsheet.html', { waitUntil: 'networkidle' })

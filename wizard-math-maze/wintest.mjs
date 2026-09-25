@@ -1,7 +1,7 @@
+import { SHOTS, DIST, launch } from './testenv.mjs'
 // The rank-up banner is the brightest thing on the win screen and it shows the
 // robes — so it has to be the thing you can press.
-import { chromium } from 'playwright'
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--no-sandbox','--disable-dev-shm-usage']})
+const b=await launch()
 const page=await b.newPage({viewport:{width:430,height:900}})
 const errs=[];page.on('pageerror',e=>errs.push(e.message))
 let fails=0

@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview --port 4173"
+    "preview": "vite preview --port 4173",
+    "test": "node runtests.mjs",
+    "test:fast": "node runtests.mjs --fast",
+    "sheets": "vite --port 4241"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",
@@ -15,6 +18,10 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
-    "vite": "^5.4.11"
+    "vite": "^5.4.11",
+    "playwright": "^1.49.0"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

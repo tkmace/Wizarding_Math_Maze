@@ -1,10 +1,10 @@
-import { chromium } from 'playwright'
 import http from 'http'
 import fs from 'fs'
 import path from 'path'
 import { takeNest, clearCoach } from './harness.mjs'
+import { SHOTS, DIST, launch } from './testenv.mjs'
 
-const ROOT = '/home/claude/wmm/dist'
+const ROOT = DIST
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.webmanifest': 'application/manifest+json' }
 
 // In-memory stand-in for api/profile.js, implementing the same contract
@@ -51,10 +51,7 @@ const srv = http.createServer((req, res) => {
 })
 await new Promise(r => srv.listen(4180, r))
 
-const browser = await chromium.launch({
-  executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
-  args: ['--no-sandbox', '--disable-dev-shm-usage'],
-})
+const browser = await launch()
 const errs = []
 
 /** A fresh browser context = a different device, with its own localStorage. */

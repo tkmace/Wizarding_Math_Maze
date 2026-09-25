@@ -1,6 +1,7 @@
+import { SHOTS, DIST, launch } from './testenv.mjs'
+const OUT = SHOTS
 // Render a contact sheet of every form so the art can be eyeballed at once.
-import { chromium } from 'playwright'
-const b = await chromium.launch({ executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args:['--no-sandbox','--disable-dev-shm-usage'] })
+const b = await launch()
 const page = await b.newPage({ viewport:{ width: 1000, height: 760 }, deviceScaleFactor: 2 })
 const mod = await import('./src/game/skins.js')
 await page.setContent(`<body style="margin:0;background:#0b0a22"><canvas id=c width=2000 height=1520></canvas></body>`)
@@ -19,7 +20,7 @@ await page.evaluate(({ code, forms }) => {
     ctx.fillStyle = '#5b5b96'; ctx.fillText('r'+f.rank+' · '+f.hat+' · '+f.staff+(f.aura?' · '+f.aura:''), cx, cy + 2)
   })
 }, { code, forms: mod.FORMS })
-await page.screenshot({ path: '/tmp/claude-0/-home-claude/9e4f1146-1d92-5690-b689-30dcc0c1e170/scratchpad/50-all-forms.png' })
+await page.screenshot({ path: `${OUT}/50-all-forms.png` })
 // And a back view, as seen in the maze
 await page.evaluate(({ code, forms }) => {
   eval(code)
@@ -33,6 +34,6 @@ await page.evaluate(({ code, forms }) => {
     ctx.fillText(f.title, cx, cy - 8)
   })
 }, { code, forms: mod.FORMS })
-await page.screenshot({ path: '/tmp/claude-0/-home-claude/9e4f1146-1d92-5690-b689-30dcc0c1e170/scratchpad/51-all-forms-back.png' })
+await page.screenshot({ path: `${OUT}/51-all-forms-back.png` })
 console.log('contact sheets rendered')
 await b.close()

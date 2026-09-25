@@ -1,9 +1,9 @@
 // The answer box must contain EXACTLY what was typed — nothing leaked in from
 // walking into the door, from a held key, or from a button that still had focus.
-import { chromium } from 'playwright'
 import http from 'http'; import fs from 'fs'; import path from 'path'
 import { takeNest, clearCoach } from './harness.mjs'
-const ROOT = '/home/claude/wmm/dist'
+import { SHOTS, DIST, launch } from './testenv.mjs'
+const ROOT = DIST
 const M = { '.html': 'text/html', '.js': 'text/javascript', '.webmanifest': 'application/manifest+json' }
 const srv = http.createServer((q, r) => {
   const u = new URL(q.url, 'http://x')
@@ -14,8 +14,8 @@ const srv = http.createServer((q, r) => {
   fs.createReadStream(f).pipe(r)
 })
 await new Promise(r => srv.listen(4231, r))
-const OUT = '/tmp/claude-0/-home-claude/9e4f1146-1d92-5690-b689-30dcc0c1e170/scratchpad'
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox', '--disable-dev-shm-usage'] })
+const OUT = SHOTS
+const b = await launch()
 const errs = []
 const ctx = await b.newContext({ viewport: { width: 900, height: 900 }, deviceScaleFactor: 1 })
 const page = await ctx.newPage()

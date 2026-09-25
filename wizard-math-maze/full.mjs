@@ -1,14 +1,14 @@
-import { chromium } from 'playwright'
 import http from 'http'; import fs from 'fs'; import path from 'path'
 import { takeNest, clearCoach } from './harness.mjs'
-const ROOT='/home/claude/wmm/dist'
+import { SHOTS, DIST, launch } from './testenv.mjs'
+const ROOT = DIST
 const MIME={'.html':'text/html','.js':'text/javascript','.css':'text/css','.webmanifest':'application/manifest+json'}
 const srv=http.createServer((q,r)=>{let p=decodeURIComponent(q.url.split('?')[0]); if(p==='/')p='/index.html'
   const f=path.join(ROOT,p); if(!fs.existsSync(f)){r.writeHead(404);return r.end()}
   r.writeHead(200,{'Content-Type':MIME[path.extname(f)]||'application/octet-stream'}); fs.createReadStream(f).pipe(r)})
 await new Promise(r=>srv.listen(4174,r))
-const OUT='/tmp/claude-0/-home-claude/9e4f1146-1d92-5690-b689-30dcc0c1e170/scratchpad'
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--no-sandbox','--disable-dev-shm-usage']})
+const OUT = SHOTS
+const b=await launch()
 const ctx=await b.newContext({viewport:{width:900,height:820},deviceScaleFactor:2})
 const page=await ctx.newPage()
 const errs=[]; page.on('pageerror',e=>errs.push('PAGEERROR '+e.message))

@@ -1,8 +1,8 @@
 // The door on a tablet: two panels, and the scratch pad actually takes ink.
-import { chromium } from 'playwright'
 import http from 'http'; import fs from 'fs'; import path from 'path'
-import { clearCoach, pickWizard, skipAttunement } from './harness.mjs'
-const ROOT='/home/claude/wmm/dist'
+import { clearCoach, pickWizard, takePractice, skipAttunement } from './harness.mjs'
+import { SHOTS, DIST, launch } from './testenv.mjs'
+const ROOT = DIST
 const M={'.html':'text/html','.js':'text/javascript','.webmanifest':'application/manifest+json'}
 const srv=http.createServer((q,r)=>{const u=new URL(q.url,'http://x')
   if(u.pathname==='/api/profile'){r.writeHead(503);return r.end('{}')}
@@ -32,8 +32,8 @@ async function walkToDoor(pg, max = 700) {
   return false
 }
 
-const OUT='/tmp/claude-0/-home-claude/9e4f1146-1d92-5690-b689-30dcc0c1e170/scratchpad'
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--no-sandbox','--disable-dev-shm-usage']})
+const OUT = SHOTS
+const b=await launch()
 // iPad-ish
 const page=await b.newPage({viewport:{width:1024,height:768},deviceScaleFactor:2})
 const errs=[];page.on('pageerror',e=>errs.push(e.message))
@@ -46,6 +46,9 @@ await pickWizard(page)
 await page.waitForSelector('text=Choose your Nest',{timeout:15000})
 await page.locator('button',{hasText:'Sea Eagles'}).first().click()
 await page.locator('button',{hasText:/^Join the /}).click()
+// The nest leads to the practice question, then the ceremony. Take the
+// defaults for both: this test is about the scratch pad.
+await takePractice(page)
 await skipAttunement(page)
 await page.waitForSelector('text=WHAT SHALL WE PRACTICE',{timeout:15000})
 await page.locator('button',{hasText:'Enter the Maze'}).click(); await page.waitForTimeout(900)

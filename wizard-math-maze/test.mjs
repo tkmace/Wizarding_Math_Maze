@@ -1,10 +1,10 @@
-import { chromium } from 'playwright'
 import http from 'http'
 import fs from 'fs'
 import path from 'path'
 import { takeNest, clearCoach } from './harness.mjs'
+import { SHOTS, DIST, launch } from './testenv.mjs'
 
-const ROOT = '/home/claude/wmm/dist'
+const ROOT = DIST
 const MIME = { '.html':'text/html', '.js':'text/javascript', '.css':'text/css', '.webmanifest':'application/manifest+json', '.svg':'image/svg+xml' }
 const srv = http.createServer((req,res)=>{
   let p = decodeURIComponent(req.url.split('?')[0])
@@ -16,8 +16,8 @@ const srv = http.createServer((req,res)=>{
 })
 await new Promise(r=>srv.listen(4173, r))
 
-const OUT = '/tmp/claude-0/-home-claude/9e4f1146-1d92-5690-b689-30dcc0c1e170/scratchpad'
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args:['--no-sandbox','--disable-dev-shm-usage'] })
+const OUT = SHOTS
+const browser = await launch()
 const errors = []
 
 async function run(label, width, height) {

@@ -1,7 +1,7 @@
-import { chromium } from 'playwright'
 import http from 'http'; import fs from 'fs'; import path from 'path'
 import { takeNest, clearCoach } from './harness.mjs'
-const ROOT='/home/claude/wmm/dist'
+import { SHOTS, DIST, launch } from './testenv.mjs'
+const ROOT = DIST
 const MIME={'.html':'text/html','.js':'text/javascript','.webmanifest':'application/manifest+json'}
 const srv=http.createServer((q,r)=>{const u=new URL(q.url,'http://x')
   if(u.pathname==='/api/profile'){r.writeHead(503);return r.end('{}')}
@@ -9,8 +9,8 @@ const srv=http.createServer((q,r)=>{const u=new URL(q.url,'http://x')
   if(!fs.existsSync(f)){r.writeHead(404);return r.end()}
   r.writeHead(200,{'Content-Type':MIME[path.extname(f)]||'application/octet-stream'}); fs.createReadStream(f).pipe(r)})
 await new Promise(r=>srv.listen(4215,r))
-const OUT='/tmp/claude-0/-home-claude/9e4f1146-1d92-5690-b689-30dcc0c1e170/scratchpad'
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--no-sandbox','--disable-dev-shm-usage']})
+const OUT = SHOTS
+const b=await launch()
 const errs=[]
 async function fresh(label){
   const ctx=await b.newContext({viewport:{width:430,height:940},deviceScaleFactor:2,hasTouch:true})

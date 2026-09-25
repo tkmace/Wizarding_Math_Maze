@@ -1,10 +1,10 @@
 // Buying a passed-over form with rune stones.
 // Checks the three gates in order (rank reached, free pick made, runes banked),
 // that the purchase actually debits, and that it survives a reload.
-import { chromium } from 'playwright'
 import http from 'http'; import fs from 'fs'; import path from 'path'
 import { takeNest } from './harness.mjs'
-const ROOT = '/home/claude/wmm/dist'
+import { SHOTS, DIST, launch } from './testenv.mjs'
+const ROOT = DIST
 const M = { '.html': 'text/html', '.js': 'text/javascript', '.webmanifest': 'application/manifest+json' }
 const srv = http.createServer((q, r) => {
   const u = new URL(q.url, 'http://x')
@@ -15,8 +15,8 @@ const srv = http.createServer((q, r) => {
   fs.createReadStream(f).pipe(r)
 })
 await new Promise(r => srv.listen(4226, r))
-const OUT = '/tmp/claude-0/-home-claude/9e4f1146-1d92-5690-b689-30dcc0c1e170/scratchpad'
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox', '--disable-dev-shm-usage'] })
+const OUT = SHOTS
+const b = await launch()
 const errs = []
 const ctx = await b.newContext({ viewport: { width: 430, height: 960 }, deviceScaleFactor: 2 })
 const page = await ctx.newPage()

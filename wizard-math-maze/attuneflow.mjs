@@ -6,10 +6,10 @@
 // likely to be quietly wrong, which are that a wrong answer must not block the
 // door, and that the placement must still be able to CLIMB afterwards rather
 // than being pinned by the beginner ceiling.
-import { chromium } from 'playwright'
 import { pickWizard, takePractice } from './harness.mjs'
 import http from 'http'; import fs from 'fs'; import path from 'path'
-const ROOT = '/home/claude/wmm/dist'
+import { SHOTS, DIST, launch } from './testenv.mjs'
+const ROOT = DIST
 const M = { '.html': 'text/html', '.js': 'text/javascript', '.webmanifest': 'application/manifest+json' }
 const srv = http.createServer((q, r) => {
   const u = new URL(q.url, 'http://x')
@@ -20,8 +20,8 @@ const srv = http.createServer((q, r) => {
   fs.createReadStream(f).pipe(r)
 })
 await new Promise(r => srv.listen(4236, r))
-const OUT = '/tmp/claude-0/-home-claude/9e4f1146-1d92-5690-b689-30dcc0c1e170/scratchpad'
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox', '--disable-dev-shm-usage'] })
+const OUT = SHOTS
+const b = await launch()
 const page = await b.newPage({ viewport: { width: 430, height: 900 }, deviceScaleFactor: 2 })
 const errs = []; page.on('pageerror', e => errs.push(e.message))
 let fails = 0

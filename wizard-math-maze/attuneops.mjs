@@ -1,10 +1,10 @@
 // Which operations the Attunement measures: chosen on the way in, on its own
 // screen, and offered again at the maze door for anything she picks later that
 // has never been measured.
-import { chromium } from 'playwright'
 import { pickWizard, clearCoach } from './harness.mjs'
-const OUT = '/tmp/claude-0/-home-claude/9e4f1146-1d92-5690-b689-30dcc0c1e170/scratchpad'
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox', '--disable-dev-shm-usage'] })
+import { SHOTS, DIST, launch } from './testenv.mjs'
+const OUT = SHOTS
+const b = await launch()
 const page = await b.newPage({ viewport: { width: 430, height: 960 }, deviceScaleFactor: 2 })
 const errs = []; page.on('pageerror', e => errs.push(e.message))
 await page.goto('http://localhost:4173/', { waitUntil: 'networkidle' })

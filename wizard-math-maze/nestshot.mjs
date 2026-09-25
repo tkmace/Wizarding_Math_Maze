@@ -1,7 +1,7 @@
-import { chromium } from 'playwright'
-const OUT='/tmp/claude-0/-home-claude/9e4f1146-1d92-5690-b689-30dcc0c1e170/scratchpad'
+import { SHOTS, DIST, launch } from './testenv.mjs'
+const OUT = SHOTS
 const tag=process.argv[2]||'1'
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--no-sandbox','--disable-dev-shm-usage']})
+const b=await launch()
 const page=await b.newPage({viewport:{width:760,height:600},deviceScaleFactor:2})
 const errs=[];page.on('pageerror',e=>errs.push(e.message))
 await page.goto('http://localhost:4241/nestsheet.html',{waitUntil:'networkidle'})
