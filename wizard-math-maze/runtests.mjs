@@ -66,12 +66,21 @@ const sh = (cmd, cmdArgs) => new Promise((res, rej) => {
   p.on('exit', c => (c === 0 ? res() : rej(new Error(`${cmd} exited ${c}`))))
 })
 
-/** Resolve once something is listening, or give up. */
-function waitForPort(port, timeoutMs = 30000) {
+/**
+ * Resolve once something is listening, or give up.
+ *
+ * Asks both stacks. A server told to listen on "localhost" binds whichever
+ * address the machine resolves that to: 127.0.0.1 on this laptop, ::1 on a CI
+ * runner with IPv6 in /etc/hosts. A probe that only knows about 127.0.0.1
+ * then waits out the whole timeout against a server that is up and fine.
+ */
+function waitForPort(port, timeoutMs = 60000) {
   const deadline = Date.now() + timeoutMs
+  const hosts = ['127.0.0.1', '::1']
+  let n = 0
   return new Promise((res, rej) => {
     const tick = () => {
-      const s = net.connect(port, '127.0.0.1')
+      const s = net.connect(port, hosts[n++ % hosts.length])
       s.on('connect', () => { s.destroy(); res() })
       s.on('error', () => {
         s.destroy()
@@ -83,17 +92,41 @@ function waitForPort(port, timeoutMs = 30000) {
   })
 }
 
+// Vite's two servers, started on demand and killed at the end.
+//
+//   --host        bind every interface, rather than whatever "localhost"
+//                 resolves to on this particular machine. Same reason as above.
+//   --strictPort  a busy port becomes an error instead of a silent move to the
+//                 next one, which otherwise surfaces as an unexplained timeout.
+//
+// Their output is kept rather than thrown away. A server that fails to start
+// says why, and discarding that leaves only "nothing on :4241", which is a
+// sentence with no information in it.
 const servers = []
+const logs = {}
+const SPEC = {
+  preview: { port: 4173, args: ['vite', 'preview', '--port', '4173', '--strictPort', '--host'] },
+  dev: { port: 4241, args: ['vite', '--port', '4241', '--strictPort', '--host'] },
+}
+
 async function ensure(kind) {
-  if (kind === 'preview' && !servers.preview) {
-    servers.preview = run('npx', ['vite', 'preview', '--port', '4173'], { stdio: 'ignore' })
-    servers.push(servers.preview)
-    await waitForPort(4173)
-  }
-  if (kind === 'dev' && !servers.dev) {
-    servers.dev = run('npx', ['vite', '--port', '4241'], { stdio: 'ignore' })
-    servers.push(servers.dev)
-    await waitForPort(4241)
+  const spec = SPEC[kind]
+  if (!spec || servers[kind]) return
+
+  const p = run('npx', spec.args)
+  logs[kind] = ''
+  const keep = d => { logs[kind] += d }
+  p.stdout.on('data', keep)
+  p.stderr.on('data', keep)
+  p.on('exit', code => { if (code) logs[kind] += `\n[${kind} server exited ${code}]\n` })
+  servers.push(p)
+  servers[kind] = p
+
+  try {
+    await waitForPort(spec.port)
+  } catch (e) {
+    console.log(`\n--- ${kind} server said ---\n${logs[kind].trim() || '(nothing at all)'}\n---`)
+    throw e
   }
 }
 
