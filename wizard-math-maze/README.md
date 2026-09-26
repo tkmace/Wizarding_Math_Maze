@@ -84,3 +84,6 @@ skimming as a human too — it is the shortest description of how this thing is
 built.
 
 `docs/roadmap.md` is what's agreed but unbuilt.
+
+`docs/glossary.md` explains the vocabulary — git, pull requests, Actions, npm —
+in the meaning it has in this repo. Skip it if none of that is new to you.
