@@ -66,12 +66,21 @@ const sh = (cmd, cmdArgs) => new Promise((res, rej) => {
   p.on('exit', c => (c === 0 ? res() : rej(new Error(`${cmd} exited ${c}`))))
 })
 
-/** Resolve once something is listening, or give up. */
-function waitForPort(port, timeoutMs = 30000) {
+/**
+ * Resolve once something is listening, or give up.
+ *
+ * Asks both stacks. A server told to listen on "localhost" binds whichever
+ * address the machine resolves that to: 127.0.0.1 on this laptop, ::1 on a CI
+ * runner with IPv6 in /etc/hosts. A probe that only knows about 127.0.0.1
+ * then waits out the whole timeout against a server that is up and fine.
+ */
+function waitForPort(port, timeoutMs = 60000) {
   const deadline = Date.now() + timeoutMs
+  const hosts = ['127.0.0.1', '::1']
+  let n = 0
   return new Promise((res, rej) => {
     const tick = () => {
-      const s = net.connect(port, '127.0.0.1')
+      const s = net.connect(port, hosts[n++ % hosts.length])
       s.on('connect', () => { s.destroy(); res() })
       s.on('error', () => {
         s.destroy()
@@ -83,17 +92,41 @@ function waitForPort(port, timeoutMs = 30000) {
   })
 }
 
+// Vite's two servers, started on demand and killed at the end.
+//
+//   --host        bind every interface, rather than whatever "localhost"
+//                 resolves to on this particular machine. Same reason as above.
+//   --strictPort  a busy port becomes an error instead of a silent move to the
+//                 next one, which otherwise surfaces as an unexplained timeout.
+//
+// Their output is kept rather than thrown away. A server that fails to start
+// says why, and discarding that leaves only "nothing on :4241", which is a
+// sentence with no information in it.
 const servers = []
+const logs = {}
+const SPEC = {
+  preview: { port: 4173, args: ['vite', 'preview', '--port', '4173', '--strictPort', '--host'] },
+  dev: { port: 4241, args: ['vite', '--port', '4241', '--strictPort', '--host'] },
+}
+
 async function ensure(kind) {
-  if (kind === 'preview' && !servers.preview) {
-    servers.preview = run('npx', ['vite', 'preview', '--port', '4173'], { stdio: 'ignore' })
-    servers.push(servers.preview)
-    await waitForPort(4173)
-  }
-  if (kind === 'dev' && !servers.dev) {
-    servers.dev = run('npx', ['vite', '--port', '4241'], { stdio: 'ignore' })
-    servers.push(servers.dev)
-    await waitForPort(4241)
+  const spec = SPEC[kind]
+  if (!spec || servers[kind]) return
+
+  const p = run('npx', spec.args, { detached: true })
+  logs[kind] = ''
+  const keep = d => { logs[kind] += d }
+  p.stdout.on('data', keep)
+  p.stderr.on('data', keep)
+  p.on('exit', code => { if (code) logs[kind] += `\n[${kind} server exited ${code}]\n` })
+  servers.push(p)
+  servers[kind] = p
+
+  try {
+    await waitForPort(spec.port)
+  } catch (e) {
+    console.log(`\n--- ${kind} server said ---\n${logs[kind].trim() || '(nothing at all)'}\n---`)
+    throw e
   }
 }
 
@@ -125,11 +158,19 @@ for (const t of chosen) {
   if (!r.ok) console.log(r.out.split('\n').filter(l => /FAIL|Error|error/.test(l)).slice(0, 8).join('\n'))
 }
 
-for (const s of servers) s.kill()
+// Kill the process GROUP, not the process. `npx vite` is a shell wrapper around
+// the real server: kill the wrapper and the server is orphaned, still holding
+// the stdout pipe this runner reads, so node waits forever on a handle that
+// will never close. That hung a CI job to its 25-minute timeout after all 18
+// suites had already passed.
+for (const s of servers) {
+  try { process.kill(-s.pid, 'SIGTERM') } catch { try { s.kill() } catch {} }
+}
 
 const bad = results.filter(r => !r.ok)
 console.log(`\n${results.length - bad.length}/${results.length} suites passed`)
-if (bad.length) {
-  console.log('failed: ' + bad.map(r => r.name).join(', '))
-  process.exit(1)
-}
+if (bad.length) console.log('failed: ' + bad.map(r => r.name).join(', '))
+
+// Explicit, because "the work is done" and "node has no open handles left" are
+// not the same claim, and only the first one is what we mean.
+process.exit(bad.length ? 1 : 0)
