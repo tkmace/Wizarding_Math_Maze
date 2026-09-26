@@ -25,8 +25,13 @@ async function walkToDoor(pg, max = 700) {
       await pg.locator('canvas').last().click({ position: { x: 30 + (i % 5) * 40, y: 40 + (i % 4) * 30 } }).catch(() => {})
       await pg.waitForTimeout(180); continue
     }
-    const r = i % 7
-    await pg.keyboard.press(r < 4 ? 'ArrowUp' : r < 6 ? 'ArrowLeft' : 'ArrowRight')
+    // Random, not a fixed cycle. `i % 7` is periodic, and a periodic input in a
+    // maze that does not change is a closed loop — the walk revisits the same
+    // cells forever, so raising the step count cannot help, which is exactly
+    // why raising it would have been the wrong fix. Biased toward forward, the
+    // same walk keytest.mjs uses.
+    const r = Math.random()
+    await pg.keyboard.press(r < 0.62 ? 'ArrowUp' : r < 0.81 ? 'ArrowLeft' : 'ArrowRight')
     await pg.waitForTimeout(80)
   }
   return false

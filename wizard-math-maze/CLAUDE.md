@@ -76,6 +76,13 @@ Conventions that matter:
 - **A test asserts. A shot looks.** `*test.mjs`/`*flow.mjs` print PASS/FAIL and
   are in the suite. `*shot.mjs`/`*sheet.mjs` produce screenshots for a human and
   are not. Do not add a "test" that cannot fail.
+- **Fix the right side.** When something goes red, work out whether the bug is
+  in the product or in the test *before* touching either, then fix that one.
+  Widening a tolerance, raising a timeout or softening an assertion to get back
+  to green is how a suite quietly stops being evidence — it will still be there,
+  still passing, and no longer telling you anything. If the honest answer is
+  "neither, it is the runner", say so in the commit message, because that claim
+  is checkable: a runner fix changes no assertions.
 - **Seed the randomness.** Statistical assertions use a seeded `mulberry32`
   over `Math.random` (see `attunetest.mjs`). An unseeded threshold test will
   flake and then be ignored, which is worse than not having it.
