@@ -113,7 +113,7 @@ async function ensure(kind) {
   const spec = SPEC[kind]
   if (!spec || servers[kind]) return
 
-  const p = run('npx', spec.args)
+  const p = run('npx', spec.args, { detached: true })
   logs[kind] = ''
   const keep = d => { logs[kind] += d }
   p.stdout.on('data', keep)
@@ -158,11 +158,19 @@ for (const t of chosen) {
   if (!r.ok) console.log(r.out.split('\n').filter(l => /FAIL|Error|error/.test(l)).slice(0, 8).join('\n'))
 }
 
-for (const s of servers) s.kill()
+// Kill the process GROUP, not the process. `npx vite` is a shell wrapper around
+// the real server: kill the wrapper and the server is orphaned, still holding
+// the stdout pipe this runner reads, so node waits forever on a handle that
+// will never close. That hung a CI job to its 25-minute timeout after all 18
+// suites had already passed.
+for (const s of servers) {
+  try { process.kill(-s.pid, 'SIGTERM') } catch { try { s.kill() } catch {} }
+}
 
 const bad = results.filter(r => !r.ok)
 console.log(`\n${results.length - bad.length}/${results.length} suites passed`)
-if (bad.length) {
-  console.log('failed: ' + bad.map(r => r.name).join(', '))
-  process.exit(1)
-}
+if (bad.length) console.log('failed: ' + bad.map(r => r.name).join(', '))
+
+// Explicit, because "the work is done" and "node has no open handles left" are
+// not the same claim, and only the first one is what we mean.
+process.exit(bad.length ? 1 : 0)
