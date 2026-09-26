@@ -1,0 +1,54 @@
+# The suite, on every pull request.
+#
+# Worth having with two people on a repo that has no unit tests at all: every
+# check here drives the real built app in a real browser, so if something is
+# green the thing actually works rather than a mock of it does.
+#
+# --fast leaves out the two multi-minute walks (v4test, full). Run those
+# locally with `npm test` before anything that matters.
+#
+# NOTE ON PATHS: this file belongs at the REPOSITORY root, because that is the
+# only place Actions looks. The app itself lives one level down, hence the
+# working-directory default and the explicit paths on the two steps that are
+# actions rather than shell (setup-node's cache, upload-artifact's path).
+name: tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: wizard-math-maze
+
+jobs:
+  suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: wizard-math-maze/package-lock.json
+
+      - run: npm ci
+
+      # Playwright's own Chromium. testenv.mjs finds it without being told.
+      - run: npx playwright install --with-deps chromium
+
+      - run: npm run test:fast
+
+      # The screenshots the harnesses take along the way, so a failure can be
+      # looked at rather than guessed at.
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: wizard-math-maze/.shots/
+          retention-days: 7
+          if-no-files-found: ignore
