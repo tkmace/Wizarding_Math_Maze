@@ -33,7 +33,7 @@ const TESTS = [
   { name: 'shoptest', needs: 'served' },
   { name: 'buytest', needs: 'served' },
   { name: 'enctest2', needs: 'served' },
-  { name: 'scratchshot', needs: 'served' },
+  { name: 'scratchtest', needs: 'served' },
   { name: 'attuneflow', needs: 'served' },
   { name: 'relogin', needs: 'served' },
 

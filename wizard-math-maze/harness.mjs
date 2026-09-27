@@ -96,3 +96,55 @@ export async function clearCoach(page) {
   await page.waitForTimeout(150)
   return true
 }
+
+// --- Determinism -------------------------------------------------------------
+//
+// The maze is built with Math.random, so every run hands a walking harness a
+// different problem. That is how scratchtest came to fail one run in three on
+// code nobody had touched — and a test whose input changes every time is not
+// measuring what it claims to measure, it is sampling.
+//
+// Two halves, and both are needed. seedPage replaces the PAGE's Math.random
+// before a line of app code runs, which fixes the maze. rng() gives a harness
+// its own seeded stream for the walk, which fixes the route. Together: same
+// seed, same maze, same steps, same answer, every run and every machine.
+//
+// The seed is fixed by default and overridable, so the suite is deterministic
+// while fuzzing stays one variable away:
+//
+//   WMM_SEED=12345 npm test -- scratchtest
+//
+// Worth doing deliberately when touching maze generation, since a fixed seed
+// buys reproducibility by giving up coverage — it walks one maze well rather
+// than a different maze badly.
+export const SEED = Number(process.env.WMM_SEED) || 20260927
+
+/** mulberry32. Small, fast, and thoroughly boring, which is the entire point. */
+export function rng(seed = SEED) {
+  let a = seed >>> 0
+  return () => {
+    a = (a + 0x6D2B79F5) | 0
+    let t = Math.imul(a ^ (a >>> 15), 1 | a)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+/**
+ * Hand the page a seeded Math.random, before any app code runs.
+ *
+ * addInitScript, not an evaluate after goto: the maze for the first room is
+ * built during the app's first render, so anything that arrives afterwards is
+ * already too late to decide what it looks like.
+ */
+export async function seedPage(page, seed = SEED) {
+  await page.addInitScript(s => {
+    let a = s >>> 0
+    Math.random = () => {
+      a = (a + 0x6D2B79F5) | 0
+      let t = Math.imul(a ^ (a >>> 15), 1 | a)
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+    }
+  }, seed)
+}

@@ -1,6 +1,6 @@
 // The door on a tablet: two panels, and the scratch pad actually takes ink.
 import http from 'http'; import fs from 'fs'; import path from 'path'
-import { clearCoach, pickWizard, takePractice, skipAttunement } from './harness.mjs'
+import { clearCoach, pickWizard, takePractice, skipAttunement, seedPage, rng } from './harness.mjs'
 import { SHOTS, DIST, launch } from './testenv.mjs'
 const ROOT = DIST
 const M={'.html':'text/html','.js':'text/javascript','.webmanifest':'application/manifest+json'}
@@ -10,6 +10,7 @@ const srv=http.createServer((q,r)=>{const u=new URL(q.url,'http://x')
   if(!fs.existsSync(f)){r.writeHead(404);return r.end()}
   r.writeHead(200,{'Content-Type':M[path.extname(f)]||'application/octet-stream'}); fs.createReadStream(f).pipe(r)})
 await new Promise(r=>srv.listen(4243,r))
+const rand = rng()
 async function walkToDoor(pg, max = 700) {
   for (let i = 0; i < max; i++) {
     if (await clearCoach(pg)) continue          // a tip sits over everything
@@ -28,9 +29,9 @@ async function walkToDoor(pg, max = 700) {
     // Random, not a fixed cycle. `i % 7` is periodic, and a periodic input in a
     // maze that does not change is a closed loop — the walk revisits the same
     // cells forever, so raising the step count cannot help, which is exactly
-    // why raising it would have been the wrong fix. Biased toward forward, the
-    // same walk keytest.mjs uses.
-    const r = Math.random()
+    // why raising it would have been the wrong fix. Seeded, so it is a search
+    // that takes the same route every time rather than a fresh gamble.
+    const r = rand()
     await pg.keyboard.press(r < 0.62 ? 'ArrowUp' : r < 0.81 ? 'ArrowLeft' : 'ArrowRight')
     await pg.waitForTimeout(80)
   }
@@ -41,6 +42,7 @@ const OUT = SHOTS
 const b=await launch()
 // iPad-ish
 const page=await b.newPage({viewport:{width:1024,height:768},deviceScaleFactor:2})
+await seedPage(page)   // same maze every run; see harness.mjs
 const errs=[];page.on('pageerror',e=>errs.push(e.message))
 let fails=0
 const check=(n,ok,d)=>{console.log(`   ${ok?'PASS':'FAIL'} — ${n}${d?' :: '+d:''}`);if(!ok)fails++}
