@@ -1,7 +1,7 @@
 // The answer box must contain EXACTLY what was typed — nothing leaked in from
 // walking into the door, from a held key, or from a button that still had focus.
 import http from 'http'; import fs from 'fs'; import path from 'path'
-import { takeNest, clearCoach } from './harness.mjs'
+import { takeNest, clearCoach, seedPage, rng } from './harness.mjs'
 import { SHOTS, DIST, launch } from './testenv.mjs'
 const ROOT = DIST
 const M = { '.html': 'text/html', '.js': 'text/javascript', '.webmanifest': 'application/manifest+json' }
@@ -19,6 +19,8 @@ const b = await launch()
 const errs = []
 const ctx = await b.newContext({ viewport: { width: 900, height: 900 }, deviceScaleFactor: 1 })
 const page = await ctx.newPage()
+await seedPage(page)   // same maze every run; see harness.mjs
+const rand = rng()
 page.on('pageerror', e => errs.push('PAGEERROR ' + e.message))
 await page.goto('http://localhost:4231/', { waitUntil: 'networkidle' })
 await page.fill('input[type=text]', 'Camille')
@@ -77,7 +79,7 @@ async function walkToDoor(hold) {
       await page.keyboard.up('ArrowUp')
       continue
     }
-    const r = Math.random()
+    const r = rand()
     await page.keyboard.press(r < 0.62 ? 'ArrowUp' : r < 0.81 ? 'ArrowLeft' : 'ArrowRight')
     await page.waitForTimeout(60)
   }
