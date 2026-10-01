@@ -19,7 +19,12 @@ export const opByKey = k => OPS.find(o => o.key === k) || OPS[0]
 // never punished for reading.
 export const TIERS = [
   { key: 'novice',     label: 'Novice',     icon: '🌿', color: '#b8f0c0', mult: 0.7, fastMs: 7000,  gate: 0.45, desc: 'Small numbers',
-    ranges: { add: [1, 8],    sub: [3, 12],   mul: [1, 4],  div: [1, 4]  } },
+    // mul starts at 2, not 1. At [1,4] nearly half of all novice multiplication
+    // questions contained a x1 — which is not multiplication, it is copying a
+    // number down — and the mean answer was 6.3. [2,5] means every question is
+    // a real one, mean 12.3, nothing above 5x5. div keeps its 1s for now: it is
+    // the hardest operation here (weight 1.75) and has not been complained about.
+    ranges: { add: [1, 8],    sub: [3, 12],   mul: [2, 5],  div: [1, 4]  } },
   { key: 'apprentice', label: 'Apprentice', icon: '🌱', color: '#7ee8a2', mult: 1.0, fastMs: 6000,  gate: 0.50, desc: 'Classic challenge',
     ranges: { add: [1, 15],   sub: [5, 20],   mul: [1, 6],  div: [1, 6]  } },
   { key: 'sorcerer',   label: 'Sorcerer',   icon: '🔥', color: '#f9ca74', mult: 1.6, fastMs: 6500,  gate: 0.60, desc: 'Numbers get serious',

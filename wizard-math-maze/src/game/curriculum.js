@@ -19,14 +19,19 @@ const REVIEW_RATE = 0.45
 // Still rises more slowly than it falls, so the maze backs off quickly when she
 // starts struggling but makes her earn the harder numbers.
 //
-// These were raised by about half again after the first version sat too long at
-// easy numbers: someone answering confidently could clear a whole maze and
-// barely feel the questions grow, which reads as the game not paying attention.
-// A steady run now moves a full tier in roughly six or seven doors rather than
-// twelve. SPEED_BONUS goes further for an answer that comes back almost
-// instantly — the clearest signal there is that the numbers are too small.
-const SKILL_UP_FAST  = 0.070
-const SKILL_UP       = 0.045
+// These were raised once, after the first version sat too long at easy numbers —
+// a confident answerer could clear a whole maze and barely feel the questions
+// grow, which reads as the game not paying attention. That overshot: at 0.045 a
+// steady run moved a full tier in seven doors and an all-fast run in four, so a
+// child could be two tiers past comfortable before the end of one sitting.
+//
+// Now nine doors steady, five if every answer comes back fast. The target is a
+// child who is being stretched, not chased: she should notice the numbers
+// growing across a few sittings rather than within one. SKILL_DOWN is
+// deliberately left ABOVE every rise, so the maze still backs off faster than it
+// pushes — the asymmetry is the kindness.
+const SKILL_UP_FAST  = 0.052
+const SKILL_UP       = 0.034
 const SKILL_UP_SLOW  = 0.008
 const SKILL_DOWN     = 0.052
 const SKILL_MIN      = 0.02
