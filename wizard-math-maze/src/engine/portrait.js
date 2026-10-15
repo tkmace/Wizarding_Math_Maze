@@ -100,6 +100,35 @@ function blob(ctx, cx, cy, rx, ry, rot, color, alpha) {
 }
 
 /**
+ * Shading that behaves like light instead of like paint.
+ *
+ * Everything in here used to shade by painting a translucent dark colour over
+ * the top. That works, but only against the fill it was tuned on: the same
+ * rgba('#1a0c18', 0.42) that models a lilac hat goes chalky over gold and
+ * vanishes into charcoal, and there are 25 robes. `multiply` and `screen` read
+ * what is underneath, so one pass is right on all of them.
+ *
+ * Both REQUIRE a clip path, and that is not tidiness. A blend mode has nothing
+ * to blend with where the canvas is still transparent, so an unclipped
+ * multiply paints its own grey straight into the background — which is exactly
+ * the halo the hat rim lights were throwing before this existed.
+ */
+function layer(ctx, mode, clip, fn, rule = 'nonzero') {
+  ctx.save()
+  clip()
+  ctx.clip(rule)
+  ctx.globalCompositeOperation = mode
+  fn()
+  ctx.restore()
+}
+
+/** Darken what is already there, inside `clip`. */
+export function shadeOver(ctx, clip, fn, rule) { layer(ctx, 'multiply', clip, fn, rule) }
+
+/** Lighten what is already there, inside `clip`. */
+export function lightOver(ctx, clip, fn, rule) { layer(ctx, 'screen', clip, fn, rule) }
+
+/**
  * Canvas grain.
  *
  * The cheapest trick in here by a distance. A perfectly smooth gradient is a
@@ -988,8 +1017,28 @@ function drawHat(ctx, R, wiz, kind, robe, trim, t) {
   const col = shade(robe, 0.08)
 
   ctx.save()
-  // Shadow onto the hair and brow first, under everything else.
-  blob(ctx, 0, brimY + R * 0.12, R * 1.15, R * 0.42, 0, '#1e0e1a', 0.62)
+  // The shadow the hat throws down onto the hair and brow.
+  //
+  // It used to sit at brimY + 0.12R, which is UNDER the hat: the crown and the
+  // brim were drawn straight over it a few lines later, so the one thing
+  // seating a hat on a head was invisible in every portrait in the game. It
+  // belongs below the brim line, on the hair it is actually falling across.
+  //
+  // multiply rather than a dark wash, so it darkens hair and skin instead of
+  // greying them and the strand detail survives; clipped to the head, because
+  // a blend mode has nothing to blend with out in the background.
+  // How far the shadow reaches is a property of the hat, not a constant: a wide
+  // brim shades most of a face, a crown shades almost nothing, and a hood casts
+  // its own shadow a few hundred lines down and does not want a second one.
+  const cast = { wide: 1.42, pointed: 1, horned: 1.06, crown: 0.72, hood: 0 }[kind] ?? 1
+  if (cast > 0) {
+    shadeOver(ctx, () => {
+      ctx.beginPath()
+      ctx.ellipse(0, -R * 0.15, R * 1.34, R * 1.55, 0, 0, TAU)
+    }, () => {
+      blob(ctx, 0, brimY + R * 0.32 * cast, R * 1.12 * cast, R * 0.40 * cast, 0, '#6e5d6c', 1)
+    })
+  }
 
   /** Felt: grain and a soft inner shading, inside whatever shape was drawn. */
   const felt = (path, bb, seed) => {
@@ -999,16 +1048,31 @@ function drawHat(ctx, R, wiz, kind, robe, trim, t) {
     grain(ctx, bb[0], bb[1], bb[2], bb[3], seed, 0.05)
     ctx.restore()
   }
-  /** The line of light along an edge. Blurred, or it is just a stroke. */
-  const rim = (path, alpha = 0.3, w = 0.05) => {
-    ctx.save()
-    ctx.filter = `blur(${Math.max(0.5, R * 0.03)}px)`
-    ctx.strokeStyle = rgba('#ffffff', alpha)
-    ctx.lineWidth = R * w
-    path()
-    ctx.stroke()
-    ctx.restore()
+  /**
+   * The line of light along an edge. Blurred, or it is just a stroke.
+   *
+   * Clipped to the shape it is lighting, and `within` is how an OPEN edge path
+   * says which closed shape it belongs to. Unclipped, the blur spreads half its
+   * width outside the silhouette and the hat wears a pale halo against the
+   * background — obvious at 4x, and at thumbnail size it just reads as "flat
+   * and pasted on", which is how it survived this long.
+   */
+  const rim = (path, alpha = 0.3, w = 0.05, within = null, rule) => {
+    lightOver(ctx, within || path, () => {
+      ctx.save()
+      ctx.filter = `blur(${Math.max(0.5, R * 0.03)}px)`
+      ctx.strokeStyle = rgba('#ffffff', alpha)
+      ctx.lineWidth = R * w
+      path()
+      ctx.stroke()
+      ctx.restore()
+    }, rule)
   }
+
+  // The crown's silhouette, kept so that things tied AROUND the crown can be
+  // held inside it. Successive ctx.clip() calls intersect, so clipping to this
+  // and then to a band's own shape gives the overlap and nothing else.
+  let crownClip = null
 
   const crownPath = (h, w, lean) => () => {
     ctx.beginPath()
@@ -1020,6 +1084,7 @@ function drawHat(ctx, R, wiz, kind, robe, trim, t) {
   }
   const crown = (h, w, lean) => {
     const path = crownPath(h, w, lean)
+    crownClip = path
     path()
     const g = ctx.createLinearGradient(-w / 2, 0, w / 2, 0)
     g.addColorStop(0, shade(col, 0.14))
@@ -1031,21 +1096,19 @@ function drawHat(ctx, R, wiz, kind, robe, trim, t) {
     // Where the cone meets the head it turns away from the light on every side,
     // so it darkens into the brim. This is what stops a cone reading as a
     // triangle of flat colour with a gradient painted across it.
-    ctx.save()
-    path()
-    ctx.clip()
-    const ao = ctx.createLinearGradient(0, brimY - h * 0.55, 0, brimY + R * 0.3)
-    ao.addColorStop(0, rgba('#1a0c18', 0))
-    ao.addColorStop(1, rgba('#1a0c18', 0.42))
-    ctx.fillStyle = ao
-    ctx.fillRect(-w, brimY - h, w * 2, h + R * 0.4)
-    ctx.restore()
+    shadeOver(ctx, path, () => {
+      const ao = ctx.createLinearGradient(0, brimY - h * 0.55, 0, brimY + R * 0.3)
+      ao.addColorStop(0, 'rgba(104,90,102,0)')
+      ao.addColorStop(1, 'rgba(104,90,102,0.72)')
+      ctx.fillStyle = ao
+      ctx.fillRect(-w, brimY - h, w * 2, h + R * 0.4)
+    })
     // The lit edge, left side only, from the tip down to the brim.
     rim(() => {
       ctx.beginPath()
       ctx.moveTo(lean, brimY - h * 0.98)
       ctx.quadraticCurveTo(-w * 0.16, brimY - h * 0.74, -w * 0.49, brimY - R * 0.02)
-    }, 0.34, 0.045)
+    }, 0.34, 0.045, path)
   }
 
   const brim = (w, th) => {
@@ -1072,7 +1135,7 @@ function drawHat(ctx, R, wiz, kind, robe, trim, t) {
     rim(() => {
       ctx.beginPath()
       ctx.ellipse(0, brimY + R * 0.1, w / 2 - R * 0.02, th - R * 0.02, 0, Math.PI * 0.62, Math.PI * 1.9)
-    }, 0.22, 0.04)
+    }, 0.22, 0.04, top)
   }
 
   const band = w => {
@@ -1089,16 +1152,22 @@ function drawHat(ctx, R, wiz, kind, robe, trim, t) {
     }
     ctx.save()
     // Cloth gathers where it is tied, so the crown darkens just above the band.
+    const gather = () => {
+      ctx.beginPath()
+      ctx.moveTo(-w * 0.46, brimY - R * 0.44)
+      ctx.quadraticCurveTo(0, brimY - R * 0.32, w * 0.46, brimY - R * 0.44)
+      ctx.lineTo(w * 0.46, brimY - R * 0.2)
+      ctx.quadraticCurveTo(0, brimY - R * 0.08, -w * 0.46, brimY - R * 0.2)
+      ctx.closePath()
+    }
     ctx.save()
-    ctx.filter = `blur(${Math.max(0.6, R * 0.045)}px)`
-    ctx.fillStyle = rgba('#1a0c18', 0.45)
-    ctx.beginPath()
-    ctx.moveTo(-w * 0.44, brimY - R * 0.4)
-    ctx.quadraticCurveTo(0, brimY - R * 0.28, w * 0.44, brimY - R * 0.4)
-    ctx.lineTo(w * 0.44, brimY - R * 0.24)
-    ctx.quadraticCurveTo(0, brimY - R * 0.12, -w * 0.44, brimY - R * 0.24)
-    ctx.closePath()
-    ctx.fill()
+    if (crownClip) { crownClip(); ctx.clip() }
+    shadeOver(ctx, gather, () => {
+      ctx.filter = `blur(${Math.max(0.9, R * 0.075)}px)`
+      ctx.fillStyle = 'rgba(104,90,103,0.52)'
+      gather()
+      ctx.fill()
+    })
     ctx.restore()
     path()
     const g = ctx.createLinearGradient(-w / 2, 0, w / 2, 0)
@@ -1167,11 +1236,19 @@ function drawHat(ctx, R, wiz, kind, robe, trim, t) {
     ctx.restore()
     // The lit outer edge — a hood is mostly silhouette, so this does more work
     // here than anywhere else.
+    const hoodOuter = () => {
+      ctx.beginPath()
+      ctx.moveTo(-R * 1.94, R * 2.4)
+      ctx.bezierCurveTo(-R * 1.82, R * 0.55, -R * 1.34, -R * 1.72, -R * 0.14, -R * 1.98)
+      ctx.quadraticCurveTo(R * 0.54, -R * 2.12, R * 0.82, -R * 1.62)
+      ctx.bezierCurveTo(R * 1.5, -R * 0.78, R * 1.84, R * 0.6, R * 1.96, R * 2.4)
+      ctx.closePath()
+    }
     rim(() => {
       ctx.beginPath()
       ctx.moveTo(-R * 1.9, R * 2.0)
       ctx.bezierCurveTo(-R * 1.8, R * 0.55, -R * 1.34, -R * 1.74, -R * 0.14, -R * 2.0)
-    }, 0.22, 0.05)
+    }, 0.22, 0.05, hoodOuter)
     // Shadow thrown into the hood, so the face sits inside it.
     ctx.save()
     ctx.beginPath()
