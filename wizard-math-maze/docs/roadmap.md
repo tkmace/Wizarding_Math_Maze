@@ -78,6 +78,60 @@ already do. If it happens it should rank effort (doors answered, days played,
 facts moved from shaky to locked-in) and probably be per-classroom rather than
 global.
 
+## Account recovery, and what going public would need
+
+Children forget four digits. It has already happened twice. Today that is
+unrecoverable by design, and the design is worth defending before it is
+changed.
+
+**The constraint.** The sync token is `PBKDF2(passcode, "wmm:<name>", 100k)`,
+computed in the browser. The server holds a token and a blob and cannot answer
+"which profile belongs to this child" — not won't, *cannot*. That is what makes
+it safe to run this for other people's children, and it is also exactly why
+there is no password reset: there is nobody to send one to and no account to
+send it about.
+
+**What recovery should be: a recovery phrase, not an email.** At signup,
+generate three random words, show them once, tell the grown-up to write them
+somewhere. Derive a SECOND token from the phrase and store it server-side as an
+alias row pointing at the same profile; entering the phrase on any device logs
+her in and lets her set a new passcode. Cross-device recovery, no email, no
+personal data, no mail infrastructure, and the server still cannot be asked who
+anyone is. Touches the sync contract, so `synctest.mjs` is the thing to extend
+first.
+
+**Why not email.** It would be personal data about children, which is COPPA
+territory in the US and a question for someone qualified rather than a design
+call. It would create the durable identifier this whole scheme exists to avoid.
+And it needs a mail sender, domain authentication, a reset-token table, rate
+limiting, and a public endpoint whose job is to answer "does this account
+exist" — the enumeration that was deliberately designed out.
+
+**A rejected idea, recorded so it is not re-proposed.** A "forgot your
+passcode" panel on the login screen, behind a hard sum, revealing the passcode
+that is already sitting in `localStorage` in clear. It dies on one observation:
+in a maths app, a maths lock gets easier exactly as the child it is locking
+gets better, and the children most likely to beat it are the ones using the app
+most. A nine-year-old here can already do 17 x 23. Any gate wants to be a
+grown-up's secret or nothing.
+
+**The rest of going public.** None of this is urgent while the players are two
+sisters and a friend's classroom, and all of it comes due together the first
+time a stranger's child signs in:
+
+- A privacy policy, and a way to actually delete a profile and its cloud row.
+- A decision on ages, written down, with the COPPA question answered by someone
+  qualified.
+- The passcode is stored in clear in `localStorage` (`loadProfile` string-
+  compares it). Fine on a family iPad; worth revisiting when the device might
+  be shared with strangers.
+- Teacher mode (above) is the same problem wearing a different hat — it is
+  already designed around child-initiated joining for exactly this reason.
+
+There is no user-generated content anywhere in the app and nothing is ever
+shown to one child about another. That is worth keeping on purpose: it is why
+there is no moderation problem to solve.
+
 ---
 
 ## Smaller
