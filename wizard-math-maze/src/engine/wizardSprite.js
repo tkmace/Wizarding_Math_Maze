@@ -9,7 +9,7 @@
 // same character.
 
 import { resolveLook } from '../game/appearance.js'
-import { drawHead, grain } from './portrait.js'
+import { drawHead, grain, shadeOver, lightOver } from './portrait.js'
 
 const TAU = Math.PI * 2
 
@@ -1249,19 +1249,30 @@ function drawHat(ctx, h, kind, robe, trim, t, view = 'front', headY = -h * 0.655
   // head. Small on purpose: the eyebrows are only a little below this.
   const sit = h * 0.024
 
-  /** A shadow on the forehead, so the hat is ON the head rather than near it. */
-  const seat = w => {
-    ctx.save()
-    const g = ctx.createLinearGradient(0, brimY, 0, brimY + h * 0.055)
-    g.addColorStop(0, 'rgba(60,30,20,0.4)')
-    g.addColorStop(1, 'rgba(60,30,20,0)')
-    ctx.fillStyle = g
-    ctx.beginPath()
-    ctx.moveTo(-w / 2, brimY)
-    ctx.quadraticCurveTo(0, brimY + sit + h * 0.05, w / 2, brimY)
-    ctx.closePath()
-    ctx.fill()
-    ctx.restore()
+  /**
+   * The shadow the hat throws onto the head, so it is ON her rather than near
+   * her. `reach` scales it with the hat: a wide brim shades most of a skull, a
+   * crown shades the inch under its rim. It was one fixed wedge for all five.
+   *
+   * multiply now, not a brown wash — the same shadow then works over her hair,
+   * over a hood lining and over bare skin without being retuned for each.
+   */
+  const seat = (w, reach = 1) => {
+    const head = () => {
+      ctx.beginPath()
+      ctx.ellipse(0, headY, headR * 1.25, headR * 1.3, 0, 0, TAU)
+    }
+    shadeOver(ctx, head, () => {
+      const g = ctx.createLinearGradient(0, brimY, 0, brimY + h * 0.07 * reach)
+      g.addColorStop(0, 'rgba(96,80,94,0.82)')
+      g.addColorStop(1, 'rgba(96,80,94,0)')
+      ctx.fillStyle = g
+      ctx.beginPath()
+      ctx.moveTo(-w / 2 * reach, brimY)
+      ctx.quadraticCurveTo(0, brimY + sit + h * 0.062 * reach, w / 2 * reach, brimY)
+      ctx.closePath()
+      ctx.fill()
+    })
   }
 
   const cone = (height, width, curve) => {
@@ -1276,20 +1287,110 @@ function drawHat(ctx, h, kind, robe, trim, t, view = 'front', headY = -h * 0.655
     g.addColorStop(0, shade(hatCol, -0.26)); g.addColorStop(0.45, hatCol); g.addColorStop(1, shade(hatCol, -0.3))
     ctx.fillStyle = g
     ctx.fill()
+
+    // Everything below here is what the front-facing hat already had and this
+    // one never did. The maze is third person, so this is the hat on screen for
+    // most of the time anyone spends playing, and it was the flatter of the two.
+    const conePath = () => {
+      ctx.beginPath()
+      ctx.moveTo(-width / 2, brimY)
+      ctx.quadraticCurveTo(-width * 0.1, brimY - height * 0.78, curve, brimY - height)
+      ctx.quadraticCurveTo(width * 0.18, brimY - height * 0.5, width / 2, brimY)
+      ctx.quadraticCurveTo(0, brimY + sit, -width / 2, brimY)
+      ctx.closePath()
+    }
+    ctx.save(); conePath(); ctx.clip()
+    grain(ctx, -width, brimY - height - h * 0.02, width * 2, height + h * 0.08, 41, 0.045)
+    ctx.restore()
+    // Where the cone meets the head it turns away from the light on every side.
+    shadeOver(ctx, conePath, () => {
+      const ao = ctx.createLinearGradient(0, brimY - height * 0.5, 0, brimY + sit)
+      ao.addColorStop(0, 'rgba(104,90,102,0)')
+      ao.addColorStop(1, 'rgba(104,90,102,0.6)')
+      ctx.fillStyle = ao
+      ctx.fillRect(-width, brimY - height, width * 2, height + h * 0.04)
+    })
+    // The lit edge. Without one a silhouette reads as a sticker on the wall
+    // behind it, which at this size is most of what you see of her.
+    lightOver(ctx, conePath, () => {
+      ctx.filter = `blur(${Math.max(0.5, h * 0.004)}px)`
+      ctx.strokeStyle = 'rgba(255,255,255,0.3)'
+      ctx.lineWidth = h * 0.007
+      ctx.beginPath()
+      ctx.moveTo(curve, brimY - height * 0.96)
+      ctx.quadraticCurveTo(-width * 0.1, brimY - height * 0.78, -width * 0.47, brimY - h * 0.004)
+      ctx.stroke()
+    })
     outline(ctx, h, robe)
   }
   const brim = (w, thick) => {
+    // A brim has a top and an under-side and you can see both. The under-side
+    // first, offset down: without it this is a disc of zero thickness stuck
+    // through the hat, which is what it was.
     ctx.beginPath()
-    ctx.ellipse(0, brimY + sit * 0.4, w / 2, thick, 0, 0, TAU)
-    ctx.fillStyle = shade(robe, -0.25)
+    ctx.ellipse(0, brimY + sit * 0.4 + thick * 0.42, w / 2, thick, 0, 0, TAU)
+    ctx.fillStyle = shade(robe, -0.55)
     ctx.fill()
+    const top = () => {
+      ctx.beginPath()
+      ctx.ellipse(0, brimY + sit * 0.4, w / 2, thick, 0, 0, TAU)
+    }
+    top()
+    const g = ctx.createLinearGradient(-w / 2, 0, w / 2, 0)
+    g.addColorStop(0, shade(robe, -0.34))
+    g.addColorStop(0.45, shade(robe, -0.16))
+    g.addColorStop(1, shade(robe, -0.42))
+    ctx.fillStyle = g
+    ctx.fill()
+    ctx.save(); top(); ctx.clip()
+    grain(ctx, -w, brimY - thick * 2, w * 2, thick * 4, 23, 0.045)
+    ctx.restore()
+    lightOver(ctx, top, () => {
+      ctx.filter = `blur(${Math.max(0.5, h * 0.004)}px)`
+      ctx.strokeStyle = 'rgba(255,255,255,0.22)'
+      ctx.lineWidth = h * 0.006
+      ctx.beginPath()
+      ctx.ellipse(0, brimY + sit * 0.4, w / 2 - h * 0.003, thick - h * 0.003, 0, Math.PI * 0.62, Math.PI * 1.9)
+      ctx.stroke()
+    })
     outline(ctx, h, robe)
   }
   const band = w => {
-    ctx.fillStyle = trim
-    ctx.globalAlpha = 0.9
-    ctx.fillRect(-w / 2 * 0.86, brimY - h * 0.035, w * 0.86, h * 0.028)
-    ctx.globalAlpha = 1
+    // Wrapped, not stuck on. portrait.js says it best: the near edge of a band
+    // round a cone dips towards you, and a straight strip is the single thing
+    // that makes a hat look like a sticker. This was a fillRect.
+    const hw = w * 0.43
+    const yTop = brimY - h * 0.038, yBot = brimY - h * 0.008
+    const path = () => {
+      ctx.beginPath()
+      ctx.moveTo(-hw, yTop)
+      ctx.quadraticCurveTo(0, yTop + h * 0.012, hw, yTop)
+      ctx.lineTo(hw, yBot)
+      ctx.quadraticCurveTo(0, yBot + h * 0.014, -hw, yBot)
+      ctx.closePath()
+    }
+    // Cloth gathers where it is tied, so the crown darkens just above the band.
+    const gather = () => {
+      ctx.beginPath()
+      ctx.moveTo(-hw, yTop - h * 0.016)
+      ctx.quadraticCurveTo(0, yTop - h * 0.004, hw, yTop - h * 0.016)
+      ctx.lineTo(hw, yTop + h * 0.004)
+      ctx.quadraticCurveTo(0, yTop + h * 0.016, -hw, yTop + h * 0.004)
+      ctx.closePath()
+    }
+    shadeOver(ctx, gather, () => {
+      ctx.filter = `blur(${Math.max(0.7, h * 0.008)}px)`
+      ctx.fillStyle = 'rgba(104,90,103,0.5)'
+      gather(); ctx.fill()
+    })
+    path()
+    const g = ctx.createLinearGradient(-hw, 0, hw, 0)
+    g.addColorStop(0, shade(trim, -0.22)); g.addColorStop(0.42, trim); g.addColorStop(1, shade(trim, -0.34))
+    ctx.fillStyle = g
+    ctx.fill()
+    ctx.save(); path(); ctx.clip()
+    grain(ctx, -w, yTop - h * 0.02, w * 2, h * 0.09, 59, 0.04)
+    ctx.restore()
   }
   const star = (sx, sy, size) => {
     ctx.save()
@@ -1311,7 +1412,7 @@ function drawHat(ctx, h, kind, robe, trim, t, view = 'front', headY = -h * 0.655
   ctx.translate(0, -brimY)
 
   if (kind === 'wide') {
-    seat(h * 0.62)
+    seat(h * 0.62, 1.3)      // wide brim: shades most of the skull
     brim(h * 0.62, h * 0.028)
     cone(h * 0.30, h * 0.32, h * 0.02)
     band(h * 0.32)
@@ -1448,13 +1549,41 @@ function drawHat(ctx, h, kind, robe, trim, t, view = 'front', headY = -h * 0.655
       ctx.quadraticCurveTo(s * h * 0.26, brimY - h * 0.10, s * h * 0.21, brimY - h * 0.20)
       ctx.quadraticCurveTo(s * h * 0.20, brimY - h * 0.08, s * h * 0.10, brimY - h * 0.04)
       ctx.closePath()
-      ctx.fillStyle = trim; ctx.fill()
+      const hornPath = () => {
+        ctx.beginPath()
+        ctx.moveTo(s * h * 0.12, brimY - h * 0.02)
+        ctx.quadraticCurveTo(s * h * 0.26, brimY - h * 0.10, s * h * 0.21, brimY - h * 0.20)
+        ctx.quadraticCurveTo(s * h * 0.20, brimY - h * 0.08, s * h * 0.10, brimY - h * 0.04)
+        ctx.closePath()
+      }
+      const hg = ctx.createLinearGradient(s * h * 0.10, 0, s * h * 0.26, 0)
+      hg.addColorStop(0, shade(trim, -0.3)); hg.addColorStop(0.5, trim); hg.addColorStop(1, shade(trim, -0.38))
+      ctx.fillStyle = hg; ctx.fill()
+      // A horn is a tube, so it darkens into the hat it springs from and keeps
+      // a highlight along its outer curve. Flat trim beside a modelled cone
+      // was the giveaway that only half the hat had been looked at.
+      shadeOver(ctx, hornPath, () => {
+        const ao = ctx.createLinearGradient(s * h * 0.26, 0, s * h * 0.09, 0)
+        ao.addColorStop(0, 'rgba(104,90,102,0)')
+        ao.addColorStop(1, 'rgba(104,90,102,0.55)')
+        ctx.fillStyle = ao
+        ctx.fillRect(-h, brimY - h * 0.25, h * 2, h * 0.3)
+      })
+      lightOver(ctx, hornPath, () => {
+        ctx.filter = `blur(${Math.max(0.5, h * 0.0035)}px)`
+        ctx.strokeStyle = 'rgba(255,255,255,0.3)'
+        ctx.lineWidth = h * 0.006
+        ctx.beginPath()
+        ctx.moveTo(s * h * 0.13, brimY - h * 0.028)
+        ctx.quadraticCurveTo(s * h * 0.255, brimY - h * 0.10, s * h * 0.207, brimY - h * 0.19)
+        ctx.stroke()
+      })
       outline(ctx, h, trim, 0.7)
     }
     band(h * 0.30)
   } else if (kind === 'crown') {
     const w = h * 0.30
-    seat(w)
+    seat(w, 0.7)             // a crown shades the inch under its rim
     ctx.beginPath()
     ctx.moveTo(-w / 2, brimY)
     ctx.lineTo(-w / 2, brimY - h * 0.05)
@@ -1472,6 +1601,33 @@ function drawHat(ctx, h, kind, robe, trim, t, view = 'front', headY = -h * 0.655
     const g = ctx.createLinearGradient(-w / 2, 0, w / 2, 0)
     g.addColorStop(0, shade(trim, -0.35)); g.addColorStop(0.5, trim); g.addColorStop(1, shade(trim, -0.4))
     ctx.fillStyle = g; ctx.fill()
+    const crownPath = () => {
+      ctx.beginPath()
+      ctx.moveTo(-w / 2, brimY)
+      ctx.lineTo(-w / 2, brimY - h * 0.05)
+      for (let i = 0; i < 4; i++) {
+        const px = -w / 2 + (w / 4) * i
+        ctx.lineTo(px + w / 8, brimY - h * (i % 2 === 0 ? 0.14 : 0.10))
+        ctx.lineTo(px + w / 4, brimY - h * 0.05)
+      }
+      ctx.lineTo(w / 2, brimY)
+      ctx.quadraticCurveTo(0, brimY + sit, -w / 2, brimY)
+      ctx.closePath()
+    }
+    // Metal, so a harder light than felt gets: a bright band across the rim
+    // where it faces up, and a darkening into the head below it.
+    shadeOver(ctx, crownPath, () => {
+      const ao = ctx.createLinearGradient(0, brimY - h * 0.04, 0, brimY + sit)
+      ao.addColorStop(0, 'rgba(104,90,102,0)')
+      ao.addColorStop(1, 'rgba(104,90,102,0.5)')
+      ctx.fillStyle = ao
+      ctx.fillRect(-w, brimY - h * 0.16, w * 2, h * 0.2)
+    })
+    lightOver(ctx, crownPath, () => {
+      ctx.filter = `blur(${Math.max(0.6, h * 0.005)}px)`
+      ctx.fillStyle = 'rgba(255,255,255,0.3)'
+      ctx.fillRect(-w / 2, brimY - h * 0.052, w, h * 0.014)
+    })
     outline(ctx, h, trim, 0.8)
     for (let i = 0; i < 3; i++) {
       ctx.beginPath()
