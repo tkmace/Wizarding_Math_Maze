@@ -310,7 +310,14 @@ export default function App() {
       const stats = {
         ...prev.stats,
         mazesCleared: (prev.stats?.mazesCleared || 0) + 1,
-        playMs: (prev.stats?.playMs || 0) + (Date.now() - runRef.current.startedAt),
+        // Capped per run. This counts wall-clock from the moment a maze opened,
+        // so a tablet left on the maze screen overnight charged the child
+        // twenty-four hours of "play": the live data has two wizards with over
+        // 1,400 minutes against a couple of hundred answers, which is not a
+        // measurement of anything. A maze is minutes; anything past half an
+        // hour is a tab nobody was sitting at.
+        playMs: (prev.stats?.playMs || 0)
+          + Math.min(30 * 60 * 1000, Date.now() - runRef.current.startedAt),
       }
       const next = { ...prev, stats }
       saveProfile(next)
