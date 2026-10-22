@@ -85,11 +85,17 @@ unrecoverable by design, and the design is worth defending before it is
 changed.
 
 **The constraint.** The sync token is `PBKDF2(passcode, "wmm:<name>", 100k)`,
-computed in the browser. The server holds a token and a blob and cannot answer
-"which profile belongs to this child" — not won't, *cannot*. That is what makes
-it safe to run this for other people's children, and it is also exactly why
-there is no password reset: there is nobody to send one to and no account to
-send it about.
+computed in the browser, and it is the only way in: `GET /api/profile` takes a
+token and nothing else, so the API cannot be asked "is there a wizard called
+Camille" and cannot be enumerated. That is why there is no password reset —
+there is no account to send one about.
+
+Be precise about what that does and does not buy, because the first draft of
+this section was wrong. The `profiles` table stores `name` in plaintext
+alongside the blob, so anyone holding the connection string can list every
+child using the app; it is first names only, capped at 40 characters, and it is
+what makes the owner's own queries possible. The property is "the public API
+cannot be enumerated", not "the database cannot identify anyone".
 
 **What recovery should be: a recovery phrase, not an email.** At signup,
 generate three random words, show them once, tell the grown-up to write them
