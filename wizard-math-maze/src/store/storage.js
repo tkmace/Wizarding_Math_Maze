@@ -54,6 +54,7 @@ export function blankProfile(name, passcode) {
     settings: { ops: ['addition'], diff: SENSE, showCompass: true, bigKeypad: true },
     createdAt: Date.now(),
     lastPlayed: Date.now(),
+    awayGiftAt: 0,               // when she was last welcomed back — see game/welcome.js
   }
 }
 

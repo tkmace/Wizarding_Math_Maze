@@ -7,12 +7,14 @@ import { formById, rankFor, pendingRanks, activePerks, buyState, STARTER } from 
 import { rollEncounter, encounterReward, duelIsTimed } from './game/encounters.js'
 import { hasNest } from './game/nests.js'
 import { seenTip } from './game/tips.js'
+import { welcomeBack } from './game/welcome.js'
 import { saveProfile } from './store/storage.js'
 import { syncEnabled, push as cloudPush } from './store/sync.js'
 import { CSS, C, sans, serif } from './ui/theme.js'
 import StarField from './ui/StarField.jsx'
 import Login from './ui/Login.jsx'
 import Hub from './ui/Hub.jsx'
+import WelcomeBack from './ui/WelcomeBack.jsx'
 import GameView from './ui/GameView.jsx'
 import MathDoor from './ui/MathDoor.jsx'
 import Wardrobe from './ui/Wardrobe.jsx'
@@ -37,6 +39,7 @@ const blankRun = () => ({ points: 0, doors: 0, answered: 0, correct: 0, fast: 0,
 export default function App() {
   const [profile, setProfile] = useState(null)
   const [screen, setScreen] = useState('login')
+  const [welcome, setWelcome] = useState(null)   // the returning-wizard card, if she is one
   const screenRef = useRef(screen)
   screenRef.current = screen
   const [ops, setOps] = useState(new Set(['addition']))
@@ -117,11 +120,19 @@ export default function App() {
   }, [commit])
 
   const enter = useCallback(p => {
-    setProfile(p)
-    setOps(new Set(p.settings?.ops?.length ? p.settings.ops : ['addition']))
-    setDiff(p.settings?.diff || SENSE)
+    // Decided here, before anything calls saveProfile: saving stamps lastPlayed
+    // with now, and the gap since her last visit is the only evidence that she
+    // has been away at all.
+    const gift = welcomeBack(p)
+    const next = gift
+      ? { ...p, totalPoints: (p.totalPoints || 0) + gift.points, awayGiftAt: gift.at }
+      : p
+    setWelcome(gift)
+    commit(next)
+    setOps(new Set(next.settings?.ops?.length ? next.settings.ops : ['addition']))
+    setDiff(next.settings?.diff || SENSE)
     setScreen('hub')
-  }, [])
+  }, [commit])
 
   useEffect(() => {
     if (!profile) return
@@ -563,6 +574,10 @@ export default function App() {
     }}>
       <style>{CSS}</style>
       <StarField />
+
+      {/* Over the top of whatever she lands on, because a gift that tips her
+          into a new rank sends her to the robe choice, not the hub. */}
+      <WelcomeBack profile={profile} gift={welcome} onSeen={() => setWelcome(null)} />
 
       {screen === 'login' && <Login onEnter={enter} />}
 
