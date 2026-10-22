@@ -186,6 +186,18 @@ export default function Login({ onEnter }) {
               style={inputStyle({ textAlign: 'center', fontSize: 22, letterSpacing: 8 })}
             />
             {codeKeypad(make, 'BEGIN ›')}
+            {/* The one thing a returning child can get wrong here with no way
+                of being told. Her name and passcode together derive the lookup
+                key, so a different passcode finds no wizard and starts a fresh
+                one — and the server cannot say "that name exists, try again",
+                because not being able to answer that is the whole point of the
+                scheme. Her old wizard is not lost: the right passcode still
+                opens it. But nothing on this screen said so, and two wizards
+                called Kali in the live data say that it needs to. */}
+            <div style={{ color: C.dim, fontSize: 11, fontWeight: 700, lineHeight: 1.45, marginTop: 2, textAlign: 'center' }}>
+              Played before? Use the <b style={{ color: C.gold }}>same passcode</b> — a different one
+              starts a brand-new wizard.
+            </div>
             {err && <Err>{err}</Err>}
             <button className="bh" onClick={make} disabled={busy}
               style={btn('gold', { width: '100%', marginTop: 4, opacity: busy ? 0.7 : 1 })}>
