@@ -7,6 +7,7 @@ import { formById, rankFor, pendingRanks, activePerks, buyState, STARTER } from 
 import { rollEncounter, encounterReward, duelIsTimed } from './game/encounters.js'
 import { hasNest } from './game/nests.js'
 import { seenTip } from './game/tips.js'
+import * as sfx from './engine/sound.js'
 import { welcomeBack } from './game/welcome.js'
 import { saveProfile } from './store/storage.js'
 import { syncEnabled, push as cloudPush } from './store/sync.js'
@@ -40,6 +41,18 @@ export default function App() {
   const [profile, setProfile] = useState(null)
   const [screen, setScreen] = useState('login')
   const [welcome, setWelcome] = useState(null)   // the returning-wizard card, if she is one
+
+  // iOS will not let an AudioContext run unless it was created inside a user
+  // gesture, and one made at page load is born suspended and stays silent with
+  // no error to say why. So: the first tap anywhere starts the clock, once.
+  useEffect(() => {
+    const go = () => { sfx.wakeSound(); window.removeEventListener('pointerdown', go) }
+    window.addEventListener('pointerdown', go)
+    return () => window.removeEventListener('pointerdown', go)
+  }, [])
+
+  useEffect(() => { sfx.soundEnabled(profile?.settings?.sound !== false) },
+    [profile?.settings?.sound])
   const screenRef = useRef(screen)
   screenRef.current = screen
   const [ops, setOps] = useState(new Set(['addition']))
@@ -267,6 +280,7 @@ export default function App() {
       const worth = maze.stones[k] === true ? 1 : (maze.stones[k] || 1)
       delete maze.stones[k]
       commit({ ...profile, stones: (profile.stones || 0) + worth })
+      if (worth > 1) sfx.greatRune(); else sfx.rune()
       say(worth > 1 ? `✨ THE GREAT RUNE ✨\n🔮 +${worth} rune stones` : '🔮 +1 Rune Stone', worth > 1 ? 2600 : 1500)
       teach('rune')
     }
@@ -353,7 +367,9 @@ export default function App() {
         hintsUsed: (profile.stats?.hintsUsed || 0) + (usedHint ? 1 : 0),
       },
     })
-    if (after > before) setNewRank(after)
+    sfx.right()
+    sfx.door()
+    if (after > before) { setNewRank(after); sfx.rankUp() }
 
     setRun(r => ({
       ...r,
@@ -391,6 +407,7 @@ export default function App() {
   const onWrong = useCallback(() => {
     const cell = doorCell
     if (!cell) return
+    sfx.again()
     setDoorQ(prev => {
       if (!prev) return prev
       // How much a miss costs is a perk — a forgiving form keeps more of it.
@@ -450,7 +467,7 @@ export default function App() {
     const before = rankFor(profile.totalPoints).rank
     const after = rankFor(next.totalPoints).rank
     commit(next)
-    if (after > before) setNewRank(after)
+    if (after > before) { setNewRank(after); sfx.rankUp() }
 
     if (reward.points > 0) {
       setRun(r => ({
@@ -604,6 +621,12 @@ export default function App() {
           onWardrobe={() => { setScreen('wardrobe'); teach('wardrobe') }}
           onShop={() => { shopFrom.current = 'hub'; setScreen('shop') }}
           onReport={() => setScreen('report')}
+          onToggleSound={() => {
+            const on = profile.settings?.sound === false
+            commit({ ...profile, settings: { ...profile.settings, sound: on } })
+            // Play the thing she just switched on, so the button proves itself.
+            if (on) { sfx.soundEnabled(true); sfx.rune() }
+          }}
           onLook={() => setScreen('look')}
           onNest={() => setScreen('nest')}
           onAttune={() => { setAttuneOps(null); setAskedOps(false); setScreen('attune') }}

@@ -38,14 +38,6 @@ lists. `trinketsheet.html` is the place to iterate.
 Do not be tempted to parameterise this into one shared style with numbers. That
 was tried; it is why the faces used to look like one person in six wigs.
 
-## Sound  **[standalone]**
-
-Nothing has audio. A door opening, a rune picked up, the Great Rune, a duel
-hit, the rank-up fanfare. Wants to be: procedural (WebAudio, no asset files, to
-match the art), off by default, and a single settings toggle. Nothing may be
-required to hear — the game must stay fully playable silent, including the
-timed encounters.
-
 ## The easiest tier may still be too hard
 
 Standing note, flagged and never addressed: `TIERS[0]` is roughly 1-8 plus 1-8,
