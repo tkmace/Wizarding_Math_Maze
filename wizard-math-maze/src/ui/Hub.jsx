@@ -8,7 +8,7 @@ import Portrait from './Portrait.jsx'
 import NestCrest from './NestCrest.jsx'
 
 /** The castle: choose what to practice, see your rank, head into a maze. */
-export default function Hub({ profile, ops, diff, onToggleOp, onSetDiff, onStart, onWardrobe, onShop, onReport, onLook, onNest, onAttune, onLogout, pendingPicks }) {
+export default function Hub({ profile, ops, diff, onToggleOp, onSetDiff, onStart, onWardrobe, onShop, onReport, onLook, onNest, onAttune, onLogout, onToggleSound, pendingPicks }) {
   const form = formById(profile.equippedSkin)
   const rank = rankFor(profile.totalPoints)
   const next = nextRank(profile.totalPoints)
@@ -242,6 +242,16 @@ export default function Hub({ profile, ops, diff, onToggleOp, onSetDiff, onStart
           ↩ Switch Wizard
         </button>
       </div>
+
+      {/* Sound is ON out of the box, which is a deliberate reversal of what the
+          roadmap said. A setting that starts off is a setting most children
+          never find, and the sounds are the point. The mute is here, in plain
+          sight, for the car and the classroom. */}
+      <button
+        className="bh" onClick={onToggleSound}
+        style={btn('ghost', { fontSize: 13, width: '100%', marginTop: 8 })}>
+        {profile.settings?.sound === false ? '🔇 Sound off — tap for sound' : '🔊 Sound on — tap to mute'}
+      </button>
 
       <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginTop: 16, flexWrap: 'wrap' }}>
         {/* A wizard grows, and one who was measured badly should not be stuck

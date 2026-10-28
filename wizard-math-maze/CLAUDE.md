@@ -14,6 +14,11 @@ In practice:
 - Nothing is ever framed as a mark, a score out of, or a test — including the
   Attunement, which is a ceremony that cannot be failed.
 - The progress page has no red on it. "Shaky" is "worth another go".
+- A wrong answer gets a soft, level, neutral tone — never a buzzer, never a
+  falling interval, never anything a game show would use. `again()` in
+  `src/engine/sound.js` is the function to leave alone when someone later
+  reaches for juicier feedback; `soundtest.mjs` asserts it does not fall and is
+  quieter than the correct answer, because that is invisible in code review.
 
 If a change would make a struggling child feel measured, it is wrong even if it
 is more accurate.

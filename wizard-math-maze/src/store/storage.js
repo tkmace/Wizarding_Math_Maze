@@ -51,7 +51,7 @@ export function blankProfile(name, passcode) {
     plays: 0,
     facts: {},
     stats: { mazesCleared: 0, doorsOpened: 0, correct: 0, wrong: 0, bestStreak: 0, hintsUsed: 0, playMs: 0 },
-    settings: { ops: ['addition'], diff: SENSE, showCompass: true, bigKeypad: true },
+    settings: { ops: ['addition'], diff: SENSE, showCompass: true, bigKeypad: true, sound: true },
     createdAt: Date.now(),
     lastPlayed: Date.now(),
     awayGiftAt: 0,               // when she was last welcomed back — see game/welcome.js
