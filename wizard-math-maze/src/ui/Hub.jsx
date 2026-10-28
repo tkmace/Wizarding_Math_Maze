@@ -8,7 +8,7 @@ import Portrait from './Portrait.jsx'
 import NestCrest from './NestCrest.jsx'
 
 /** The castle: choose what to practice, see your rank, head into a maze. */
-export default function Hub({ profile, ops, diff, onToggleOp, onSetDiff, onStart, onWardrobe, onShop, onReport, onLook, onNest, onAttune, onLogout, onToggleSound, pendingPicks }) {
+export default function Hub({ profile, ops, diff, onToggleOp, onSetDiff, onStart, onWardrobe, onShop, onReport, onLook, onNest, onAttune, onLogout, onToggleSound, audioReady, pendingPicks }) {
   const form = formById(profile.equippedSkin)
   const rank = rankFor(profile.totalPoints)
   const next = nextRank(profile.totalPoints)
@@ -250,7 +250,15 @@ export default function Hub({ profile, ops, diff, onToggleOp, onSetDiff, onStart
       <button
         className="bh" onClick={onToggleSound}
         style={btn('ghost', { fontSize: 13, width: '100%', marginTop: 8 })}>
-        {profile.settings?.sound === false ? '🔇 Sound off — tap for sound' : '🔊 Sound on — tap to mute'}
+        {profile.settings?.sound === false
+          ? '🔇 Sound off — tap for sound'
+          : audioReady
+            ? '🔊 Sound on — tap to mute'
+            // Switched on, but the browser has not given us a running clock.
+            // On an iPad that is almost always the silent switch, which mutes
+            // web audio whatever the volume buttons say. Saying so beats a
+            // button that claims sound is on while nothing comes out.
+            : '🔇 Sound on, but your device is silent — check the mute switch'}
       </button>
 
       <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginTop: 16, flexWrap: 'wrap' }}>
