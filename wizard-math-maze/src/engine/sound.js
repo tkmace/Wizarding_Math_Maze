@@ -33,23 +33,55 @@ export function soundEnabled(next) {
  */
 export function wakeSound() {
   try {
-    if (ctx) {
-      if (ctx.state === 'suspended') ctx.resume().catch(() => {})
-      return ctx
-    }
     const AC = typeof window !== 'undefined' && (window.AudioContext || window.webkitAudioContext)
     if (!AC) return null
-    ctx = new AC()
-    master = ctx.createGain()
-    // Quiet by default. This is played in bedrooms and classrooms, and nobody
-    // ever wished a maths game were louder.
-    master.gain.value = 0.18
-    master.connect(ctx.destination)
+    if (!ctx) {
+      ctx = new AC()
+      master = ctx.createGain()
+      // Quiet by default. This is played in bedrooms and classrooms, and nobody
+      // ever wished a maths game were louder.
+      master.gain.value = 0.18
+      master.connect(ctx.destination)
+    }
+    // ALWAYS try to resume, including on a context we just made. Safari hands
+    // back a context that is already suspended more often than not, and the
+    // first version only resumed one it found suspended on a LATER call — so a
+    // context born asleep stayed asleep, silently, forever.
+    if (ctx.state !== 'running') ctx.resume().catch(() => {})
+    // The unlock itself: iOS treats a context as unlocked once something has
+    // actually been played through it inside a gesture. One silent frame does
+    // that without making a sound.
+    try {
+      const b = ctx.createBufferSource()
+      b.buffer = ctx.createBuffer(1, 1, ctx.sampleRate)
+      b.connect(ctx.destination)
+      b.start(0)
+    } catch { /* nothing to unlock, or already unlocked */ }
     return ctx
   } catch { return null }
 }
 
-const live = () => (enabled && ctx && ctx.state === 'running' ? ctx : null)
+/**
+ * Is there actually audio? Not "is sound switched on" — whether the browser has
+ * given us a running clock. The two are different, and the difference is the
+ * whole of this bug: the setting said ON while the context was asleep, so every
+ * sound no-opped and nothing anywhere said why.
+ */
+export function soundReady() {
+  return !!(ctx && ctx.state === 'running')
+}
+
+const live = () => {
+  if (!enabled || !ctx) return null
+  if (ctx.state !== 'running') {
+    // Nudge it, so the NEXT sound has a chance even if this one is lost. A
+    // context can be suspended again by the OS at any time — a phone call, a
+    // backgrounded tab — and nothing else would ever wake it.
+    ctx.resume().catch(() => {})
+    return null
+  }
+  return ctx
+}
 
 /**
  * One note. `slide` bends the pitch over the life of the note, which is most of

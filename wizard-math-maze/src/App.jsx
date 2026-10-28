@@ -45,10 +45,26 @@ export default function App() {
   // iOS will not let an AudioContext run unless it was created inside a user
   // gesture, and one made at page load is born suspended and stays silent with
   // no error to say why. So: the first tap anywhere starts the clock, once.
+  // It keeps listening until there is actually a running clock, rather than
+  // giving up after one tap. The first version unhooked itself on the first
+  // pointerdown whether or not that tap had worked — and on a tablet it often
+  // does not, so a single unlucky first touch meant silence for the whole
+  // session with nothing to say why. Several event names because Safari has
+  // historically honoured touchend and click for this and not pointerdown.
+  const [audioReady, setAudioReady] = useState(false)
   useEffect(() => {
-    const go = () => { sfx.wakeSound(); window.removeEventListener('pointerdown', go) }
-    window.addEventListener('pointerdown', go)
-    return () => window.removeEventListener('pointerdown', go)
+    const EVENTS = ['pointerdown', 'touchend', 'click', 'keydown']
+    const go = () => {
+      sfx.wakeSound()
+      // resume() is async, so ask again in a moment rather than now.
+      setTimeout(() => {
+        const ok = sfx.soundReady()
+        setAudioReady(ok)
+        if (ok) EVENTS.forEach(e => window.removeEventListener(e, go))
+      }, 60)
+    }
+    EVENTS.forEach(e => window.addEventListener(e, go))
+    return () => EVENTS.forEach(e => window.removeEventListener(e, go))
   }, [])
 
   useEffect(() => { sfx.soundEnabled(profile?.settings?.sound !== false) },
@@ -624,9 +640,15 @@ export default function App() {
           onToggleSound={() => {
             const on = profile.settings?.sound === false
             commit({ ...profile, settings: { ...profile.settings, sound: on } })
-            // Play the thing she just switched on, so the button proves itself.
-            if (on) { sfx.soundEnabled(true); sfx.rune() }
+            if (on) {
+              // A tap on this button IS a user gesture, so it is also the best
+              // chance in the app to unlock audio that never woke up. Try.
+              sfx.wakeSound()
+              sfx.soundEnabled(true)
+              setTimeout(() => { setAudioReady(sfx.soundReady()); sfx.rune() }, 80)
+            }
           }}
+          audioReady={audioReady}
           onLook={() => setScreen('look')}
           onNest={() => setScreen('nest')}
           onAttune={() => { setAttuneOps(null); setAskedOps(false); setScreen('attune') }}
