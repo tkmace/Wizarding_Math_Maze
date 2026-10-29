@@ -1,5 +1,7 @@
+import { useEffect } from 'react'
 import { C, sans, serif, panel } from './theme.js'
 import { welcomeWords } from '../game/welcome.js'
+import * as sfx from '../engine/sound.js'
 
 /**
  * The castle noticed she was gone.
@@ -11,6 +13,16 @@ import { welcomeWords } from '../game/welcome.js'
  * screenshot tells you.
  */
 export default function WelcomeBack({ profile, gift, onSeen }) {
+  // A beat after the card, not with it. The tap that logged her in is also the
+  // tap that woke the audio clock, and resume() has not finished at the moment
+  // this mounts — a sound fired now is thrown away by a context that is still
+  // suspended, which is how the first version of this was silent.
+  useEffect(() => {
+    if (!gift) return
+    const t = setTimeout(() => sfx.shimmer(), 420)
+    return () => clearTimeout(t)
+  }, [gift])
+
   if (!gift) return null
   return (
     <div

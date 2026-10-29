@@ -1,9 +1,15 @@
 import { C, sans, serif } from './theme.js'
+import * as sfx from '../engine/sound.js'
 
 /**
  * On-screen number pad. The original game was arrow-keys-and-keyboard only,
  * which made it unplayable on a tablet — this is the answer-entry half of the
  * fix. Keys are 56px minimum so they work under a child's finger.
+ *
+ * The key sounds live here rather than in each caller, so anything that puts a
+ * pad on screen gets them without having to remember to. Submit is silent on
+ * purpose: the verdict arrives a few milliseconds later and two sounds on top
+ * of each other would blur the one that matters.
  */
 export default function Keypad({ onDigit, onBack, onSubmit, disabled, canSubmit, submitLabel = '✓' }) {
   const key = (content, handler, tone) => (
@@ -33,9 +39,9 @@ export default function Keypad({ onDigit, onBack, onSubmit, disabled, canSubmit,
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginTop: 14 }}>
-      {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => key(n, () => onDigit(String(n)), 'plain'))}
-      {key('⌫', onBack, 'back')}
-      {key(0, () => onDigit('0'), 'plain')}
+      {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => key(n, () => { sfx.key(n); onDigit(String(n)) }, 'plain'))}
+      {key('⌫', () => { sfx.erase(); onBack() }, 'back')}
+      {key(0, () => { sfx.key(0); onDigit('0') }, 'plain')}
       <button
         className="bh"
         onClick={onSubmit}

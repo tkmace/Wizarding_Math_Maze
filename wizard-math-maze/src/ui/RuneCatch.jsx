@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { encounterQuestion, answerChoices } from '../game/encounters.js'
 import { C, sans, serif } from './theme.js'
+import * as sfx from '../engine/sound.js'
 
 const ROUNDS = 4
 const CHANCES = 3
@@ -51,6 +52,7 @@ export default function RuneCatch({ creature, ops, diff, profile, onDone }) {
     // is the same complaint the duel had.
     s.runes = []
     setPhase(outcome)
+    if (outcome === 'won') sfx.victory(); else sfx.scatter()
     setTimeout(() => onDone({ outcome, earned: s.earned, answers: s.answers }), 1200)
   }, [s, onDone])
 
@@ -80,6 +82,7 @@ export default function RuneCatch({ creature, ops, diff, profile, onDone }) {
     s.answers.push({ q, correct: hit.correct, ms })
 
     if (hit.correct) {
+      sfx.rune()
       hit.pop = 0.001
       s.earned += q.curPts
       for (let i = 0; i < 22; i++) {
@@ -88,6 +91,7 @@ export default function RuneCatch({ creature, ops, diff, profile, onDone }) {
       }
       setTimeout(advance, 420)
     } else {
+      sfx.again()
       hit.pop = -1                          // marks it wrong: greys out
       s.chances -= 1
       s.shake = 1

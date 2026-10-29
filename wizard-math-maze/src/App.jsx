@@ -221,6 +221,7 @@ export default function App() {
     encPending.current = false
     encState.current = { count: 0, lastAt: -99 }
     steps.current = 0
+    sfx.page()
     setScreen('game')
     teach('maze')
   }, [ops, diff, profile, perks, teach])
@@ -261,12 +262,15 @@ export default function App() {
     const cur = posRef.current
     const { row, col, facing } = cur
 
-    if (action === 'turnLeft')  { setPos({ row, col, facing: (facing + 3) % 4 }); return }
-    if (action === 'turnRight') { setPos({ row, col, facing: (facing + 1) % 4 }); return }
+    if (action === 'turnLeft')  { sfx.turn(); setPos({ row, col, facing: (facing + 3) % 4 }); return }
+    if (action === 'turnRight') { sfx.turn(); setPos({ row, col, facing: (facing + 1) % 4 }); return }
 
     const [dr, dc] = action === 'forward' ? FACING_DELTA[facing] : FACING_DELTA[(facing + 2) % 4]
     const nr = row + dr, nc = col + dc
     const cell = maze.grid[nr]?.[nc]
+    // Walking into a wall is silent. A child holding the forward key against
+    // stone would otherwise get the one sound in the game that repeats twenty
+    // times a second, and it would be a dull knock telling her she is stuck.
     if (cell === undefined || cell === WALL) return
 
     if (cell === DOOR) {
@@ -280,12 +284,14 @@ export default function App() {
     if (cell === END) {
       const needed = (maze.pointsRequired || 0) - runRef.current.points
       if (needed > 0) {
+        sfx.sealed()
         say(`🔒 The way out is sealed —\nearn ${needed} more points to open it`, 3600)
         teach('gate')
         return
       }
     }
 
+    sfx.step()
     setPos({ row: nr, col: nc, facing })
     revealFrom(maze.seen, maze.grid, nr, nc)
 
@@ -301,7 +307,9 @@ export default function App() {
       teach('rune')
     }
 
-    if (cell === END) { setTimeout(() => finishMaze(), 280); return }
+    // Out. The gate sound runs while the win screen is still arriving, so the
+    // stone is already grinding by the time she sees the result.
+    if (cell === END) { sfx.exit(); setTimeout(() => finishMaze(), 280); return }
 
     // Wandering encounters fire on ordinary corridor squares only — never on the
     // exit, and never stacked on top of a door puzzle.
@@ -312,6 +320,9 @@ export default function App() {
       // has a visible cause. Movement is already blocked by encPending.
       encPending.current = true
       const start = performance.now()
+      // With the creature, not with the card: the sound is the warning, and it
+      // is no use arriving after the thing it was warning about.
+      sfx.ambush()
       setEffects(e => [...e, { kind: 'ambush', creature: enc.creature, start, dur: AMBUSH_MS }])
       setTimeout(() => {
         encPending.current = false
@@ -519,6 +530,7 @@ export default function App() {
       bought: [...(profile.bought || []), id],
       equippedSkin: id,
     })
+    sfx.buy()
     syncUp()
   }, [profile, commit, syncUp])
 
@@ -538,6 +550,7 @@ export default function App() {
       trinkets: [...(profile.trinkets || []), id],
       wearing: [...(profile.wearing || []), id],
     })
+    sfx.buy()
     syncUp()
   }, [profile, commit, syncUp])
 
@@ -602,6 +615,14 @@ export default function App() {
     setScreen('hub')
   }, [pending, profile, commit])
 
+  /**
+   * Go somewhere, audibly. Every move between the castle and a panel goes
+   * through here so the click is acknowledged — a tap that changes the whole
+   * screen and makes no sound is the thing that made the app feel half-muted
+   * even once sound was working.
+   */
+  const go = useCallback(s => { sfx.page(); setScreen(s) }, [])
+
   // --- Shell -----------------------------------------------------------------
   const form = profile ? formById(profile.equippedSkin || STARTER) : null
   const doorsLeft = maze ? Object.keys(maze.dq).length : 0
@@ -634,9 +655,9 @@ export default function App() {
           profile={profile} ops={ops} diff={diff} pendingPicks={pending.length}
           onToggleOp={toggleOp} onSetDiff={setDiff}
           onStart={startGame}
-          onWardrobe={() => { setScreen('wardrobe'); teach('wardrobe') }}
-          onShop={() => { shopFrom.current = 'hub'; setScreen('shop') }}
-          onReport={() => setScreen('report')}
+          onWardrobe={() => { go('wardrobe'); teach('wardrobe') }}
+          onShop={() => { shopFrom.current = 'hub'; go('shop') }}
+          onReport={() => go('report')}
           onToggleSound={() => {
             const on = profile.settings?.sound === false
             commit({ ...profile, settings: { ...profile.settings, sound: on } })
@@ -649,9 +670,9 @@ export default function App() {
             }
           }}
           audioReady={audioReady}
-          onLook={() => setScreen('look')}
-          onNest={() => setScreen('nest')}
-          onAttune={() => { setAttuneOps(null); setAskedOps(false); setScreen('attune') }}
+          onLook={() => go('look')}
+          onNest={() => go('nest')}
+          onAttune={() => { setAttuneOps(null); setAskedOps(false); go('attune') }}
           onLogout={() => { setProfile(null); setScreen('login') }}
         />
       )}
@@ -664,7 +685,7 @@ export default function App() {
           showCompass={profile.settings?.showCompass}
           paused={!!doorQ || !!encounter}
           onAction={onAction}
-          onExit={() => setScreen('hub')}
+          onExit={() => go('hub')}
         />
       )}
 
@@ -672,36 +693,36 @@ export default function App() {
         <WinScreen
           profile={profile} run={run} newRank={newRank} form={form}
           onAgain={pending.length ? () => setScreen('pick') : startGame}
-          onCastle={() => setScreen('hub')}
+          onCastle={() => go('hub')}
         />
       )}
 
       {screen === 'wardrobe' && profile && (
         <Wardrobe profile={profile} onEquip={equip} onBuy={buy}
-          onShop={() => { shopFrom.current = 'wardrobe'; setScreen('shop') }}
-          onClose={() => setScreen('hub')} />
+          onShop={() => { shopFrom.current = 'wardrobe'; go('shop') }}
+          onClose={() => go('hub')} />
       )}
 
       {screen === 'shop' && profile && (
         <Shop profile={profile} onBuy={buyTrinket} onWear={wearTrinket}
           from={shopFrom.current}
-          onClose={() => setScreen(shopFrom.current)} />
+          onClose={() => go(shopFrom.current)} />
       )}
       {screen === 'report' && profile && (
-        <ParentReport profile={profile} onClose={() => setScreen('hub')} />
+        <ParentReport profile={profile} onClose={() => go('hub')} />
       )}
       {screen === 'nest' && profile && (
         <NestPicker
           current={profile.nest}
           onChoose={saveNest}
-          onClose={hasNest(profile) ? () => setScreen('hub') : null}
+          onClose={hasNest(profile) ? () => go('hub') : null}
         />
       )}
       {screen === 'wizard' && profile && (
         <WizardPicker
           profile={profile} form={form}
           onChoose={saveWizard}
-          onClose={profile.wizard ? () => setScreen('hub') : null}
+          onClose={profile.wizard ? () => go('hub') : null}
         />
       )}
       {screen === 'tuning' && profile && attuneOps && (
@@ -733,7 +754,7 @@ export default function App() {
         <LookPicker
           profile={profile}
           onSave={saveLook}
-          onClose={() => setScreen('hub')}
+          onClose={() => go('hub')}
           onNest={look => { if (look) commit({ ...profile, appearance: look }); setScreen('nest') }}
           onWizard={look => { if (look) commit({ ...profile, appearance: look }); setScreen('wizard') }}
         />

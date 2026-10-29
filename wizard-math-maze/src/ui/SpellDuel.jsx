@@ -4,6 +4,7 @@ import { drawWizard } from '../engine/wizardSprite.js'
 import { lookFor } from '../game/wizards.js'
 import { encounterQuestion, duelPlan, answerChoices } from '../game/encounters.js'
 import { C, sans, serif, btn } from './theme.js'
+import * as sfx from '../engine/sound.js'
 
 /**
  * A spell duel.
@@ -50,6 +51,7 @@ export default function SpellDuel({ creature, ops, diff, profile, form, appearan
     if (d.over) return
     d.over = true
     setPhase(outcome)
+    if (outcome === 'won') sfx.victory(); else sfx.scatter()
     // Let the death or cast animation land before handing back.
     setTimeout(() => onDone({
       outcome,
@@ -72,11 +74,15 @@ export default function SpellDuel({ creature, ops, diff, profile, form, appearan
     d.answers.push({ q, correct, ms })
 
     if (correct) {
+      sfx.bolt()
       d.earned += q.curPts
       d.bolt = { p: 0 }
       d.charge = Math.max(0, d.charge - plan.hitRelief)
       setGood(value)              // hold this question up, ticked, until the bolt lands
     } else {
+      // The same neutral tone the doors use. A duel is the most game-like
+      // thing in here and therefore the easiest place to slip in a buzzer.
+      sfx.again()
       d.charge = Math.min(1, d.charge + plan.missCost)
       setDud(value)                 // grey it out rather than just rejecting the tap
       setShake(true)

@@ -39,6 +39,7 @@ const TESTS = [
   { name: 'attuneflow', needs: 'served' },
   { name: 'relogin', needs: 'served' },
   { name: 'synctest', needs: 'served' },
+  { name: 'wiretest', needs: 'served' },
 
   { name: 'controltest', needs: 'dev' },
   { name: 'wintest', needs: 'dev' },
