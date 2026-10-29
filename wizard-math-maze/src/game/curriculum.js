@@ -169,24 +169,86 @@ export function recordAnswer(profile, q, correct, ms, swiftBonusMs = 0) {
   return { facts, skill, opPlays, plays, fast, bonus: fast ? roundPts(q.curPts * 0.25) : 0 }
 }
 
-// --- Mastery classification ---------------------------------------------------
+// --- Classification -----------------------------------------------------------
+//
+// Two different questions, and the progress page used to answer only the first:
+//
+//   1. How is she doing on THIS SUM?           -> factState()
+//   2. How is she doing at SUBTRACTION?        -> areaState()
+//
+// The second is the one a child and a parent actually ask, and it is the one
+// the page now leads with. The first is a detail underneath it.
+
+/**
+ * How one fact is going.
+ *
+ * 'solid' is box 2: she has answered it right, first try, on at least two
+ * occasions with other questions in between. That is a reasonable meaning for
+ * "she knows this".
+ *
+ * It used to be box 4, and box 4 is unreachable in practice. Running the engine
+ * over a simulated child, a NEAR-PERFECT answerer reaches box 4 on zero facts
+ * in three hundred answers: the review queue is sorted lowest-box-first, so a
+ * fact she nearly knows is never at the head of it, and most questions are
+ * freshly generated anyway. So the old bar was not strict, it was impossible —
+ * the progress page read "0 locked in" for every child who has ever used this,
+ * including one who got 96% of three hundred questions right. See
+ * docs/roadmap.md, "Variety versus fluency", for why the queue is the way it is
+ * and why that is a deliberate open question rather than a bug.
+ */
 export function factState(f) {
   if (!f || f.n === 0) return 'new'
-  if (f.box >= 4) return 'mastered'
+  if (f.box >= 2) return 'solid'
   // Only flag it as shaky if she has actually got it wrong. A fact she has seen
   // once and answered correctly is "learning", not a problem.
   if (f.box <= 1 && f.wrong > 0) return 'shaky'
   return 'learning'
 }
 
-const STATE_ORDER = ['shaky', 'learning', 'mastered', 'new']
+const STATE_ORDER = ['shaky', 'learning', 'solid', 'new']
+
+/**
+ * How she is doing at a whole operation — the thing "locked in" now means.
+ *
+ * Two signals, because either one alone lies. Accuracy alone would call a child
+ * who has answered four questions an expert. Volume alone would reward grinding
+ * through sums she is getting wrong. So an area is only as good as the weaker of
+ * "she gets these right" and "she has a decent number of them solid".
+ *
+ * The thresholds come from simulating children of known ability against the
+ * real engine (see progresstest.mjs, which pins them). Roughly: a 90% answerer
+ * is locked in after about a hundred answers, an 80% answerer reads as getting
+ * strong however long she plays, and a child at 55% stays at building up.
+ *
+ * The floor is 'building', never anything worse. There is no state here that
+ * tells a child she is bad at subtraction — the lowest thing the page can say
+ * about an area she has worked at is that it is coming along, which is both
+ * kinder and, for a child who is still practising, true.
+ */
+export const AREA_LEVELS = {
+  locked:   { label: 'Locked in',     blurb: 'you know this one',          rank: 3 },
+  strong:   { label: 'Getting strong', blurb: 'coming together nicely',    rank: 2 },
+  building: { label: 'Building up',   blurb: 'this is the work paying off', rank: 1 },
+  started:  { label: 'Just started',  blurb: 'early days here',            rank: 0 },
+}
+
+/** Minimum answers before an area is described at all. */
+const AREA_MIN_ATTEMPTS = 12
+
+export function areaState({ attempts = 0, right = 0, solid = 0 } = {}) {
+  if (attempts < AREA_MIN_ATTEMPTS) return 'started'
+  const acc = attempts ? right / attempts : 0
+  if (acc >= 0.85 && solid >= 10) return 'locked'
+  if (acc >= 0.72 && solid >= 4) return 'strong'
+  return 'building'
+}
 
 /** Everything the parent report needs, derived from the fact table. */
 export function masteryReport(profile) {
   const facts = profile?.facts || {}
   const byOp = {}
   for (const o of ['addition', 'subtraction', 'multiplication', 'division'])
-    byOp[o] = { mastered: 0, learning: 0, shaky: 0, attempts: 0, right: 0, wrong: 0, skill: skillOf(profile, o) }
+    byOp[o] = { solid: 0, learning: 0, shaky: 0, attempts: 0, right: 0, wrong: 0, skill: skillOf(profile, o) }
 
   const rows = []
   for (const [key, f] of Object.entries(facts)) {
@@ -205,13 +267,28 @@ export function masteryReport(profile) {
     (y.wrong - y.right) - (x.wrong - x.right) ||
     y.n - x.n)
 
+  // How each area is going. Done here rather than in the UI so the words a
+  // child reads about herself are decided in game logic, where they can be
+  // tested, rather than in a render.
+  for (const o of Object.keys(byOp)) byOp[o].state = areaState(byOp[o])
+
+  const played = Object.entries(byOp).filter(([, b]) => b.attempts > 0)
+  const areas = played
+    .map(([op, b]) => ({ op, state: b.state, rank: AREA_LEVELS[b.state].rank, acc: b.right / b.attempts }))
+    .sort((x, y) => y.rank - x.rank || y.acc - x.acc)
+
   const timed = rows.filter(r => r.bestMs != null)
   const all = rows.reduce((s, r) => s + r.n, 0)
   return {
     rows,
     byOp,
+    areas,
+    /** Her best area, for the line at the top of the page. Null before she starts. */
+    bestArea: areas[0] || null,
+    /** How many operations she is at or above `state` in. */
+    areasAtLeast: state => areas.filter(a => a.rank >= AREA_LEVELS[state].rank).length,
     needsWork: rows.filter(r => r.state === 'shaky').slice(0, 12),
-    strongest: rows.filter(r => r.state === 'mastered').slice(0, 12),
+    strongest: rows.filter(r => r.state === 'solid').slice(0, 12),
     totalFacts: rows.length,
     totalAttempts: all,
     accuracy: all ? rows.reduce((s, r) => s + r.right, 0) / all : 0,
