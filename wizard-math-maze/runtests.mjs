@@ -26,6 +26,7 @@ const TESTS = [
   { name: 'runetest', needs: 'pure' },
   { name: 'welcometest', needs: 'pure' },
   { name: 'soundtest', needs: 'pure' },
+  { name: 'progresstest', needs: 'pure' },
 
   { name: 'looktest', needs: 'served' },
   { name: 'picktest', needs: 'served' },
