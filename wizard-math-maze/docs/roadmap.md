@@ -130,17 +130,57 @@ There is no user-generated content anywhere in the app and nothing is ever
 shown to one child about another. That is worth keeping on purpose: it is why
 there is no moderation problem to solve.
 
+## Variety versus fluency
+
+Recorded because it is a live design question, not a bug waiting to be fixed,
+and because the next person to read `curriculum.js` will think it is one.
+
+`curriculum.js` implements a Leitner box system: a fact she gets right on the
+first try is promoted a box, the next review is pushed further out
+(`BOX_INTERVAL = [1, 3, 8, 20, 50, 120]` questions), and a miss drops it two
+boxes. `factState()` calls a fact "mastered" — "locked in" on the progress page
+— at box 4.
+
+**In practice nothing ever gets there.** Running the real engine over a
+simulated child's 217 answers, no fact reaches box 4 even at 100% accuracy; the
+best any fact reaches is box 2 or 3. Three mechanisms, all in `nextQuestion()`
+and `factInDifficulty()`:
+
+- The due queue is sorted by **lowest box first**, so a fact she nearly knows is
+  never at the head of it. There is always some box-0 fact to ask instead.
+- `REVIEW_RATE` is 0.45, so most questions are freshly generated. New facts
+  enter much faster than old ones consolidate: 215 distinct facts met in 400
+  answers, for one child on one operation.
+- Tier ranges have a **rising floor** (addition `[1,8]` → `[1,15]` → `[5,40]`),
+  and review eligibility uses the whole band. So facts below the current floor
+  drop out of the review queue permanently and can never be promoted.
+
+The live data agrees: 217 answers, 6 facts locked in.
+
+**Tom's position (Oct 2026), and the reason this is not an open issue:** nobody
+is using the app enough for fluency to be the point yet, and the variety is
+arguably the better property for a game whose job is to make a child willing to
+do maths at all. A tighter review loop means seeing the same sums more often,
+which is how a game stops being a game.
+
+So this is a fork, not a defect, and whoever takes it should take it as one:
+
+- **If variety is the design**, say so in `curriculum.js`, and fix the progress
+  page instead — "locked in" currently reads 0 forever, which under-reports what
+  a child has actually learned and is the one place this leaks out to a user.
+- **If fluency is the design**, the three mechanisms above are the three things
+  to change, in that order. It is pure `src/game/` logic, so the effect is
+  measurable in plain node before anyone's profile is touched.
+
+Doing neither is the only wrong answer: the code is currently attempting the
+second and achieving the first by accident.
+
 ---
 
 ## Smaller
 
 - **Delete the paused Supabase project.** Superseded by Neon; nothing points at
-  it. Housekeeping.
-- **Codex leftovers.** `src/ui/WizardPortrait.jsx` and `src/game/portraits.js`
-  are tracked, imported by nothing, and describe a renderer that no longer
-  exists. Safe to delete; left in place only because they were never explicitly
-  condemned.
-- **`.DS_Store` is tracked** at the repo root and in `src/`. Should be removed
-  from the index — `.gitignore` already covers it.
+  it. Still sitting there as `tkmace's Project`, status INACTIVE — a two-click
+  job in the Supabase dashboard, and not one an assistant should do for you.
 - **`v4test` and `full` take minutes each.** They are excluded from
   `test:fast` and CI. Worth splitting into something that can run on every PR.
