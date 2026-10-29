@@ -20,9 +20,21 @@ class FakeOsc {
   connect() {} start() {} stop() {}
 }
 class FakeGain {
-  constructor() { this.peak = 0
-    this.gain = { value: 0, setValueAtTime: () => {},
-                  exponentialRampToValueAtTime: (v) => { this.peak = Math.max(this.peak, v) } } }
+  // `peak` has to catch BOTH ways the module sets a gain: the ramped envelope
+  // on a tone, and the plain `gain.value = x` on a noise burst. The first
+  // version of this fake only recorded the ramp, so every percussive layer —
+  // every footstep, every door, the whole gate — was invisible to this file.
+  constructor() {
+    const self = this
+    this.peak = 0
+    let v = 0
+    this.gain = {
+      get value() { return v },
+      set value(x) { v = x; self.peak = Math.max(self.peak, x) },
+      setValueAtTime: () => {},
+      exponentialRampToValueAtTime: (x) => { self.peak = Math.max(self.peak, x) },
+    }
+  }
   connect() {}
 }
 globalThis.window = {
@@ -30,7 +42,7 @@ globalThis.window = {
     constructor() { this.state = 'running'; this.currentTime = 0; this.sampleRate = 48000 }
     createOscillator() { const o = new FakeOsc(); made.push({ kind: 'osc', node: o }); return o }
     createGain() { const g = new FakeGain(); made.push({ kind: 'gain', node: g }); return g }
-    createBiquadFilter() { return { type: '', frequency: { value: 0 }, connect() {} } }
+    createBiquadFilter() { const f = { type: '', frequency: { value: 0 }, connect() {} }; made.push({ kind: 'filter', node: f }); return f }
     createBufferSource() { return { buffer: null, connect() {}, start() {} } }
     createBuffer(_c, n) { return { getChannelData: () => new Float32Array(n) } }
     get destination() { return { } }
@@ -39,6 +51,7 @@ globalThis.window = {
 const played = fn => { made = []; fn(); return {
   oscs: made.filter(m => m.kind === 'osc').map(m => m.node),
   peak: Math.max(0, ...made.filter(m => m.kind === 'gain').map(m => m.node.peak)),
+  cuts: made.filter(m => m.kind === 'filter').map(m => m.node.frequency.value),
 } }
 
 sfx.wakeSound()
@@ -64,9 +77,64 @@ console.log('the Great Rune is bigger than a rune')
 check('more notes', played(() => sfx.greatRune()).oscs.length > played(() => sfx.rune()).oscs.length)
 check('a rank-up is bigger still', played(() => sfx.rankUp()).oscs.length >= 8)
 
+// --- the ambient budget -----------------------------------------------------
+//
+// These four fire constantly: a footstep every step, a keypress every digit.
+// Loudness is not readable from a gain number (see soundsheet.mjs for the
+// A-weighted measurement), but a cap on the gains is, and a cap is what stops
+// the slow creep that turns background into foreground. If one of these ever
+// needs to go over its cap, the honest move is to measure the mix again and
+// change the cap deliberately, not to nudge the number until it feels right.
+console.log('the constant sounds stay in the background')
+const CAP = { step: 0.2, key: 0.1, turn: 0.07, erase: 0.16, page: 0.11 }
+for (const [name, cap] of Object.entries(CAP)) {
+  const p = played(() => sfx[name](7)).peak
+  check(`${name} is at or under its cap`, p <= cap + 1e-9, `${p} vs ${cap}`)
+}
+const loudest = Math.max(...['door', 'rune', 'right', 'exit', 'rankUp', 'greatRune']
+  .map(n => played(() => sfx[n]()).peak))
+for (const name of Object.keys(CAP)) {
+  check(`${name} is quieter than every sound that means something`,
+    played(() => sfx[name](7)).peak < loudest)
+}
+
+console.log('a keypress sounds like the digit it is')
+const k1 = played(() => sfx.key(1)), k9 = played(() => sfx.key(9))
+check('1 is lower than 9', k1.oscs[0].freqs[0] < k9.oscs[0].freqs[0],
+  `${k1.oscs[0].freqs[0]} vs ${k9.oscs[0].freqs[0]}`)
+check('a non-digit does not break it', played(() => sfx.key('x')).oscs.length === 1)
+
+console.log('footsteps are not one footstep repeated')
+const s1 = played(() => sfx.step()), s2 = played(() => sfx.step())
+check('two steps differ', s1.cuts[0] !== s2.cuts[0], `${s1.cuts[0]} vs ${s2.cuts[0]}`)
+
+// --- the one rule, in the places it is easiest to forget --------------------
+console.log('a sealed gate reports the stone, not the child')
+const seal = played(() => sfx.sealed())
+check('nothing in it falls', seal.oscs.every(o => o.ramps.length === 0))
+check('it is quieter than the way out', seal.peak < played(() => sfx.exit()).peak)
+
+console.log('losing an encounter is not a failure sting')
+const sc = played(() => sfx.scatter()).oscs.map(o => o.freqs[0])
+const descending = sc.every((f, i) => i === 0 || f < sc[i - 1])
+check('it is not a descending run', !descending, sc.join(' → '))
+check('it is quieter than winning one', played(() => sfx.scatter()).peak
+  < played(() => sfx.victory()).peak)
+
+console.log('the hierarchy of good news')
+const n = f => played(f).oscs.length
+check('a rune < an encounter won < a rank', n(() => sfx.rune()) < n(() => sfx.victory())
+  && n(() => sfx.victory()) < n(() => sfx.rankUp()))
+check('the way out is the longest sound in a run', n(() => sfx.exit()) >= 4)
+
 console.log('muting actually mutes')
 sfx.soundEnabled(false)
-check('nothing is played at all', played(() => { sfx.door(); sfx.right(); sfx.rankUp() }).oscs.length === 0)
+// Every single one, not a sample of three: a new sound that forgets to go
+// through `live()` would be the one that keeps playing in a silent classroom.
+const ALL = Object.keys(sfx).filter(k => typeof sfx[k] === 'function'
+  && !['wakeSound', 'soundEnabled', 'soundReady'].includes(k))
+check(`nothing is played at all (${ALL.length} sounds)`,
+  played(() => ALL.forEach(k => sfx[k](3))).oscs.length === 0)
 sfx.soundEnabled(true)
 check('and it comes back', played(() => sfx.right()).oscs.length === 2)
 

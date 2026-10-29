@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { buildHint, opByKey } from '../game/math.js'
 import { C, sans, serif, btn } from './theme.js'
+import * as sfx from '../engine/sound.js'
 import Keypad from './Keypad.jsx'
 import ScratchPad from './ScratchPad.jsx'
 import Hint from './Hint.jsx'
@@ -88,7 +89,10 @@ export default function MathDoor({ q, stones, swiftMs = 0, bigKeypad, exam = fal
       setShake(true)
       setTimeout(() => setShake(false), 430)
       const wrongs = q.wrongs + 1
-      if (wrongs >= 2) setShowHint(true)      // two misses: help arrives, free
+      // Two misses: help arrives, free. Its own sound, after the neutral tone
+      // for the answer — so what she hears is "that one's tricky… here, look",
+      // which is the order the two sounds actually mean.
+      if (wrongs >= 2 && !showHint) { setShowHint(true); setTimeout(() => sfx.shimmer(), 260) }
       onWrong()
     }
   }
@@ -124,9 +128,11 @@ export default function MathDoor({ q, stones, swiftMs = 0, bigKeypad, exam = fal
         e.preventDefault()
         return
       }
-      if (/^[0-9]$/.test(e.key)) { e.preventDefault(); setAns(a => (a + e.key).slice(0, 6)) }
-      else if (e.key === 'Backspace') { e.preventDefault(); setAns(a => a.slice(0, -1)) }
-      else if (e.key === 'Escape') { e.preventDefault(); setAns('') }
+      // The pad makes its own sounds; a physical keyboard has to be given them
+      // here, or the laptop version of the same action is silent.
+      if (/^[0-9]$/.test(e.key)) { e.preventDefault(); sfx.key(e.key); setAns(a => (a + e.key).slice(0, 6)) }
+      else if (e.key === 'Backspace') { e.preventDefault(); sfx.erase(); setAns(a => a.slice(0, -1)) }
+      else if (e.key === 'Escape') { e.preventDefault(); sfx.erase(); setAns('') }
       else if (e.key === 'Enter') { e.preventDefault(); submit() }
       else if (e.key === ' ' || e.key === 'Spacebar') { e.preventDefault() }
     }
@@ -136,8 +142,8 @@ export default function MathDoor({ q, stones, swiftMs = 0, bigKeypad, exam = fal
 
   const useStone = () => {
     if (showHint) return
-    if (q.wrongs >= 2) { setShowHint(true); return }
-    if (stones > 0) { onSpendStone(); setShowHint(true) }
+    if (q.wrongs >= 2) { sfx.shimmer(); setShowHint(true); return }
+    if (stones > 0) { onSpendStone(); sfx.shimmer(); setShowHint(true) }
   }
 
   const fastLeft = Math.max(0, 1 - elapsed / fastMs)

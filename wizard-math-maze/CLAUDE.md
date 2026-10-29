@@ -19,6 +19,12 @@ In practice:
   `src/engine/sound.js` is the function to leave alone when someone later
   reaches for juicier feedback; `soundtest.mjs` asserts it does not fall and is
   quieter than the correct answer, because that is invisible in code review.
+  The same reasoning governs `sealed()` (the exit gate reports that the stone is
+  thick, which is a fact about the door) and `scatter()` (losing an encounter
+  costs nothing, so it is glass drifting away rather than a descending run).
+  In the Attunement, a right answer and a miss make the SAME sound — the
+  ceremony never tells her which it was, and a cheerful chime there would leak
+  the whole measurement through the speaker.
 
 If a change would make a struggling child feel measured, it is wrong even if it
 is more accurate.
@@ -79,8 +85,9 @@ npm test -- keytest      # one
 Conventions that matter:
 
 - **A test asserts. A shot looks.** `*test.mjs`/`*flow.mjs` print PASS/FAIL and
-  are in the suite. `*shot.mjs`/`*sheet.mjs` produce screenshots for a human and
-  are not. Do not add a "test" that cannot fail.
+  are in the suite. `*shot.mjs`/`*sheet.mjs` produce output for a human to read
+  — screenshots, or the loudness table from `soundsheet.mjs` — and are not. Do
+  not add a "test" that cannot fail.
 - **Fix the right side.** When something goes red, work out whether the bug is
   in the product or in the test *before* touching either, then fix that one.
   Widening a tolerance, raising a timeout or softening an assertion to get back
@@ -101,6 +108,36 @@ Conventions that matter:
 
 Verify art with a screenshot you actually look at. Several regressions here were
 invisible in code review and obvious in a 200px crop.
+
+## Sound
+
+Procedural WebAudio, for the same reasons as the art: no files, no licences,
+nothing to keep in sync with a build. `src/engine/sound.js` is the whole of it —
+two primitives (`tone`, `thud`) and about twenty sounds built from them.
+
+Three things that are easy to get wrong:
+
+- **An AudioContext is born suspended.** It can only be started from inside a
+  real user gesture, and one that is left suspended swallows every sound in
+  silence with no error anywhere. `wakeSound()` always calls `resume()` and
+  plays a one-sample silent buffer; `soundReady()` is the only honest answer to
+  "is there audio", and it is not the same question as "is sound switched on".
+  On iOS the hardware silent switch mutes WebAudio whatever the volume is, which
+  is why the castle's sound button has a third state that says so.
+- **Verify under the real autoplay policy.** Do not launch a browser with
+  `--autoplay-policy=no-user-gesture-required` to check audio. That switches off
+  the exact restriction the code exists to handle, and a check that does it
+  proves nothing — this is how the first sound release shipped silent.
+  `wiretest.mjs` makes the context report `suspended` until something resumes
+  it, which is what a tablet does and what desktop Chromium will not do for you.
+- **Gain numbers are not loudness.** A 210Hz footstep and a 660Hz keypress at
+  the same gain are nowhere near as loud as each other. `soundsheet.mjs` renders
+  every sound through a small offline WebAudio and prints A-weighted loudness;
+  the ordering is what matters. The four constant sounds (step, key, turn,
+  erase) must stay at the bottom of that list, and `soundtest.mjs` keeps a cap
+  on each so the budget cannot drift upward one commit at a time.
+
+`master.gain` in `wakeSound()` is the single volume for the whole app.
 
 ## The adaptive system
 

@@ -7,6 +7,7 @@ import { warmPlaysFor, recordAnswer } from '../game/curriculum.js'
 import { senseTier, opByKey, OPS } from '../game/math.js'
 import { FACING_DELTA, WALL, DOOR, END, PATH, revealFrom } from '../game/maze.js'
 import { C, sans, serif, btn, panel } from './theme.js'
+import * as sfx from '../engine/sound.js'
 import GameView from './GameView.jsx'
 import MathDoor from './MathDoor.jsx'
 import Portrait from './Portrait.jsx'
@@ -122,6 +123,9 @@ export default function Attunement({ profile, ops, form, chooser = true, onDone,
     }
     setResult({ ...r, right, earned, stones: found })
     setPhase('done')
+    // The reveal sound, not a fanfare. A ceremony that cannot be failed must
+    // not end on the noise a game makes when you win one.
+    sfx.shimmer()
     onDone({
       ...next,
       skill,
@@ -148,8 +152,8 @@ export default function Attunement({ profile, ops, form, chooser = true, onDone,
     // Same reasoning as the door guard below: every move updates the ref it was
     // read from, so two presses in one tick are two steps rather than one.
     const go = p => { posRef.current = p; setPos(p) }
-    if (action === 'turnLeft') { go({ row, col, facing: (facing + 3) % 4 }); return }
-    if (action === 'turnRight') { go({ row, col, facing: (facing + 1) % 4 }); return }
+    if (action === 'turnLeft') { sfx.turn(); go({ row, col, facing: (facing + 3) % 4 }); return }
+    if (action === 'turnRight') { sfx.turn(); go({ row, col, facing: (facing + 1) % 4 }); return }
 
     const [dr, dc] = action === 'forward' ? FACING_DELTA[facing] : FACING_DELTA[(facing + 2) % 4]
     const nr = row + dr, nc = col + dc
@@ -179,6 +183,7 @@ export default function Attunement({ profile, ops, form, chooser = true, onDone,
     // one that looks like an exit. Reaching it now finishes, on whatever the
     // staircase has, because a staircase has a usable estimate at every step.
     if (cell === END) { finish(); return }
+    sfx.step()
     go({ row: nr, col: nc, facing })
     revealFrom(maze.seen, maze.grid, nr, nc)
     // A stone she walks over. Banked at the end with the rest of the reward,
@@ -186,6 +191,7 @@ export default function Attunement({ profile, ops, form, chooser = true, onDone,
     const k = `${nr},${nc}`
     if (maze.stones?.[k]) {
       delete maze.stones[k]
+      sfx.rune()
       setFound(n => n + 1)
     }
   }, [maze, finish])
@@ -213,6 +219,11 @@ export default function Attunement({ profile, ops, form, chooser = true, onDone,
     const q = doorRef.current
     const cell = doorCell
     attuneRecord(s, q, correct, ms)
+    // ONE sound, whichever way it went. Everywhere else a right answer and a
+    // miss sound different; here they must not, because the whole point of the
+    // ceremony is that she is never told which it was. A `right()` here would
+    // leak the entire measurement through the speaker.
+    sfx.door()
     setProgress(attuneProgress(s))
     setDoorQ(null); setDoorCell(null)
     if (cell) passThrough(cell)
