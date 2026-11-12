@@ -1,4 +1,4 @@
-import { masteryReport } from '../game/curriculum.js'
+import { masteryReport, AREA_LEVELS } from '../game/curriculum.js'
 import { OPS, opByKey } from '../game/math.js'
 import { C, sans, serif } from './theme.js'
 import { Sheet } from './Wardrobe.jsx'
@@ -17,11 +17,18 @@ import { Sheet } from './Wardrobe.jsx'
  * wall of warning colours. The page was telling the truth and giving entirely
  * the wrong impression.
  *
- * Learning is now GREEN — a lighter, springier green than mastered, because
+ * Learning is now GREEN — a lighter, springier green than solid, because
  * getting there is good news, not a caution — and the worst thing on the page
  * is amber. There is no red on a child's progress page at all. What used to be
  * "shaky" is "worth another go", which is also what the maze actually does
  * with it.
+ *
+ * A second thing was wrong in the same spirit. "Locked in" used to count single
+ * facts at box 4, which is unreachable — see factState() — so the page told
+ * every child, however well she was doing, that she had locked in nothing. It
+ * now describes an AREA: how she is doing at subtraction, rather than whether
+ * she has ground out 7+8 enough times. That is the question a child is actually
+ * asking when she opens this page, and it is one the data can answer.
  */
 export default function ParentReport({ profile, onClose }) {
   const r = masteryReport(profile)
@@ -30,12 +37,21 @@ export default function ParentReport({ profile, onClose }) {
   // One honest, cheerful sentence at the top. It names the biggest true good
   // thing rather than grading her, because a progress page a child opens
   // herself should start by telling her what is going right.
-  const locked = OPS.reduce((n, o) => n + (r.byOp[o.key]?.mastered || 0), 0)
-  const praise = locked >= 12 || r.accuracy >= 0.85
-    ? { icon: '🌟', line: 'This is going really well', tone: C.good }
-    : locked >= 4 || r.accuracy >= 0.7
-      ? { icon: '📈', line: "You're getting stronger", tone: C.rising }
-      : { icon: '🌱', line: 'A good start — keep going', tone: C.rising }
+  //
+  // The good thing is now an AREA she is doing well at, by name. "Addition is
+  // locked in" is worth hearing; "3 facts locked in" was not, and was usually
+  // "0 facts locked in" anyway.
+  const best = r.bestArea
+  const bestOp = best ? opByKey(best.op) : null
+  const lockedAreas = r.areasAtLeast('locked')
+  const solidCount = OPS.reduce((n, o) => n + (r.byOp[o.key]?.solid || 0), 0)
+  const praise = best?.state === 'locked'
+    ? { icon: '🌟', line: lockedAreas > 1 ? `${lockedAreas} areas locked in` : `${bestOp.label} is locked in`, tone: C.good }
+    : best?.state === 'strong'
+      ? { icon: '📈', line: `${bestOp.label} is getting strong`, tone: C.rising }
+      : best?.state === 'building'
+        ? { icon: '🌿', line: `${bestOp.label} is building up`, tone: C.rising }
+        : { icon: '🌱', line: 'A good start — keep going', tone: C.rising }
 
   return (
     <Sheet title="My Progress" subtitle={`${profile.name} · ${r.totalAttempts.toLocaleString()} problem${r.totalAttempts === 1 ? '' : 's'} answered`} onClose={onClose}>
@@ -57,9 +73,8 @@ export default function ParentReport({ profile, onClose }) {
                 {praise.line}
               </span>
               <span style={{ display: 'block', color: C.faint, fontSize: 11, marginTop: 1 }}>
-                {locked > 0
-                  ? `${locked} fact${locked === 1 ? '' : 's'} locked in · ${Math.round(r.accuracy * 100)}% right so far`
-                  : `${Math.round(r.accuracy * 100)}% right so far`}
+                {`${Math.round(r.accuracy * 100)}% right so far`}
+                {r.strongest.length > 0 && ` · ${solidCount} sum${solidCount === 1 ? '' : 's'} you know well`}
               </span>
             </span>
           </div>
@@ -78,23 +93,26 @@ export default function ParentReport({ profile, onClose }) {
           <div style={{ display: 'grid', gap: 9, marginBottom: 16 }}>
             {OPS.filter(o => r.byOp[o.key].attempts > 0).map(o => {
               const b = r.byOp[o.key]
-              const tot = Math.max(1, b.mastered + b.learning + b.shaky)
+              const tot = Math.max(1, b.solid + b.learning + b.shaky)
+              // The area's own verdict, which is the headline of the row. Its
+              // colour never goes below C.rising: an area is never amber, only
+              // individual sums are, because "you are amber at division" is
+              // exactly the sentence this app exists not to say.
+              const lvl = AREA_LEVELS[b.state]
+              const tone = b.state === 'locked' ? C.good : b.state === 'started' ? C.faint : C.rising
               return (
                 <div key={o.key}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
                     <span style={{ color: o.color }}>{o.icon} {o.label}</span>
-                    <span style={{ color: C.faint }}>
-                      {b.right}/{b.attempts} right
-                      {b.skill != null && <span style={{ color: C.dim, marginLeft: 6 }}>· sense {Math.round(b.skill * 100)}%</span>}
-                    </span>
+                    <span style={{ color: tone, fontSize: 11.5 }}>{lvl.label}</span>
                   </div>
                   <div style={{ display: 'flex', height: 11, borderRadius: 8, overflow: 'hidden', background: '#0a0a2c', border: `1px solid ${C.line}` }}>
-                    <Seg w={b.mastered / tot} c={C.good} />
+                    <Seg w={b.solid / tot} c={C.good} />
                     <Seg w={b.learning / tot} c={C.rising} />
                     <Seg w={b.shaky / tot} c={C.amber} />
                   </div>
                   <div style={{ fontSize: 9.5, color: C.faint, marginTop: 3 }}>
-                    {b.mastered} locked in · {b.learning} getting there
+                    {b.right}/{b.attempts} right · {b.solid} solid · {b.learning} getting there
                     {b.shaky > 0 && ` · ${b.shaky} worth another go`}
                   </div>
                 </div>
@@ -107,7 +125,7 @@ export default function ParentReport({ profile, onClose }) {
               <SubHead>WORTH ANOTHER GO</SubHead>
               <p style={{ color: C.faint, fontSize: 10.5, margin: '0 0 8px', lineHeight: 1.6 }}>
                 Nothing to worry about — the maze already brings these round more
-                often than the rest, which is how they end up locked in.
+                often than the rest, which is how they end up solid.
               </p>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
                 {r.needsWork.map(f => (
@@ -121,7 +139,7 @@ export default function ParentReport({ profile, onClose }) {
 
           {r.strongest.length > 0 && (
             <>
-              <SubHead>LOCKED IN</SubHead>
+              <SubHead>SUMS YOU KNOW WELL</SubHead>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                 {r.strongest.map(f => (
                   <span key={f.key} style={chip(C.good)}>
